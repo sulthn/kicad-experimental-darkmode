@@ -358,7 +358,6 @@ bool EDIT_TOOL::Init()
                                                       && notMovingCondition );
 
     menu.AddItem( PCB_ACTIONS::routerRouteSelected,     isRoutable );
-    menu.AddItem( PCB_ACTIONS::routerRouteSelectedFromEnd, isRoutable );
     menu.AddItem( PCB_ACTIONS::unrouteSelected,         isRoutable );
     menu.AddItem( PCB_ACTIONS::routerAutorouteSelected, isRoutable );
     menu.AddItem( PCB_ACTIONS::moveIndividually,  SELECTION_CONDITIONS::MoreThan( 1 )
@@ -2004,6 +2003,8 @@ int EDIT_TOOL::Rotate( const TOOL_EVENT& aEvent )
     if( selection.Empty() )
         return 0;
 
+    // A single textbox "walks" if we rotate it around its position, as we keep resetting which
+    // corner is the origin.
     if( selection.Size() == 1 && dynamic_cast<PCB_TEXTBOX*>( selection.Front() ) )
     {
         selection.SetReferencePoint( static_cast<PCB_TEXTBOX*>( selection.Front() )->GetCenter() );
@@ -2577,6 +2578,8 @@ void EDIT_TOOL::DeleteItems( const PCB_SELECTION& aItems, bool aIsCut )
                     commit.Modify( zone );
                     zone->RemoveCutout( outlineIdx, holeIdx );
                     zone->UnFill();
+
+                    // TODO Refill zone when KiCad supports auto re-fill
 
                     // Update the display
                     zone->HatchBorder();

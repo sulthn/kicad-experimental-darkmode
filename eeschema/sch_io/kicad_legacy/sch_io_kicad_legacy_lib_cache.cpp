@@ -259,7 +259,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::loadDocs()
 
             case 'F':
                 if( symbol )
-                    symbol->GetField( FIELD_T::DATASHEET )->SetText( text );
+                    symbol->GetFieldById( DATASHEET_FIELD )->SetText( text );
                 break;
 
             case 0:
@@ -447,7 +447,7 @@ LIB_SYMBOL* SCH_IO_KICAD_LEGACY_LIB_CACHE::LoadPart( LINE_READER& aReader, int a
         tmp = tokens.GetNextToken();
 
         if( tmp == "P" )
-            symbol->SetGlobalPower();
+            symbol->SetPower();
         else if( tmp == "N" )
             symbol->SetNormal();
         else
@@ -506,14 +506,20 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::loadAliases( std::unique_ptr<LIB_SYMBOL>& aS
             LIB_SYMBOL* newSymbol = new LIB_SYMBOL( newAliasName );
 
             // Inherit the parent mandatory field attributes.
-            for( FIELD_T fieldId : MANDATORY_FIELDS )
+            for( int fieldId : MANDATORY_FIELDS )
             {
-                SCH_FIELD* field = newSymbol->GetField( fieldId );
-                SCH_FIELD* parentField = aSymbol->GetField( fieldId );
+                SCH_FIELD* field = newSymbol->GetFieldById( fieldId );
+
+                // the MANDATORY_FIELD_COUNT are exactly that in RAM.
+                wxASSERT( field );
+
+                SCH_FIELD* parentField = aSymbol->GetFieldById( fieldId );
+
+                wxASSERT( parentField );
 
                 *field = *parentField;
 
-                if( fieldId == FIELD_T::VALUE )
+                if( fieldId == VALUE_FIELD )
                     field->SetText( newAliasName );
 
                 field->SetParent( newSymbol );
@@ -536,29 +542,27 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::loadField( std::unique_ptr<LIB_SYMBOL>& aSym
     wxCHECK_RET( *line == 'F', "Invalid field line" );
 
     wxString    text;
-    int         legacy_field_id;
+    int         id;
 
-    if( sscanf( line + 1, "%d", &legacy_field_id ) != 1 || legacy_field_id < 0 )
+    if( sscanf( line + 1, "%d", &id ) != 1 || id < 0 )
         SCH_PARSE_ERROR( "invalid field ID", aReader, line + 1 );
 
-    FIELD_T    id = FIELD_T::USER;
     SCH_FIELD* field;
 
-    // Map fixed legacy IDs
-    switch( legacy_field_id )
+    // Description was not mandatory until v8.0, so any fields with an index
+    // past this point should be user fields
+    if( id >= 0 && id < DESCRIPTION_FIELD )
     {
-        case 0: id = FIELD_T::REFERENCE; break;
-        case 1: id = FIELD_T::VALUE;     break;
-        case 2: id = FIELD_T::FOOTPRINT; break;
-        case 3: id = FIELD_T::DATASHEET; break;
-    }
+        field = aSymbol->GetFieldById( id );
 
-    if( id != FIELD_T::USER )
-    {
-        field = aSymbol->GetField( id );
+        // this will fire only if somebody broke a constructor or editor.
+        // MANDATORY_FIELDS are always present in ram resident symbols, no
+        // exceptions, and they always have their names set, even fixed fields.
+        wxASSERT( field );
     }
     else
     {
+        id = aSymbol->GetNextAvailableFieldId();
         field = new SCH_FIELD( aSymbol.get(), id );
         aSymbol->AddDrawItem( field, false );
     }
@@ -574,7 +578,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::loadField( std::unique_ptr<LIB_SYMBOL>& aSym
 
     // The value field needs to be "special" escaped.  The other fields are
     // escaped normally and don't need special handling
-    if( id == FIELD_T::VALUE )
+    if( id == VALUE_FIELD )
         text = EscapeString( text, CTX_QUOTED_STR );
 
     // Doctor the *.lib file field which has a "~" in blank fields.  New saves will
@@ -670,11 +674,11 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::loadField( std::unique_ptr<LIB_SYMBOL>& aSym
         // Fields in RAM must always have names, because we are trying to get
         // less dependent on field ids and more dependent on names.
         // Plus assumptions are made in the field editors.
-        field->SetName( GetCanonicalFieldName( field->GetId() ) );
+        field->SetName( GetCanonicalFieldName( id ) );
 
         // Ensure the VALUE field = the symbol name (can be not the case
         // with malformed libraries: edited by hand, or converted from other tools)
-        if( id == FIELD_T::VALUE )
+        if( id == VALUE_FIELD )
             field->SetText( aSymbol->GetName() );
     }
     else
@@ -689,7 +693,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::loadField( std::unique_ptr<LIB_SYMBOL>& aSym
         int      suffix = 0;
 
         //Deduplicate field name
-        while( aSymbol->GetField( candidateFieldName ) != nullptr )
+        while( aSymbol->FindField( candidateFieldName ) != nullptr )
             candidateFieldName = wxString::Format( "%s_%d", fieldName, ++suffix );
 
         field->SetName( candidateFieldName );
@@ -953,7 +957,7 @@ SCH_SHAPE* SCH_IO_KICAD_LEGACY_LIB_CACHE::loadCircle( LINE_READER& aReader )
 }
 
 
-SCH_ITEM* SCH_IO_KICAD_LEGACY_LIB_CACHE::loadText( LINE_READER& aReader,
+SCH_TEXT* SCH_IO_KICAD_LEGACY_LIB_CACHE::loadText( LINE_READER& aReader,
                                                    int aMajorVersion, int aMinorVersion )
 {
     const char* line = aReader.Line();
@@ -998,27 +1002,12 @@ SCH_ITEM* SCH_IO_KICAD_LEGACY_LIB_CACHE::loadText( LINE_READER& aReader,
         str.Replace( "''", "\"" );
     }
 
-    SCH_ITEM* sch_item = nullptr;
-    EDA_TEXT* eda_text = nullptr;
-
-    if( !visible )
-    {
-        SCH_FIELD* field = new SCH_FIELD( center, FIELD_T::USER, nullptr );
-        sch_item = field;
-        eda_text = field;
-    }
-    else
-    {
-        SCH_TEXT* sch_text = new SCH_TEXT( center, str, LAYER_DEVICE );
-        sch_item = sch_text;
-        eda_text = sch_text;
-    }
-
-    eda_text->SetTextAngle( EDA_ANGLE( angleInTenths, TENTHS_OF_A_DEGREE_T ) );
-    eda_text->SetTextSize( size );
-    eda_text->SetVisible( visible );
-    sch_item->SetUnit( unit );
-    sch_item->SetBodyStyle( bodyStyle );
+    SCH_TEXT* text = new SCH_TEXT( center, str, LAYER_DEVICE );
+    text->SetTextAngle( EDA_ANGLE( angleInTenths, TENTHS_OF_A_DEGREE_T ) );
+    text->SetTextSize( size );
+    text->SetVisible( visible );
+    text->SetUnit( unit );
+    text->SetBodyStyle( bodyStyle );
 
     // Here things are murky and not well defined.  At some point it appears the format
     // was changed to add text properties.  However rather than add the token to the end of
@@ -1032,37 +1021,37 @@ SCH_ITEM* SCH_IO_KICAD_LEGACY_LIB_CACHE::loadText( LINE_READER& aReader,
              && !is_eol( *line ) )
     {
         if( strCompare( "Italic", line, &line ) )
-            eda_text->SetItalicFlag( true );
+            text->SetItalicFlag( true );
         else if( !strCompare( "Normal", line, &line ) )
-            SCH_PARSE_ERROR( "invalid eda_text stype, expected 'Normal' or 'Italic'", aReader, line );
+            SCH_PARSE_ERROR( "invalid text stype, expected 'Normal' or 'Italic'", aReader, line );
 
         if( parseInt( aReader, line, &line ) > 0 )
-            eda_text->SetBoldFlag( true );
+            text->SetBoldFlag( true );
 
-        // Some old libaries version > 2.0 do not have these options for eda_text justification:
+        // Some old libaries version > 2.0 do not have these options for text justification:
         if( !is_eol( *line ) )
         {
             switch( parseChar( aReader, line, &line ) )
             {
-            case 'L': eda_text->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );   break;
-            case 'C': eda_text->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER ); break;
-            case 'R': eda_text->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );  break;
-            default: SCH_PARSE_ERROR( "invalid horizontal eda_text justication; expected L, C, or R",
+            case 'L': text->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );   break;
+            case 'C': text->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER ); break;
+            case 'R': text->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );  break;
+            default: SCH_PARSE_ERROR( "invalid horizontal text justication; expected L, C, or R",
                                       aReader, line );
             }
 
             switch( parseChar( aReader, line, &line ) )
             {
-            case 'T': eda_text->SetVertJustify( GR_TEXT_V_ALIGN_TOP );    break;
-            case 'C': eda_text->SetVertJustify( GR_TEXT_V_ALIGN_CENTER ); break;
-            case 'B': eda_text->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM ); break;
-            default: SCH_PARSE_ERROR( "invalid vertical eda_text justication; expected T, C, or B",
+            case 'T': text->SetVertJustify( GR_TEXT_V_ALIGN_TOP );    break;
+            case 'C': text->SetVertJustify( GR_TEXT_V_ALIGN_CENTER ); break;
+            case 'B': text->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM ); break;
+            default: SCH_PARSE_ERROR( "invalid vertical text justication; expected T, C, or B",
                                       aReader, line );
             }
         }
     }
 
-    return sch_item;
+    return text;
 }
 
 
@@ -1494,7 +1483,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMA
         {
             LIB_SYMBOL* symbol = entry.second;
 
-            if( symbol->IsDerived() && symbol->GetParent().lock() == aSymbol->SharedPtr() )
+            if( symbol->IsAlias() && symbol->GetParent().lock() == aSymbol->SharedPtr() )
                 aliasNames.Add( symbol->GetName() );
         }
     }
@@ -1520,7 +1509,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMA
                       aSymbol->GetShowPinNumbers() ? 'Y' : 'N',
                       aSymbol->GetShowPinNames() ? 'Y' : 'N',
                       aSymbol->GetUnitCount(), aSymbol->UnitsLocked() ? 'L' : 'F',
-                      aSymbol->IsGlobalPower() ? 'P' : 'N' );
+                      aSymbol->IsPower() ? 'P' : 'N' );
 
     timestamp_t dateModified = aSymbol->GetLastModDate();
 
@@ -1536,14 +1525,37 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMA
         aFormatter.Print( 0, "Ti %d/%d/%d %d:%d:%d\n", year, mon, day, hour, min, sec );
     }
 
-    std::vector<SCH_FIELD*> orderedFields;
-    aSymbol->GetFields( orderedFields );
+    std::vector<SCH_FIELD*> fields;
+    aSymbol->GetFields( fields );
 
-    // NB: FieldIDs in legacy libraries must be consecutive, and include user fields
-    int legacy_field_id = 0;
+    // Mandatory fields:
+    // may have their own save policy so there is a separate loop for them.
+    // Empty fields are saved, because the user may have set visibility,
+    // size and orientation
+    for( SCH_FIELD* field : fields )
+    {
+        if( field->IsMandatory() )
+            saveField( field, aFormatter );
+    }
 
-    for( SCH_FIELD* field : orderedFields )
-        saveField( field, legacy_field_id++, aFormatter );
+    // User defined fields:
+    // may have their own save policy so there is a separate loop for them.
+    int fieldId = MANDATORY_FIELD_COUNT;     // really wish this would go away.
+
+    for( SCH_FIELD* field : fields )
+    {
+        if( field->IsMandatory() )
+            continue;
+
+        // There is no need to save empty fields, i.e. no reason to preserve field
+        // names now that fields names come in dynamically through the template
+        // fieldnames.
+        if( !field->GetText().IsEmpty() )
+        {
+            field->SetId( fieldId++ );
+            saveField( field, aFormatter );
+        }
+    }
 
     // Save the alias list: a line starting by "ALIAS".
     if( !aliasNames.IsEmpty() )
@@ -1683,12 +1695,13 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::saveCircle( SCH_SHAPE* aCircle, OUTPUTFORMAT
 }
 
 
-void SCH_IO_KICAD_LEGACY_LIB_CACHE::saveField( const SCH_FIELD* aField, int aLegacyFieldIdx,
+void SCH_IO_KICAD_LEGACY_LIB_CACHE::saveField( const SCH_FIELD* aField,
                                                OUTPUTFORMATTER& aFormatter )
 {
     wxCHECK_RET( aField && aField->Type() == SCH_FIELD_T, "Invalid SCH_FIELD object." );
 
     int      hjustify, vjustify;
+    int      id = aField->GetId();
     wxString text = aField->GetText();
 
     hjustify = 'C';
@@ -1706,7 +1719,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::saveField( const SCH_FIELD* aField, int aLeg
         vjustify = 'T';
 
     aFormatter.Print( 0, "F%d %s %d %d %d %c %c %c %c%c%c",
-                      aLegacyFieldIdx,
+                      id,
                       EscapedUTF8( text ).c_str(),       // wraps in quotes
                       schIUScale.IUToMils( aField->GetTextPos().x ),
                       schIUScale.IUToMils( -aField->GetTextPos().y ),
@@ -1721,7 +1734,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::saveField( const SCH_FIELD* aField, int aLeg
     // default names as they weren't yet canonical.
     if( !aField->IsMandatory()
             && !aField->GetName().IsEmpty()
-            && aField->GetName() != GetUserFieldName( aLegacyFieldIdx, !DO_TRANSLATE ) )
+            && aField->GetName() != GetUserFieldName( id, !DO_TRANSLATE ) )
     {
         aFormatter.Print( 0, " %s", EscapedUTF8( aField->GetName() ).c_str() );
     }
@@ -1948,7 +1961,7 @@ void SCH_IO_KICAD_LEGACY_LIB_CACHE::DeleteSymbol( const wxString& aSymbolName )
 
         while( it1 != m_symbols.end() )
         {
-            if( it1->second->IsDerived()
+            if( it1->second->IsAlias()
               && it1->second->GetParent().lock() == rootSymbol->SharedPtr() )
             {
                 delete it1->second;

@@ -396,11 +396,9 @@ DIALOG_SYMBOL_PROPERTIES::DIALOG_SYMBOL_PROPERTIES( SCH_EDIT_FRAME* aParent,
     Bind( SYMBOL_DELAY_FOCUS, &DIALOG_SYMBOL_PROPERTIES::HandleDelayedFocus, this );
     Bind( SYMBOL_DELAY_SELECTION, &DIALOG_SYMBOL_PROPERTIES::HandleDelayedSelection, this );
 
-    wxCommandEvent* evt = new wxCommandEvent( SYMBOL_DELAY_SELECTION );
-    evt->SetClientData( new VECTOR2I( 0, FDC_VALUE ) );
-    QueueEvent( evt );
-    evt = new wxCommandEvent( SYMBOL_DELAY_FOCUS );
-    evt->SetClientData( new VECTOR2I( 0, FDC_VALUE ) );
+    QueueEvent( new wxCommandEvent( SYMBOL_DELAY_SELECTION ) );
+    wxCommandEvent *evt = new wxCommandEvent( SYMBOL_DELAY_FOCUS );
+    evt->SetClientData( new VECTOR2I( REFERENCE_FIELD, FDC_VALUE ) );
     QueueEvent( evt );
 
     finishDialogSettings();
@@ -448,9 +446,9 @@ bool DIALOG_SYMBOL_PROPERTIES::TransferDataToWindow()
     std::set<wxString> defined;
 
     // Push a copy of each field into m_updateFields
-    for( SCH_FIELD& srcField : m_symbol->GetFields() )
+    for( int i = 0; i < m_symbol->GetFieldCount(); ++i )
     {
-        SCH_FIELD field( srcField );
+        SCH_FIELD field( m_symbol->GetFields()[i] );
 
         // change offset to be symbol-relative
         field.Offset( -m_symbol->GetPosition() );
@@ -467,7 +465,7 @@ bool DIALOG_SYMBOL_PROPERTIES::TransferDataToWindow()
     {
         if( defined.count( templateFieldname.m_Name ) <= 0 )
         {
-            SCH_FIELD field( { 0, 0 }, FIELD_T::USER, m_symbol, templateFieldname.m_Name );
+            SCH_FIELD field( VECTOR2I( 0, 0 ), -1, m_symbol, templateFieldname.m_Name );
             field.SetVisible( templateFieldname.m_Visible );
             m_fields->push_back( field );
         }
@@ -745,24 +743,15 @@ bool DIALOG_SYMBOL_PROPERTIES::TransferDataFromWindow()
         fields.push_back( field );
     }
 
-    int ordinal = 42;   // Arbitrarily larger than any mandatory FIELD_T ids.
-
-    for( SCH_FIELD& field : fields )
-    {
-        if( !field.IsMandatory() )
-            field.SetOrdinal( ordinal++ );
-    }
-
     // Reference has a specific initialization, depending on the current active sheet
     // because for a given symbol, in a complex hierarchy, there are more than one
     // reference.
-    m_symbol->SetRef( &GetParent()->GetCurrentSheet(),
-                      m_fields->GetField( FIELD_T::REFERENCE )->GetText() );
+    m_symbol->SetRef( &GetParent()->GetCurrentSheet(), m_fields->at( REFERENCE_FIELD ).GetText() );
 
     // Similar for Value and Footprint, except that the GUI behavior is that they are kept
     // in sync between multiple instances.
-    m_symbol->SetValueFieldText( m_fields->GetField( FIELD_T::VALUE )->GetText() );
-    m_symbol->SetFootprintFieldText(  m_fields->GetField( FIELD_T::FOOTPRINT )->GetText() );
+    m_symbol->SetValueFieldText( m_fields->at( VALUE_FIELD ).GetText() );
+    m_symbol->SetFootprintFieldText(  m_fields->at( FOOTPRINT_FIELD ).GetText() );
 
     m_symbol->SetExcludedFromSim( m_cbExcludeFromSim->IsChecked() );
     m_symbol->SetExcludedFromBOM( m_cbExcludeFromBom->IsChecked() );
@@ -835,13 +824,8 @@ void DIALOG_SYMBOL_PROPERTIES::OnGridCellChanging( wxGridEvent& event )
 
 void DIALOG_SYMBOL_PROPERTIES::OnGridEditorShown( wxGridEvent& aEvent )
 {
-    if( m_fields->at( aEvent.GetRow() ).GetId() == FIELD_T::REFERENCE
-            && aEvent.GetCol() == FDC_VALUE )
-    {
-        wxCommandEvent* evt = new wxCommandEvent( SYMBOL_DELAY_SELECTION );
-        evt->SetClientData( new VECTOR2I( aEvent.GetRow(), aEvent.GetCol() ) );
-        QueueEvent( evt );
-    }
+    if( aEvent.GetRow() == REFERENCE_FIELD && aEvent.GetCol() == FDC_VALUE )
+        QueueEvent( new wxCommandEvent( SYMBOL_DELAY_SELECTION ) );
 
     m_editorShown = true;
 }
@@ -859,10 +843,10 @@ void DIALOG_SYMBOL_PROPERTIES::OnAddField( wxCommandEvent& event )
         return;
 
     SCHEMATIC_SETTINGS& settings = m_symbol->Schematic()->Settings();
-    SCH_FIELD           newField( { 0, 0 }, FIELD_T::USER, m_symbol,
-                                  GetUserFieldName( (int) m_fields->size(), DO_TRANSLATE ) );
+    int                 fieldID = (int) m_fields->size();
+    SCH_FIELD           newField( VECTOR2I(), fieldID, m_symbol, GetUserFieldName( fieldID, DO_TRANSLATE ) );
 
-    newField.SetTextAngle( m_fields->GetField( FIELD_T::REFERENCE )->GetTextAngle() );
+    newField.SetTextAngle( m_fields->at( REFERENCE_FIELD ).GetTextAngle() );
     newField.SetTextSize( VECTOR2I( settings.m_DefaultTextSize, settings.m_DefaultTextSize ) );
     newField.SetVisible( false );
 
@@ -1119,12 +1103,8 @@ void DIALOG_SYMBOL_PROPERTIES::HandleDelayedFocus( wxCommandEvent& event )
 
 void DIALOG_SYMBOL_PROPERTIES::HandleDelayedSelection( wxCommandEvent& event )
 {
-    VECTOR2I *loc = static_cast<VECTOR2I*>( event.GetClientData() );
-
-    wxCHECK_RET( loc, wxT( "Missing focus cell location" ) );
-
     // Handle a delayed selection
-    wxGridCellEditor* cellEditor = m_fieldsGrid->GetCellEditor( loc->x, loc->y );
+    wxGridCellEditor* cellEditor = m_fieldsGrid->GetCellEditor( REFERENCE_FIELD, FDC_VALUE );
 
     if( wxTextEntry* txt = dynamic_cast<wxTextEntry*>( cellEditor->GetControl() ) )
         KIUI::SelectReferenceNumber( txt );

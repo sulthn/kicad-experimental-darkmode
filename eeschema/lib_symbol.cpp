@@ -59,7 +59,7 @@ std::vector<SEARCH_TERM> LIB_SYMBOL::GetSearchTerms()
     terms.emplace_back( SEARCH_TERM( GetKeyWords(), 1 ) );
     terms.emplace_back( SEARCH_TERM( GetDescription(), 1 ) );
 
-    wxString footprint = GetFootprint();
+    wxString  footprint = GetFootprintField().GetText();
 
     if( !footprint.IsEmpty() )
         terms.emplace_back( SEARCH_TERM( GetFootprintField().GetText(), 1 ) );
@@ -105,20 +105,23 @@ LIB_SYMBOL::LIB_SYMBOL( const wxString& aName, LIB_SYMBOL* aParent, SYMBOL_LIB* 
     m_options        = ENTRY_NORMAL;
     m_unitsLocked    = false;
 
-    auto addField =
-            [&]( FIELD_T id, bool visible )
-            {
-                SCH_FIELD* field = new SCH_FIELD( this, id );
-                field->SetVisible( visible );
-                m_drawings[SCH_FIELD_T].push_back( field );
-            };
+    // Add the MANDATORY_FIELDS in RAM only.  These are assumed to be present
+    // when the field editors are invoked.
+    m_drawings[SCH_FIELD_T].reserve( MANDATORY_FIELD_COUNT );
 
-    // construct only the mandatory fields
-    addField( FIELD_T::REFERENCE,   true  );
-    addField( FIELD_T::VALUE,       true  );
-    addField( FIELD_T::FOOTPRINT,   false );
-    addField( FIELD_T::DATASHEET,   false );
-    addField( FIELD_T::DESCRIPTION, false );
+    for( int fieldId : MANDATORY_FIELDS )
+        m_drawings[SCH_FIELD_T].push_back( new SCH_FIELD( this, fieldId ) );
+
+    // Ensure reference and value fields are visible when creating a lib symbol
+    // whatever the SCH_FIELD Ctor default value is.
+    GetReferenceField().SetVisible( true );
+    GetValueField().SetVisible( true );
+
+    // Set visibilty to false for these other mandatory fields (at lest for now)
+    // whatever the SCH_FIELD Ctor default value is.
+    GetFootprintField().SetVisible( false );
+    GetDatasheetField().SetVisible( false );
+    GetDescriptionField().SetVisible( false );
 
     SetName( aName );
 
@@ -336,7 +339,7 @@ std::unique_ptr< LIB_SYMBOL > LIB_SYMBOL::Flatten() const
 {
     std::unique_ptr< LIB_SYMBOL > retv;
 
-    if( IsDerived() )
+    if( IsAlias() )
     {
         LIB_SYMBOL_SPTR parent = m_parent.lock();
 
@@ -344,7 +347,7 @@ std::unique_ptr< LIB_SYMBOL > LIB_SYMBOL::Flatten() const
                      wxString::Format( "Parent of derived symbol '%s' undefined", m_name ) );
 
         // Copy the parent.
-        if( parent->IsDerived() )
+        if( parent->IsAlias() )
             retv = parent->Flatten();
         else
             retv = std::make_unique<LIB_SYMBOL>( *parent.get() );
@@ -352,26 +355,31 @@ std::unique_ptr< LIB_SYMBOL > LIB_SYMBOL::Flatten() const
         retv->m_name = m_name;
         retv->SetLibId( m_libId );
 
-        // Overwrite parent's mandatory fields for fields which are defined in this.
-        for( FIELD_T fieldId : MANDATORY_FIELDS )
+        // Now add the inherited part mandatory field (this) information.
+        for( int fieldId : MANDATORY_FIELDS )
         {
-            if( !GetField( fieldId )->GetText().IsEmpty() )
-                *retv->GetField( fieldId ) = *GetField( fieldId );
+            wxString tmp = GetFieldById( fieldId )->GetText();
+
+            // If the field isn't defined then inherit the parent field value.
+            if( tmp.IsEmpty() )
+                retv->GetFieldById( fieldId )->SetText( retv->GetFieldById( fieldId )->GetText() );
+            else
+                *retv->GetFieldById( fieldId ) = *GetFieldById( fieldId );
         }
 
         // Grab all the rest of derived symbol fields.
         for( const SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
         {
-            const SCH_FIELD* field = static_cast<const SCH_FIELD*>( &item );
+            const SCH_FIELD* aliasField = static_cast<const SCH_FIELD*>( &item );
 
             // Mandatory fields were already resolved.
-            if( field->IsMandatory() )
+            if( aliasField->IsMandatory() )
                 continue;
 
-            SCH_FIELD* newField = new SCH_FIELD( *field );
+            SCH_FIELD* newField = new SCH_FIELD( *aliasField );
             newField->SetParent( retv.get() );
 
-            SCH_FIELD* parentField = retv->GetField( field->GetName() );
+            SCH_FIELD* parentField = retv->FindField( aliasField->GetName() );
 
             if( !parentField )  // Derived symbol field does not exist in parent symbol.
             {
@@ -391,6 +399,7 @@ std::unique_ptr< LIB_SYMBOL > LIB_SYMBOL::Flatten() const
         retv->SetExcludedFromBOM( parent->GetExcludedFromBOM() );
         retv->SetExcludedFromBoard( parent->GetExcludedFromBoard() );
 
+        retv->UpdateFieldOrdinals();
         retv->m_parent.reset();
     }
     else
@@ -411,69 +420,33 @@ const wxString LIB_SYMBOL::GetLibraryName() const
 }
 
 
-bool LIB_SYMBOL::IsLocalPower() const
-{
-    std::shared_ptr<LIB_SYMBOL> parent;
-
-    if( !m_parent.expired() && ( parent = m_parent.lock() ) )
-    {
-        if( parent->IsRoot() )
-            return parent->m_options == ENTRY_LOCAL_POWER;
-        else
-            return parent->IsLocalPower();
-    }
-
-    return m_options == ENTRY_LOCAL_POWER;
-}
-
-
-void LIB_SYMBOL::SetLocalPower()
-{
-    if( LIB_SYMBOL_SPTR parent = m_parent.lock() )
-    {
-        if( parent->IsRoot() )
-            parent->m_options = ENTRY_LOCAL_POWER;
-        else
-            parent->SetLocalPower();
-    }
-
-    m_options = ENTRY_LOCAL_POWER;
-}
-
-
-bool LIB_SYMBOL::IsGlobalPower() const
-{
-    std::shared_ptr<LIB_SYMBOL> parent;
-
-    if( !m_parent.expired() && ( parent = m_parent.lock() ) )
-    {
-        if( parent->IsRoot() )
-            return parent->m_options == ENTRY_GLOBAL_POWER;
-        else
-            return parent->IsGlobalPower();
-    }
-
-    return m_options == ENTRY_GLOBAL_POWER;
-}
-
-
 bool LIB_SYMBOL::IsPower() const
 {
-    return IsLocalPower() || IsGlobalPower();
+    std::shared_ptr<LIB_SYMBOL> parent;
+
+    if( !m_parent.expired() && ( parent = m_parent.lock() ) )
+    {
+        if( parent->IsRoot() )
+            return parent->m_options == ENTRY_POWER;
+        else
+            return parent->IsPower();
+    }
+
+    return m_options == ENTRY_POWER;
 }
 
 
-void LIB_SYMBOL::SetGlobalPower()
+void LIB_SYMBOL::SetPower()
 {
     if( LIB_SYMBOL_SPTR parent = m_parent.lock() )
     {
         if( parent->IsRoot() )
-            parent->m_options = ENTRY_GLOBAL_POWER;
+            parent->m_options = ENTRY_POWER;
         else
-            parent->SetGlobalPower();
+            parent->SetPower();
     }
 
-    m_options = ENTRY_GLOBAL_POWER;
+    m_options = ENTRY_POWER;
 }
 
 
@@ -534,7 +507,7 @@ bool LIB_SYMBOL::ResolveTextVar( wxString* token, int aDepth ) const
         {
             const SCH_FIELD& field = static_cast<const SCH_FIELD&>( item );
 
-            if( field.GetId() == FIELD_T::FOOTPRINT )
+            if( field.GetId() == FOOTPRINT_FIELD )
                 footprint = field.GetShownText( nullptr, false, aDepth + 1 );
 
             if( token->IsSameAs( field.GetCanonicalName().Upper() )
@@ -622,6 +595,100 @@ bool LIB_SYMBOL::ResolveTextVar( wxString* token, int aDepth ) const
     }
 
     return false;
+}
+
+
+void LIB_SYMBOL::Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                        const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed )
+{
+    for( SCH_ITEM& item : m_drawings )
+    {
+        // Do not print private items
+        if( item.IsPrivate() )
+            continue;
+
+        // Do not draw items not attached to the current part
+        if( aUnit && item.m_unit && ( item.m_unit != aUnit ) )
+            continue;
+
+        if( aBodyStyle && item.m_bodyStyle && ( item.m_bodyStyle != aBodyStyle ) )
+            continue;
+
+        if( item.Type() == SCH_PIN_T )
+        {
+            item.Print( aSettings, aUnit, aBodyStyle, aOffset, aForceNoFill, aDimmed );
+        }
+        else if( item.Type() == SCH_FIELD_T )
+        {
+            SCH_FIELD& field = static_cast<SCH_FIELD&>( item );
+
+            if( ( field.IsVisible() && aSettings->m_ShowVisibleFields )
+                || ( !field.IsVisible() && aSettings->m_ShowHiddenFields ) )
+            {
+                item.Print( aSettings, aUnit, aBodyStyle, aOffset, aForceNoFill, aDimmed );
+            }
+        }
+        else if( item.Type() == SCH_SHAPE_T )
+        {
+            SCH_SHAPE& shape = static_cast<SCH_SHAPE&>( item );
+
+            if( shape.GetFillMode() == FILL_T::FILLED_WITH_BG_BODYCOLOR )
+                aForceNoFill = true;
+
+            // Ensure the color of shape is from LAYER_DEVICE if not specified.
+            COLOR4D init_color = shape.GetStroke().GetColor();
+            STROKE_PARAMS prms = shape.GetStroke();
+
+            if( init_color == COLOR4D::UNSPECIFIED )
+            {
+                COLOR4D color = aSettings->GetLayerColor( LAYER_DEVICE );
+                prms.SetColor( color );
+                shape.SetStroke( prms );
+            }
+
+            shape.Print( aSettings, aUnit, aBodyStyle, aOffset, aForceNoFill, aDimmed );
+            prms.SetColor( init_color );
+            shape.SetStroke( prms );
+        }
+        else
+        {
+            item.Print( aSettings, aUnit, aBodyStyle, aOffset, aForceNoFill, aDimmed );
+        }
+    }
+}
+
+
+void LIB_SYMBOL::PrintBackground( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                                  const VECTOR2I& aOffset, bool aDimmed )
+{
+    /* draw background for filled items using background option
+     * Solid lines will be drawn after the background
+     * Note also, background is not drawn when printing in black and white
+     */
+    if( !GetGRForceBlackPenState() )
+    {
+        for( SCH_ITEM& item : m_drawings )
+        {
+            // Do not print private items
+            if( item.IsPrivate() )
+                continue;
+
+            if( item.Type() == SCH_SHAPE_T )
+            {
+                SCH_SHAPE& shape = static_cast<SCH_SHAPE&>( item );
+
+                // Do not draw items not attached to the current part
+                if( aUnit && shape.m_unit && ( shape.m_unit != aUnit ) )
+                    continue;
+
+                if( aBodyStyle && shape.m_bodyStyle && ( shape.m_bodyStyle != aBodyStyle ) )
+                    continue;
+
+                if( shape.GetFillMode() == FILL_T::FILLED_WITH_BG_BODYCOLOR )
+                    shape.Print( aSettings, aUnit, aBodyStyle, aOffset, false, aDimmed );
+            }
+        }
+    }
 }
 
 
@@ -1004,11 +1071,12 @@ void LIB_SYMBOL::SetFields( const std::vector<SCH_FIELD>& aFieldsList )
 }
 
 
-void LIB_SYMBOL::GetFields( std::vector<SCH_FIELD*>& aList, bool aVisibleOnly ) const
+void LIB_SYMBOL::GetFields( std::vector<SCH_FIELD*>& aList, bool aVisibleOnly )
 {
-    for( const SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
+    // Grab the MANDATORY_FIELDS first, in expected order given by enum MANDATORY_FIELD_T
+    for( int fieldId : MANDATORY_FIELDS )
     {
-        const SCH_FIELD* field = static_cast<const SCH_FIELD*>( &item );
+        SCH_FIELD* field = GetFieldById( fieldId );
 
         if( aVisibleOnly )
         {
@@ -1016,60 +1084,50 @@ void LIB_SYMBOL::GetFields( std::vector<SCH_FIELD*>& aList, bool aVisibleOnly ) 
                 continue;
         }
 
-        aList.push_back( const_cast<SCH_FIELD*>( field ) );
+        aList.push_back( field );
     }
 
-    std::sort( aList.begin(), aList.end(),
-               []( SCH_FIELD* lhs, SCH_FIELD* rhs )
-               {
-                   return lhs->GetOrdinal() < rhs->GetOrdinal();
-               } );
+    // Now grab all the rest of fields.
+    for( SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
+    {
+        SCH_FIELD* field = static_cast<SCH_FIELD*>( &item );
+
+        if( aVisibleOnly )
+        {
+            if( !field->IsVisible() || field->GetText().IsEmpty() )
+                continue;
+        }
+
+        if( !field->IsMandatory() )
+            aList.push_back( field );
+    }
 }
 
 
 void LIB_SYMBOL::CopyFields( std::vector<SCH_FIELD>& aList )
 {
-    std::vector<SCH_FIELD*> orderedFields;
+    // Grab the MANDATORY_FIELDS first, in expected order given by enum MANDATORY_FIELD_T
+    for( int fieldId : MANDATORY_FIELDS )
+        aList.push_back( *GetFieldById( fieldId ) );
 
-    GetFields( orderedFields );
-
-    for( SCH_FIELD* field : orderedFields )
-        aList.emplace_back( *field );
-}
-
-
-int LIB_SYMBOL::GetNextFieldOrdinal() const
-{
-    int ordinal = 42;     // Arbitrarily larger than any mandatory FIELD_T id
-
-    for( const SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
-        ordinal = std::max( ordinal, static_cast<const SCH_FIELD*>( &item )->GetOrdinal() + 1 );
-
-    return ordinal;
-}
-
-
-const SCH_FIELD* LIB_SYMBOL::GetField( FIELD_T aFieldType ) const
-{
-    for( const SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
-    {
-        const SCH_FIELD* field = static_cast<const SCH_FIELD*>( &item );
-
-        if( field->GetId() == aFieldType )
-            return field;
-    }
-
-    return nullptr;
-}
-
-
-SCH_FIELD* LIB_SYMBOL::GetField( FIELD_T aFieldType )
-{
+    // Now grab all the rest of fields.
     for( SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
     {
         SCH_FIELD* field = static_cast<SCH_FIELD*>( &item );
 
-        if( field->GetId() == aFieldType )
+        if( !field->IsMandatory() )
+            aList.push_back( *field );
+    }
+}
+
+
+SCH_FIELD* LIB_SYMBOL::GetFieldById( int aId ) const
+{
+    for( const SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
+    {
+        SCH_FIELD* field = ( SCH_FIELD* ) &item;
+
+        if( field->GetId() == aId )
             return field;
     }
 
@@ -1077,83 +1135,84 @@ SCH_FIELD* LIB_SYMBOL::GetField( FIELD_T aFieldType )
 }
 
 
-const SCH_FIELD* LIB_SYMBOL::GetField( const wxString& aFieldName ) const
+SCH_FIELD* LIB_SYMBOL::FindField( const wxString& aFieldName, bool aCaseInsensitive )
+{
+    for( SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
+    {
+        if( aCaseInsensitive )
+        {
+            if( static_cast<SCH_FIELD*>( &item )->GetCanonicalName().Upper() == aFieldName.Upper() )
+                return static_cast<SCH_FIELD*>( &item );
+        }
+        else
+        {
+            if( static_cast<SCH_FIELD*>( &item )->GetCanonicalName() == aFieldName )
+                return static_cast<SCH_FIELD*>( &item );
+        }
+    }
+
+    return nullptr;
+}
+
+
+const SCH_FIELD* LIB_SYMBOL::FindField( const wxString& aFieldName,
+                                        bool aCaseInsensitive ) const
 {
     for( const SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
     {
         const SCH_FIELD& field = static_cast<const SCH_FIELD&>( item );
 
-        if( field.GetName() == aFieldName )
-            return &field;
+        if( aCaseInsensitive )
+        {
+            if( field.GetCanonicalName().Upper() == aFieldName.Upper() )
+                return &field;
+        }
+        else
+        {
+            if( field.GetCanonicalName() == aFieldName )
+                return &field;
+        }
     }
 
     return nullptr;
 }
 
 
-SCH_FIELD* LIB_SYMBOL::GetField( const wxString& aFieldName )
+SCH_FIELD& LIB_SYMBOL::GetValueField() const
 {
-    for( SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
-    {
-        SCH_FIELD& field = static_cast<SCH_FIELD&>( item );
-
-        if( field.GetName() == aFieldName )
-            return &field;
-    }
-
-    return nullptr;
-}
-
-
-SCH_FIELD* LIB_SYMBOL::FindFieldCaseInsensitive( const wxString& aFieldName )
-{
-    for( SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
-    {
-        SCH_FIELD& field = static_cast<SCH_FIELD&>( item );
-
-        if( field.GetCanonicalName().IsSameAs( aFieldName, false ) )
-            return &field;
-    }
-
-    return nullptr;
-}
-
-
-const SCH_FIELD& LIB_SYMBOL::GetValueField() const
-{
-    const SCH_FIELD* field = GetField( FIELD_T::VALUE );
+    SCH_FIELD* field = GetFieldById( VALUE_FIELD );
     wxASSERT( field != nullptr );
     return *field;
 }
 
 
-const SCH_FIELD& LIB_SYMBOL::GetReferenceField() const
+SCH_FIELD& LIB_SYMBOL::GetReferenceField() const
 {
-    const SCH_FIELD* field = GetField( FIELD_T::REFERENCE );
+    SCH_FIELD* field = GetFieldById( REFERENCE_FIELD );
     wxASSERT( field != nullptr );
     return *field;
 }
 
 
-const SCH_FIELD& LIB_SYMBOL::GetFootprintField() const
+SCH_FIELD& LIB_SYMBOL::GetFootprintField() const
 {
-    const SCH_FIELD* field = GetField( FIELD_T::FOOTPRINT );
+    SCH_FIELD* field = GetFieldById( FOOTPRINT_FIELD );
     wxASSERT( field != nullptr );
     return *field;
 }
 
 
-const SCH_FIELD& LIB_SYMBOL::GetDatasheetField() const
+SCH_FIELD& LIB_SYMBOL::GetDatasheetField() const
 {
-    const SCH_FIELD* field = GetField( FIELD_T::DATASHEET );
+    SCH_FIELD* field = GetFieldById( DATASHEET_FIELD );
     wxASSERT( field != nullptr );
     return *field;
 }
 
 
-const SCH_FIELD& LIB_SYMBOL::GetDescriptionField() const
+SCH_FIELD& LIB_SYMBOL::GetDescriptionField() const
 {
-    const SCH_FIELD* field = GetField( FIELD_T::DESCRIPTION );
+    SCH_FIELD* field = GetFieldById( DESCRIPTION_FIELD );
     wxASSERT( field != nullptr );
     return *field;
 }
@@ -1161,7 +1220,7 @@ const SCH_FIELD& LIB_SYMBOL::GetDescriptionField() const
 
 wxString LIB_SYMBOL::GetPrefix()
 {
-    wxString refDesignator = GetField( FIELD_T::REFERENCE )->GetText();
+    wxString refDesignator = GetFieldById( REFERENCE_FIELD )->GetText();
 
     refDesignator.Replace( wxS( "~" ), wxS( " " ) );
 
@@ -1189,6 +1248,43 @@ void LIB_SYMBOL::RunOnChildren( const std::function<void( SCH_ITEM* )>& aFunctio
 {
     for( SCH_ITEM& item : m_drawings )
         aFunction( &item );
+}
+
+
+int LIB_SYMBOL::UpdateFieldOrdinals()
+{
+    int retv = 0;
+    int lastOrdinal = MANDATORY_FIELD_COUNT;
+
+    for( SCH_ITEM& item : m_drawings[ SCH_FIELD_T ] )
+    {
+        SCH_FIELD* field = static_cast<SCH_FIELD*>( &item );
+
+        // Mandatory fields were already resolved always have the same ordinal values.
+        if( field->IsMandatory() )
+            continue;
+
+        if( field->GetId() != lastOrdinal )
+        {
+            field->SetId( lastOrdinal );
+            retv += 1;
+        }
+
+        lastOrdinal += 1;
+    }
+
+    return retv;
+}
+
+
+int LIB_SYMBOL::GetNextAvailableFieldId() const
+{
+    int retv = MANDATORY_FIELD_COUNT;
+
+    while( GetFieldById( retv ) )
+        retv += 1;
+
+    return retv;
 }
 
 
@@ -1480,7 +1576,7 @@ std::vector<LIB_SYMBOL_UNIT> LIB_SYMBOL::GetUnitDrawItems()
 
 int LIB_SYMBOL::Compare( const LIB_SYMBOL& aRhs, int aCompareFlags, REPORTER* aReporter ) const
 {
-    UNITS_PROVIDER unitsProvider( schIUScale, EDA_UNITS::MM );
+    UNITS_PROVIDER unitsProvider( schIUScale, EDA_UNITS::MILLIMETRES );
 
     if( m_me == aRhs.m_me )
         return 0;
@@ -1616,9 +1712,9 @@ int LIB_SYMBOL::Compare( const LIB_SYMBOL& aRhs, int aCompareFlags, REPORTER* aR
         int              tmp = 0;
 
         if( aField->IsMandatory() )
-            bField = aRhs.GetField( aField->GetId() );
+            bField = aRhs.GetFieldById( aField->GetId() );
         else
-            bField = aRhs.GetField( aField->GetName() );
+            bField = aRhs.FindField( aField->GetName() );
 
         if( !bField )
             tmp = 1;

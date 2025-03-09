@@ -161,29 +161,29 @@ void SYMBOL_TREE_SYNCHRONIZING_ADAPTER::updateLibrary( LIB_TREE_NODE_LIBRARY& aL
     if( hashIt == m_libHashes.end() )
     {
         // add a new library
-        for( LIB_SYMBOL* symbol : m_libMgr->EnumerateSymbols( aLibNode.m_Name ) )
-            aLibNode.AddItem( symbol );
+        for( LIB_SYMBOL* alias : m_libMgr->GetAliases( aLibNode.m_Name ) )
+            aLibNode.AddItem( alias );
     }
     else if( hashIt->second != m_libMgr->GetLibraryHash( aLibNode.m_Name ) )
     {
         // update an existing library
-        std::list<LIB_SYMBOL*> symbols = m_libMgr->EnumerateSymbols( aLibNode.m_Name );
+        std::list<LIB_SYMBOL*> aliases = m_libMgr->GetAliases( aLibNode.m_Name );
 
         // remove the common part from the aliases list
         for( auto nodeIt = aLibNode.m_Children.begin(); nodeIt != aLibNode.m_Children.end(); /**/ )
         {
-            auto symbolIt = std::find_if( symbols.begin(), symbols.end(),
+            auto aliasIt = std::find_if( aliases.begin(), aliases.end(),
                     [&] ( const LIB_SYMBOL* a )
                     {
                         return a->GetName() == (*nodeIt)->m_LibId.GetLibItemName().wx_str();
                     } );
 
-            if( symbolIt != symbols.end() )
+            if( aliasIt != aliases.end() )
             {
                 // alias exists both in the symbol tree and the library manager,
                 // update only the node data.
-                static_cast<LIB_TREE_NODE_ITEM*>( nodeIt->get() )->Update( *symbolIt );
-                symbols.erase( symbolIt );
+                static_cast<LIB_TREE_NODE_ITEM*>( nodeIt->get() )->Update( *aliasIt );
+                aliases.erase( aliasIt );
                 ++nodeIt;
             }
             else
@@ -194,8 +194,8 @@ void SYMBOL_TREE_SYNCHRONIZING_ADAPTER::updateLibrary( LIB_TREE_NODE_LIBRARY& aL
         }
 
         // now the aliases list contains only new aliases that need to be added to the tree
-        for( LIB_SYMBOL* symbol : symbols )
-            aLibNode.AddItem( symbol );
+        for( LIB_SYMBOL* alias : aliases )
+            aLibNode.AddItem( alias );
     }
 
     aLibNode.AssignIntrinsicRanks();

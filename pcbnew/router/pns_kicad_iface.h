@@ -95,7 +95,7 @@ public:
 
     BOARD* GetBoard() const { return m_board; }
 
-    virtual EDA_UNITS GetUnits() const { return EDA_UNITS::MM; };
+    virtual EDA_UNITS GetUnits() const { return EDA_UNITS::MILLIMETRES; };
 
     PNS::RULE_RESOLVER* GetRuleResolver() override;
     PNS::DEBUG_DECORATOR* GetDebugDecorator() override;

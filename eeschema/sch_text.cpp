@@ -296,6 +296,92 @@ KIFONT::FONT* SCH_TEXT::getDrawFont() const
 }
 
 
+void SCH_TEXT::Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                      const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed )
+{
+    COLOR4D color = GetTextColor();
+    COLOR4D bg = aSettings->GetBackgroundColor();
+    bool    blackAndWhiteMode = GetGRForceBlackPenState();
+
+    if( blackAndWhiteMode || color == COLOR4D::UNSPECIFIED )
+        color = aSettings->GetLayerColor( m_layer );
+
+    if( bg == COLOR4D::UNSPECIFIED || GetGRForceBlackPenState() )
+        bg = COLOR4D::WHITE;
+
+    if( !IsVisible() )
+        bg = aSettings->GetLayerColor( LAYER_HIDDEN );
+
+    if( aDimmed )
+    {
+        color.Desaturate( );
+        color = color.Mix( bg, 0.5f );
+    }
+
+    KIFONT::FONT* font = GetFont();
+
+    if( !font )
+        font = KIFONT::FONT::GetFont( aSettings->GetDefaultFont(), IsBold(), IsItalic() );
+
+    if( m_layer == LAYER_DEVICE )
+    {
+        wxDC* DC = aSettings->GetPrintDC();
+        int   penWidth = std::max( GetEffectiveTextPenWidth(), aSettings->GetDefaultPenWidth() );
+
+        // Calculate the text orientation, according to the symbol orientation/mirror (needed when
+        // draw text in schematic)
+        EDA_ANGLE orient = GetTextAngle();
+
+        if( aSettings->m_Transform.y1 )  // Rotate symbol 90 degrees.
+        {
+            if( orient == ANGLE_HORIZONTAL )
+                orient = ANGLE_VERTICAL;
+            else
+                orient = ANGLE_HORIZONTAL;
+        }
+
+        /*
+         * Calculate the text justification, according to the symbol orientation/mirror.
+         * This is a bit complicated due to cumulative calculations:
+         * - numerous cases (mirrored or not, rotation)
+         * - the GRText function will also recalculate H and V justifications according to the text
+         *   orientation.
+         * - When a symbol is mirrored, the text is not mirrored and justifications are complicated
+         *   to calculate so the more easily way is to use no justifications (centered text) and
+         *   use GetBoundingBox to know the text coordinate considered as centered
+        */
+        BOX2I    bBox = GetBoundingBox();
+        VECTOR2I txtpos = bBox.Centre();
+
+        // Calculate pos according to mirror/rotation.
+        txtpos = aSettings->m_Transform.TransformCoordinate( txtpos ) + aOffset;
+
+        GRPrintText( DC, txtpos, color, GetShownText( true ), orient, GetTextSize(),
+                     GR_TEXT_H_ALIGN_CENTER, GR_TEXT_V_ALIGN_CENTER, penWidth, IsItalic(),
+                     IsBold(), font, GetFontMetrics() );
+    }
+    else
+    {
+        VECTOR2I text_offset = aOffset + GetSchematicTextOffset( aSettings );
+
+        // Adjust text drawn in an outline font to more closely mimic the positioning of
+        // SCH_FIELD text.
+        if( font->IsOutline() )
+        {
+            BOX2I    firstLineBBox = GetTextBox( 0 );
+            int      sizeDiff = firstLineBBox.GetHeight() - GetTextSize().y;
+            int      adjust = KiROUND( sizeDiff * 0.4 );
+            VECTOR2I adjust_offset( 0, - adjust );
+
+            RotatePoint( adjust_offset, GetDrawRotation() );
+            text_offset += adjust_offset;
+        }
+
+        EDA_TEXT::Print( aSettings, text_offset, color );
+    }
+}
+
+
 const BOX2I SCH_TEXT::GetBoundingBox() const
 {
     BOX2I bbox = GetTextBox();
@@ -330,17 +416,6 @@ wxString SCH_TEXT::GetShownText( const SCH_SHEET_PATH* aPath, bool aAllowExtraTe
     std::function<bool( wxString* )> textResolver =
             [&]( wxString* token ) -> bool
             {
-                if( SCH_SYMBOL* sch_symbol = dynamic_cast<SCH_SYMBOL*>( m_parent ) )
-                {
-                    if( sch_symbol->ResolveTextVar( aPath, token, aDepth + 1 ) )
-                        return true;
-                }
-                else if( LIB_SYMBOL* lib_symbol = dynamic_cast<LIB_SYMBOL*>( m_parent ) )
-                {
-                    if( lib_symbol->ResolveTextVar( token, aDepth + 1 ) )
-                        return true;
-                }
-
                 if( sheet )
                 {
                     if( sheet->ResolveTextVar( aPath, token, aDepth + 1 ) )
@@ -696,6 +771,7 @@ static struct SCH_TEXT_DESC
         propMgr.InheritsAfter( TYPE_HASH( SCH_TEXT ), TYPE_HASH( EDA_TEXT ) );
 
         propMgr.Mask( TYPE_HASH( SCH_TEXT ), TYPE_HASH( EDA_TEXT ), _HKI( "Mirrored" ) );
+        propMgr.Mask( TYPE_HASH( SCH_TEXT ), TYPE_HASH( EDA_TEXT ), _HKI( "Visible" ) );
         propMgr.Mask( TYPE_HASH( SCH_TEXT ), TYPE_HASH( EDA_TEXT ), _HKI( "Width" ) );
         propMgr.Mask( TYPE_HASH( SCH_TEXT ), TYPE_HASH( EDA_TEXT ), _HKI( "Height" ) );
         propMgr.Mask( TYPE_HASH( SCH_TEXT ), TYPE_HASH( EDA_TEXT ), _HKI( "Thickness" ) );

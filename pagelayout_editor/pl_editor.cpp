@@ -35,9 +35,6 @@
 #include <dialogs/panel_pl_editor_color_settings.h>
 #include <dialogs/panel_grid_settings.h>
 
-#include <dialogs/panel_toolbar_customization.h>
-#include <toolbars_pl_editor.h>
-
 #include "pl_editor_frame.h"
 #include "pl_editor_settings.h"
 
@@ -50,7 +47,7 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
 
     IFACE( const char* aName, KIWAY::FACE_T aType ) :
             KIFACE_BASE( aName, aType ),
-            UNITS_PROVIDER( drawSheetIUScale, EDA_UNITS::MM )
+            UNITS_PROVIDER( drawSheetIUScale, EDA_UNITS::MILLIMETRES )
     {}
 
     bool OnKifaceStart( PGM_BASE* aProgram, int aCtlBits, KIWAY* aKiway ) override;
@@ -87,24 +84,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
 
         case PANEL_DS_COLORS:
             return new PANEL_PL_EDITOR_COLOR_SETTINGS( aParent );
-
-        case PANEL_DS_TOOLBARS:
-        {
-            SETTINGS_MANAGER&  mgr = Pgm().GetSettingsManager();
-            APP_SETTINGS_BASE* cfg = mgr.GetAppSettings<PL_EDITOR_SETTINGS>( "pl_editor" );
-            TOOLBAR_SETTINGS*  tb  = mgr.GetToolbarSettings<PL_EDITOR_TOOLBAR_SETTINGS>( "pl_editor-toolbars" );
-
-            std::vector<TOOL_ACTION*>            actions;
-            std::vector<ACTION_TOOLBAR_CONTROL*> controls;
-
-            for( TOOL_ACTION* action : ACTION_MANAGER::GetActionList() )
-                actions.push_back( action );
-
-            for( ACTION_TOOLBAR_CONTROL* control : ACTION_TOOLBAR::GetCustomControlList() )
-                controls.push_back( control );
-
-            return new PANEL_TOOLBAR_CUSTOMIZATION( aParent, cfg, tb, actions, controls );
-        }
 
         default:
             ;

@@ -661,11 +661,11 @@ void APPEARANCE_CONTROLS::createControls()
 
     m_layerDisplaySeparator = new wxStaticLine( layerDisplayPane, wxID_ANY, wxDefaultPosition,
                                                 wxDefaultSize, wxLI_HORIZONTAL );
-    layerDisplayOptionsSizer->Add( m_layerDisplaySeparator, 0, wxEXPAND | wxTOP, 4 );
+    layerDisplayOptionsSizer->Add( m_layerDisplaySeparator, 0, wxEXPAND | wxBOTTOM, 3 );
 
     m_cbFlipBoard = new wxCheckBox( layerDisplayPane, wxID_ANY, _( "Flip board view" ) );
     m_cbFlipBoard->SetFont( infoFont );
-    layerDisplayOptionsSizer->Add( m_cbFlipBoard, 0, wxTOP | wxBOTTOM, 3 );
+    layerDisplayOptionsSizer->Add( m_cbFlipBoard, 0, wxTOP | wxBOTTOM, 5 );
 
     layerDisplayPane->SetSizer( layerDisplayOptionsSizer );
     layerDisplayPane->Layout();
@@ -1823,7 +1823,7 @@ void APPEARANCE_CONTROLS::rebuildLayers()
 
     m_layersOuterSizer->AddSpacer( 10 );
     m_windowLayers->SetBackgroundColour( m_layerPanelColour );
-    m_windowLayers->FitInside(); // Updates virtual size to fit subwindows, also auto-layouts.
+    m_windowLayers->Layout();
 
     m_paneLayerDisplayOptions->SetLabel( _( "Layer Display Options" ) );
 

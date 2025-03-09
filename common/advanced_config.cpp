@@ -103,6 +103,8 @@ static const wxChar EnableGenerators[] = wxT( "EnableGenerators" );
 static const wxChar EnableGit[] = wxT( "EnableGit" );
 static const wxChar EnableLibWithText[] = wxT( "EnableLibWithText" );
 static const wxChar EnableLibDir[] = wxT( "EnableLibDir" );
+static const wxChar EnableEeschemaPrintCairo[] = wxT( "EnableEeschemaPrintCairo" );
+static const wxChar EnableEeschemaExportClipboardCairo[] = wxT( "EnableEeschemaExportClipboardCairo" );
 static const wxChar DisambiguationTime[] = wxT( "DisambiguationTime" );
 static const wxChar PcbSelectionVisibilityRatio[] = wxT( "PcbSelectionVisibilityRatio" );
 static const wxChar FontErrorSize[] = wxT( "FontErrorSize" );
@@ -125,10 +127,6 @@ static const wxChar MsgPanelShowUuids[] = wxT( "MsgPanelShowUuids" );
 static const wxChar MaximumThreads[] = wxT( "MaximumThreads" );
 static const wxChar NetInspectorBulkUpdateOptimisationThreshold[] =
         wxT( "NetInspectorBulkUpdateOptimisationThreshold" );
-static const wxChar ExcludeFromSimulationLineWidth[] = wxT( "ExcludeFromSimulationLineWidth" );
-static const wxChar GitIconRefreshInterval[] = wxT( "GitIconRefreshInterval" );
-static const wxChar GitProjectStatusRefreshInterval[] = wxT( "GitProjectStatusRefreshInterval" );
-static const wxChar ConfigurableToolbars[] = wxT( "ConfigurableToolbars" );
 
 } // namespace KEYS
 
@@ -263,6 +261,9 @@ ADVANCED_CFG::ADVANCED_CFG()
     m_EnableLibWithText         = false;
     m_EnableLibDir              = false;
 
+    m_EnableEeschemaPrintCairo  = true;
+    m_EnableEeschemaExportClipboardCairo = true;
+
     m_3DRT_BevelHeight_um       = 30;
     m_3DRT_BevelExtentFactor    = 1.0 / 16.0;
 
@@ -305,13 +306,6 @@ ADVANCED_CFG::ADVANCED_CFG()
     m_MinimumMarkerSeparationDistance = 0.15;
 
     m_NetInspectorBulkUpdateOptimisationThreshold = 25;
-
-    m_ExcludeFromSimulationLineWidth = 25;
-
-    m_GitIconRefreshInterval = 10000;
-    m_GitProjectStatusRefreshInterval = 60000;
-
-    m_ConfigurableToolbars = false;
 
     loadFromConfigFile();
 }
@@ -511,6 +505,14 @@ void ADVANCED_CFG::loadSettings( wxConfigBase& aCfg )
     configParams.push_back( new PARAM_CFG_BOOL( true, AC_KEYS::EnableLibDir,
                                                 &m_EnableLibDir, m_EnableLibDir ) );
 
+    configParams.push_back( new PARAM_CFG_BOOL( true, AC_KEYS::EnableEeschemaPrintCairo,
+                                                &m_EnableEeschemaPrintCairo,
+                                                m_EnableEeschemaPrintCairo ) );
+
+    configParams.push_back( new PARAM_CFG_BOOL( true, AC_KEYS::EnableEeschemaExportClipboardCairo,
+                                                &m_EnableEeschemaExportClipboardCairo,
+                                                m_EnableEeschemaExportClipboardCairo ) );
+
     configParams.push_back( new PARAM_CFG_DOUBLE( true, AC_KEYS::PcbSelectionVisibilityRatio,
                                                   &m_PcbSelectionVisibilityRatio,
                                                   m_PcbSelectionVisibilityRatio, 0.0, 1.0 ) );
@@ -589,22 +591,6 @@ void ADVANCED_CFG::loadSettings( wxConfigBase& aCfg )
             new PARAM_CFG_INT( true, AC_KEYS::NetInspectorBulkUpdateOptimisationThreshold,
                                &m_NetInspectorBulkUpdateOptimisationThreshold,
                                m_NetInspectorBulkUpdateOptimisationThreshold, 0, 1000 ) );
-
-    configParams.push_back( new PARAM_CFG_INT( true, AC_KEYS::ExcludeFromSimulationLineWidth,
-                                               &m_ExcludeFromSimulationLineWidth,
-                                               m_ExcludeFromSimulationLineWidth, 1, 100 ) );
-
-    configParams.push_back( new PARAM_CFG_INT( true, AC_KEYS::GitIconRefreshInterval,
-                                               &m_GitIconRefreshInterval,
-                                               m_GitIconRefreshInterval, 0, 100000 ) );
-
-    configParams.push_back( new PARAM_CFG_INT( true, AC_KEYS::GitProjectStatusRefreshInterval,
-                                                &m_GitProjectStatusRefreshInterval,
-                                                m_GitProjectStatusRefreshInterval, 0, 100000 ) );
-
-    configParams.push_back( new PARAM_CFG_BOOL( true, AC_KEYS::ConfigurableToolbars,
-                                                   &m_ConfigurableToolbars,
-                                                   m_ConfigurableToolbars ) );
 
     // Special case for trace mask setting...we just grab them and set them immediately
     // Because we even use wxLogTrace inside of advanced config

@@ -168,7 +168,6 @@ TOOL_ACTION ACTIONS::finishInteractive( TOOL_ACTION_ARGS()
         .FriendlyName( _( "Finish" ) )
         .Tooltip( _( "Finish current tool" ) )
         .Icon( BITMAPS::checked_ok )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE ) );
 
 TOOL_ACTION ACTIONS::showContextMenu( TOOL_ACTION_ARGS()
@@ -177,12 +176,10 @@ TOOL_ACTION ACTIONS::showContextMenu( TOOL_ACTION_ARGS()
         .FriendlyName( _( "Show Context Menu" ) )
         .Tooltip( _( "Perform the right-mouse-button action" ) )
         .Flags( AF_NONE )
-        .Parameter( CURSOR_RIGHT_CLICK )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN ) );
+        .Parameter( CURSOR_RIGHT_CLICK ) );
 
 TOOL_ACTION ACTIONS::updateMenu( TOOL_ACTION_ARGS()
         .Name( "common.Interactive.updateMenu" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL ) );
 
 TOOL_ACTION ACTIONS::undo( TOOL_ACTION_ARGS()
@@ -301,7 +298,6 @@ TOOL_ACTION ACTIONS::deleteTool( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Interactive Delete Tool" ) )
         .Tooltip( _( "Delete clicked items" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::delete_cursor )
         .Flags( AF_ACTIVATE ) );
 
@@ -460,7 +456,6 @@ TOOL_ACTION ACTIONS::editTable( TOOL_ACTION_ARGS()
 
 TOOL_ACTION ACTIONS::activatePointEditor( TOOL_ACTION_ARGS()
         .Name( "common.Control.activatePointEditor" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL ) );
 
 TOOL_ACTION ACTIONS::cycleArcEditMode( TOOL_ACTION_ARGS()
@@ -533,7 +528,6 @@ TOOL_ACTION ACTIONS::replaceAll( TOOL_ACTION_ARGS()
 
 TOOL_ACTION ACTIONS::updateFind( TOOL_ACTION_ARGS()
         .Name( "common.Control.updateFind" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL ) );
 
 
@@ -673,7 +667,6 @@ TOOL_ACTION ACTIONS::zoomTool( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Zoom to Selection" )
         .FriendlyName( _( "Zoom to Selection" ) )
         .Icon( BITMAPS::zoom_area )
-        .ToolbarState( { TOOLBAR_STATE::TOGGLE, TOOLBAR_STATE::CANCEL } )
         .Flags( AF_ACTIVATE ) );
 
 TOOL_ACTION ACTIONS::zoomUndo( TOOL_ACTION_ARGS()
@@ -710,7 +703,6 @@ TOOL_ACTION ACTIONS::cursorUp( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( WXK_UP )
         .FriendlyName( _( "Cursor Up" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_UP ) );
 
@@ -719,7 +711,6 @@ TOOL_ACTION ACTIONS::cursorDown( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( WXK_DOWN )
         .FriendlyName( _( "Cursor Down" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_DOWN ) );
 
@@ -728,7 +719,6 @@ TOOL_ACTION ACTIONS::cursorLeft( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( WXK_LEFT )
         .FriendlyName( _( "Cursor Left" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_LEFT ) );
 
@@ -737,7 +727,6 @@ TOOL_ACTION ACTIONS::cursorRight( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( WXK_RIGHT )
         .FriendlyName( _( "Cursor Right" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_RIGHT ) );
 
@@ -747,7 +736,6 @@ TOOL_ACTION ACTIONS::cursorUpFast( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( MD_CTRL + static_cast<int>( WXK_UP ) )
         .FriendlyName( _( "Cursor Up Fast" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_UP_FAST ) );
 
@@ -756,7 +744,6 @@ TOOL_ACTION ACTIONS::cursorDownFast( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( MD_CTRL + static_cast<int>( WXK_DOWN ) )
         .FriendlyName( _( "Cursor Down Fast" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_DOWN_FAST ) );
 
@@ -765,7 +752,6 @@ TOOL_ACTION ACTIONS::cursorLeftFast( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( MD_CTRL + static_cast<int>( WXK_LEFT ) )
         .FriendlyName( _( "Cursor Left Fast" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_LEFT_FAST ) );
 
@@ -774,7 +760,6 @@ TOOL_ACTION ACTIONS::cursorRightFast( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( MD_CTRL + static_cast<int>( WXK_RIGHT ) )
         .FriendlyName( _( "Cursor Right Fast" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_RIGHT_FAST ) );
 
@@ -785,7 +770,6 @@ TOOL_ACTION ACTIONS::cursorClick( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Mouse Left Click" )
         .FriendlyName( _( "Click" ) )
         .Tooltip( _( "Performs left mouse button click" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_CLICK ) );
 
@@ -796,13 +780,11 @@ TOOL_ACTION ACTIONS::cursorDblClick( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Mouse Left Double Click" )
         .FriendlyName( _( "Double-click" ) )
         .Tooltip( _( "Performs left mouse button double-click" ) )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Flags( AF_NONE )
         .Parameter( CURSOR_DBL_CLICK ) );
 
 TOOL_ACTION ACTIONS::refreshPreview( TOOL_ACTION_ARGS()
         .Name( "common.Control.refreshPreview" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL ) );
 
 TOOL_ACTION ACTIONS::pinLibrary( TOOL_ACTION_ARGS()
@@ -821,7 +803,6 @@ TOOL_ACTION ACTIONS::showLibraryTree( TOOL_ACTION_ARGS()
         .Name( "common.Control.showLibraryTree" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Library Tree" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::search_tree ) );
 
 TOOL_ACTION ACTIONS::hideLibraryTree( TOOL_ACTION_ARGS()
@@ -830,22 +811,11 @@ TOOL_ACTION ACTIONS::hideLibraryTree( TOOL_ACTION_ARGS()
         .FriendlyName( _( "Hide Library Tree" ) )
         .Icon( BITMAPS::search_tree ) );
 
-TOOL_ACTION ACTIONS::toggleSimulationSidePanel( TOOL_ACTION_ARGS()
-        .Name( "common.Control.toggleSimulationSidePanel" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Show Side Panel" ) ) );
-
-TOOL_ACTION ACTIONS::toggleConsole( TOOL_ACTION_ARGS()
-        .Name( "common.Control.toggleConsole" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Show Console Panel" ) ) );
-
 TOOL_ACTION ACTIONS::libraryTreeSearch( TOOL_ACTION_ARGS()
         .Name( "common.Control.libraryTreeSearch" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Focus Library Tree Search Field" ) )
-        .DefaultHotkey( MD_CTRL + 'L' )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN ) );
+        .DefaultHotkey( MD_CTRL + 'L' ) );
 
 TOOL_ACTION ACTIONS::panUp( TOOL_ACTION_ARGS()
         .Name( "common.Control.panUp" )
@@ -921,7 +891,6 @@ TOOL_ACTION ACTIONS::gridSetOrigin( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Set Grid Origin" )
         .FriendlyName( _( "Grid Origin" ) )
         .Tooltip( _( "Place the grid origin point" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::grid_select_axis )
         .Parameter<VECTOR2D*>( nullptr ) );
 
@@ -941,7 +910,6 @@ TOOL_ACTION ACTIONS::toggleGrid( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL)
         .FriendlyName( _( "Show Grid" ) )
         .Tooltip( _( "Display background grid in the edit window" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::grid ) );
 
 TOOL_ACTION ACTIONS::toggleGridOverrides( TOOL_ACTION_ARGS()
@@ -950,7 +918,6 @@ TOOL_ACTION ACTIONS::toggleGridOverrides( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL)
         .FriendlyName( _( "Grid Overrides" ) )
         .Tooltip( _( "Enables item-specific grids that override the current grid" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::grid_override ) );
 
 TOOL_ACTION ACTIONS::gridProperties( TOOL_ACTION_ARGS()
@@ -971,15 +938,13 @@ TOOL_ACTION ACTIONS::inchesUnits( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Inches" ) )
         .Icon( BITMAPS::unit_inch )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_NONE )
-        .Parameter( EDA_UNITS::INCH ) );
+        .Parameter( EDA_UNITS::INCHES ) );
 
 TOOL_ACTION ACTIONS::milsUnits( TOOL_ACTION_ARGS()
         .Name( "common.Control.mils" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Mils" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::unit_mil )
         .Flags( AF_NONE )
         .Parameter( EDA_UNITS::MILS ) );
@@ -988,24 +953,20 @@ TOOL_ACTION ACTIONS::millimetersUnits( TOOL_ACTION_ARGS()
         .Name( "common.Control.metricUnits" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Millimeters" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::unit_mm )
         .Flags( AF_NONE )
-        .Parameter( EDA_UNITS::MM ) );
+        .Parameter( EDA_UNITS::MILLIMETRES ) );
 
 TOOL_ACTION ACTIONS::updateUnits( TOOL_ACTION_ARGS()
         .Name( "common.Control.updateUnits" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL ) );
 
 TOOL_ACTION ACTIONS::updatePreferences( TOOL_ACTION_ARGS()
         .Name( "common.Control.updatePreferences" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL ) );
 
 TOOL_ACTION ACTIONS::selectLibTreeColumns( TOOL_ACTION_ARGS()
         .Name( "common.Control.selectColumns" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Select Columns..." ) ) );
 
@@ -1023,7 +984,6 @@ TOOL_ACTION ACTIONS::togglePolarCoords( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Polar Coordinates" ) )
         .Tooltip( _( "Switch between polar and cartesian coordinate systems" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::polar_coord ) );
 
 TOOL_ACTION ACTIONS::resetLocalCoords( TOOL_ACTION_ARGS()
@@ -1047,7 +1007,6 @@ TOOL_ACTION ACTIONS::toggleCursorStyle( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Full-Window Crosshairs" ) )
         .Tooltip( _( "Switch display of full-window crosshairs" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::cursor_shape ) );
 
 TOOL_ACTION ACTIONS::highContrastMode( TOOL_ACTION_ARGS()
@@ -1056,7 +1015,6 @@ TOOL_ACTION ACTIONS::highContrastMode( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Toggle High Contrast Mode" )
         .FriendlyName( _( "Inactive Layer View Mode" ) )
         .Tooltip( _( "Toggle inactive layers between normal and dimmed" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::contrast_mode ) );
 
 TOOL_ACTION ACTIONS::highContrastModeCycle( TOOL_ACTION_ARGS()
@@ -1071,14 +1029,12 @@ TOOL_ACTION ACTIONS::toggleBoundingBoxes( TOOL_ACTION_ARGS()
         .Name( "common.Control.toggleBoundingBoxes" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Bounding Boxes" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::gerbview_show_negative_objects ) );
 
 TOOL_ACTION ACTIONS::selectionTool( TOOL_ACTION_ARGS()
         .Name( "common.InteractiveSelection.selectionTool" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Select item(s)" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::cursor )
         .Flags( AF_ACTIVATE ) );
 
@@ -1090,19 +1046,16 @@ TOOL_ACTION ACTIONS::measureTool( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Measure Distance (Modern Toolset only)" )
         .FriendlyName( _( "Measure Tool" ) )
         .Tooltip( _( "Interactively measure distance between points" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::measurement )
         .Flags( AF_ACTIVATE ) );
 
 TOOL_ACTION ACTIONS::pickerTool( TOOL_ACTION_ARGS()
         .Name( "common.InteractivePicker.pickerTool" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL )
         .Flags( AF_ACTIVATE ) );
 
 TOOL_ACTION ACTIONS::pickerSubTool( TOOL_ACTION_ARGS()
         .Name( "common.InteractivePicker.pickerSubTool" )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN )
         .Scope( AS_GLOBAL ) );
 
 TOOL_ACTION ACTIONS::showProjectManager( TOOL_ACTION_ARGS()
@@ -1160,7 +1113,6 @@ TOOL_ACTION ACTIONS::showProperties( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Properties" ) )
         .Tooltip( _( "Show/hide the properties manager" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::tools ) );
 
 TOOL_ACTION ACTIONS::showDatasheet( TOOL_ACTION_ARGS()

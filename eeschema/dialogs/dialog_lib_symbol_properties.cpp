@@ -74,8 +74,7 @@ DIALOG_LIB_SYMBOL_PROPERTIES::DIALOG_LIB_SYMBOL_PROPERTIES( SYMBOL_EDIT_FRAME* a
 
     // Give a bit more room for combobox editors
     m_grid->SetDefaultRowSize( m_grid->GetDefaultRowSize() + 4 );
-    m_fields = new FIELDS_GRID_TABLE( this, aParent, m_grid, m_libEntry,
-                                      m_embeddedFiles->GetLocalFiles() );
+    m_fields = new FIELDS_GRID_TABLE( this, aParent, m_grid, m_libEntry, m_embeddedFiles->GetLocalFiles() );
     m_grid->SetTable( m_fields );
     m_grid->PushEventHandler( new FIELDS_GRID_TRICKS( m_grid, this, aLibEntry,
                                                       [&]( wxCommandEvent& aEvent )
@@ -84,14 +83,16 @@ DIALOG_LIB_SYMBOL_PROPERTIES::DIALOG_LIB_SYMBOL_PROPERTIES( SYMBOL_EDIT_FRAME* a
                                                       } ) );
     m_grid->SetSelectionMode( wxGrid::wxGridSelectRows );
 
-    // Load the FIELDS_GRID_TABLE
-    m_libEntry->CopyFields( *m_fields );
-
     // Show/hide columns according to the user's preference
     SYMBOL_EDITOR_SETTINGS* cfg = m_Parent->GetSettings();
     m_grid->ShowHideColumns( cfg->m_EditSymbolVisibleColumns );
 
-    m_SymbolNameCtrl->SetValidator( FIELD_VALIDATOR( FIELD_T::VALUE ) );
+    wxGridCellAttr* attr = new wxGridCellAttr;
+    attr->SetEditor( new GRID_CELL_URL_EDITOR( this, PROJECT_SCH::SchSearchS( &Prj() ),
+                                               m_embeddedFiles->GetLocalFiles() ) );
+    m_grid->SetAttr( DATASHEET_FIELD, FDC_VALUE, attr );
+
+    m_SymbolNameCtrl->SetValidator( FIELD_VALIDATOR( VALUE_FIELD ) );
 
     // Configure button logos
     m_bpAdd->SetBitmap( KiBitmapBundle( BITMAPS::small_plus ) );
@@ -136,17 +137,17 @@ DIALOG_LIB_SYMBOL_PROPERTIES::DIALOG_LIB_SYMBOL_PROPERTIES( SYMBOL_EDIT_FRAME* a
         if( ( m_lastLayout == DIALOG_LIB_SYMBOL_PROPERTIES::LAST_LAYOUT::ALIAS
               && aLibEntry->IsRoot() )
             || ( m_lastLayout == DIALOG_LIB_SYMBOL_PROPERTIES::LAST_LAYOUT::PARENT
-                 && aLibEntry->IsDerived() ) )
+                 && aLibEntry->IsAlias() ) )
         {
             resetSize();
         }
     }
 
-    m_lastLayout = ( aLibEntry->IsDerived() ) ? DIALOG_LIB_SYMBOL_PROPERTIES::LAST_LAYOUT::ALIAS
-                                              : DIALOG_LIB_SYMBOL_PROPERTIES::LAST_LAYOUT::PARENT;
+    m_lastLayout = ( aLibEntry->IsAlias() ) ? DIALOG_LIB_SYMBOL_PROPERTIES::LAST_LAYOUT::ALIAS
+                                            : DIALOG_LIB_SYMBOL_PROPERTIES::LAST_LAYOUT::PARENT;
 
     m_grid->GetParent()->Layout();
-    syncControlStates( m_libEntry->IsDerived() );
+    syncControlStates( m_libEntry->IsAlias() );
     Layout();
 
     finishDialogSettings();
@@ -177,6 +178,9 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataToWindow()
     if( !wxDialog::TransferDataToWindow() )
         return false;
 
+    // Push a copy of each field into m_updateFields
+    m_libEntry->CopyFields( *m_fields );
+
     std::set<wxString> defined;
 
     for( SCH_FIELD& field : *m_fields )
@@ -198,7 +202,7 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataToWindow()
         {
             if( defined.count( templateFieldname.m_Name ) <= 0 )
             {
-                SCH_FIELD field( { 0, 0 }, FIELD_T::USER, m_libEntry, templateFieldname.m_Name );
+                SCH_FIELD field( VECTOR2I( 0, 0 ), -1, m_libEntry, templateFieldname.m_Name );
                 field.SetVisible( templateFieldname.m_Visible );
                 m_fields->push_back( field );
                 m_addedTemplateFields.insert( templateFieldname.m_Name );
@@ -235,17 +239,9 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataToWindow()
     m_hasAlternateBodyStyles->SetValue( m_Parent->GetShowDeMorgan() );
 
     m_OptionPower->SetValue( m_libEntry->IsPower() );
-    m_OptionLocalPower->SetValue( m_libEntry->IsLocalPower() );
 
     if( m_libEntry->IsPower() )
-    {
         m_spiceFieldsButton->Hide();
-        m_OptionLocalPower->Enable();
-    }
-    else
-    {
-        m_OptionLocalPower->Enable( false );
-    }
 
     m_excludeFromSimCheckBox->SetValue( m_libEntry->GetExcludedFromSim() );
     m_excludeFromBomCheckBox->SetValue( m_libEntry->GetExcludedFromBOM() );
@@ -260,7 +256,7 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataToWindow()
     m_FootprintFilterListBox->Append( tmp );
 
     // Populate the list of root parts for inherited objects.
-    if( m_libEntry->IsDerived() )
+    if( m_libEntry->IsAlias() )
     {
         wxArrayString symbolNames;
         wxString libName = m_Parent->GetCurLib();
@@ -308,24 +304,20 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::Validate()
     if( !m_grid->CommitPendingChanges() )
         return false;
 
-    // Symbol reference can be empty because it inherits from the parent symbol.
-    if( m_libEntry->IsRoot() )
+    // Alias symbol reference can be empty because it inherits from the parent symbol.
+    if( m_libEntry->IsRoot()
+            && UTIL::GetRefDesPrefix( m_fields->at( REFERENCE_FIELD ).GetText() ).IsEmpty() )
     {
-        SCH_FIELD* field = m_fields->GetField( FIELD_T::REFERENCE );
+        if( m_NoteBook->GetSelection() != 0 )
+            m_NoteBook->SetSelection( 0 );
 
-        if( UTIL::GetRefDesPrefix( field->GetText() ).IsEmpty() )
-        {
-            if( m_NoteBook->GetSelection() != 0 )
-                m_NoteBook->SetSelection( 0 );
+        m_delayedErrorMessage = _( "References must start with a letter." );
+        m_delayedFocusGrid = m_grid;
+        m_delayedFocusColumn = FDC_VALUE;
+        m_delayedFocusRow = REFERENCE_FIELD;
+        m_delayedFocusPage = 0;
 
-            m_delayedErrorMessage = _( "References must start with a letter." );
-            m_delayedFocusGrid = m_grid;
-            m_delayedFocusColumn = FDC_VALUE;
-            m_delayedFocusRow = m_fields->GetFieldRow( FIELD_T::REFERENCE );
-            m_delayedFocusPage = 0;
-
-            return false;
-        }
+        return false;
     }
 
     // Check for missing field names.
@@ -354,7 +346,7 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::Validate()
     }
 
     // Verify that the parent name is set if the symbol is inherited
-    if( m_libEntry->IsDerived() )
+    if( m_libEntry->IsAlias() )
     {
         wxString parentName = m_inheritanceSelectCombo->GetValue();
 
@@ -403,13 +395,11 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataFromWindow()
         return false;
     }
 
-    UNDO_REDO opType = UNDO_REDO::LIBEDIT;
-
     if( oldName != newName )
     {
         wxString libName = m_Parent->GetCurLib();
 
-        if( m_Parent->GetLibManager().SymbolNameInUse( newName, libName ) )
+        if( m_Parent->GetLibManager().SymbolExists( newName, libName ) )
         {
             wxString msg;
 
@@ -420,26 +410,22 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataFromWindow()
             return false;
         }
 
-        opType = UNDO_REDO::LIB_RENAME;
+        m_Parent->SaveCopyInUndoList( _( "Edit Symbol Properties" ), m_libEntry,
+                                      UNDO_REDO::LIB_RENAME );
     }
-
-    m_Parent->SaveCopyInUndoList( _( "Edit Symbol Properties" ), m_libEntry, opType );
+    else
+    {
+        m_Parent->SaveCopyInUndoList( _( "Edit Symbol Properties" ), m_libEntry );
+    }
 
     // The Y axis for components in lib is from bottom to top while the screen axis is top
     // to bottom: we must change the y coord sign when writing back to the library
-    for( SCH_FIELD& field : *m_fields )
+    for( int ii = 0; ii < (int) m_fields->size(); ++ii )
     {
-        VECTOR2I pos = field.GetPosition();
+        VECTOR2I pos = m_fields->at( ii ).GetPosition();
         pos.y = -pos.y;
-        field.SetPosition( pos );
-    }
-
-    int ordinal = 42;   // Arbitrarily larger than any mandatory FIELD_T ids.
-
-    for( SCH_FIELD& field : *m_fields )
-    {
-        if( !field.IsMandatory() )
-            field.SetOrdinal( ordinal++ );
+        m_fields->at( ii ).SetPosition( pos );
+        m_fields->at( ii ).SetId( ii );
     }
 
     for( int ii = m_fields->GetNumberRows() - 1; ii >= 0; ii-- )
@@ -465,7 +451,7 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataFromWindow()
     m_libEntry->SetFields( *m_fields );
 
     // Update the parent for inherited symbols
-    if( m_libEntry->IsDerived() )
+    if( m_libEntry->IsAlias() )
     {
         wxString parentName = EscapeString( m_inheritanceSelectCombo->GetValue(), CTX_LIBID );
 
@@ -473,7 +459,7 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataFromWindow()
         wxString libName = m_Parent->GetCurLib();
 
         // Get the parent from the libManager based on the name set in the inheritance combo box.
-        LIB_SYMBOL* newParent = m_Parent->GetLibManager().GetSymbol( parentName, libName );
+        LIB_SYMBOL* newParent = m_Parent->GetLibManager().GetAlias( parentName, libName );
 
         // Verify that the requested parent exists
         wxCHECK( newParent, false );
@@ -491,11 +477,7 @@ bool DIALOG_LIB_SYMBOL_PROPERTIES::TransferDataFromWindow()
 
     if( m_OptionPower->GetValue() )
     {
-        if( m_OptionLocalPower->GetValue() )
-            m_libEntry->SetLocalPower();
-        else
-            m_libEntry->SetGlobalPower();
-
+        m_libEntry->SetPower();
         // Power symbols must have value matching name for now
         m_libEntry->GetValueField().SetText( newName );
     }
@@ -578,10 +560,7 @@ void DIALOG_LIB_SYMBOL_PROPERTIES::OnGridCellChanging( wxGridEvent& event )
 void DIALOG_LIB_SYMBOL_PROPERTIES::OnSymbolNameText( wxCommandEvent& event )
 {
     if( m_OptionPower->IsChecked() )
-    {
-        m_grid->SetCellValue( m_fields->GetFieldRow( FIELD_T::VALUE ), FDC_VALUE,
-                              m_SymbolNameCtrl->GetValue() );
-    }
+        m_grid->SetCellValue( VALUE_FIELD, FDC_VALUE, m_SymbolNameCtrl->GetValue() );
 
     OnModify();
 }
@@ -614,8 +593,8 @@ void DIALOG_LIB_SYMBOL_PROPERTIES::OnAddField( wxCommandEvent& event )
         return;
 
     SYMBOL_EDITOR_SETTINGS* settings = m_Parent->GetSettings();
-    SCH_FIELD               newField( m_libEntry, FIELD_T::USER,
-                                      GetUserFieldName( m_fields->size(), DO_TRANSLATE ) );
+    int       fieldID = (int) m_fields->size();
+    SCH_FIELD newField( m_libEntry, fieldID );
 
     newField.SetTextSize( VECTOR2I( schIUScale.MilsToIU( settings->m_Defaults.text_size ),
                                     schIUScale.MilsToIU( settings->m_Defaults.text_size ) ) );
@@ -888,8 +867,7 @@ void DIALOG_LIB_SYMBOL_PROPERTIES::OnUpdateUI( wxUpdateUIEvent& event )
         int row = m_grid->GetGridCursorRow();
         int col = m_grid->GetGridCursorCol();
 
-        if( row == m_fields->GetFieldRow( FIELD_T::VALUE ) && col == FDC_VALUE
-                && m_OptionPower->IsChecked() )
+        if( row == VALUE_FIELD && col == FDC_VALUE && m_OptionPower->IsChecked() )
         {
             wxGridCellEditor* editor = m_grid->GetCellEditor( row, col );
             m_SymbolNameCtrl->ChangeValue( editor->GetValue() );
@@ -991,7 +969,6 @@ void DIALOG_LIB_SYMBOL_PROPERTIES::onPowerCheckBox( wxCommandEvent& aEvent )
         m_excludeFromBoardCheckBox->Enable( false );
         m_excludeFromSimCheckBox->Enable( false );
         m_spiceFieldsButton->Show( false );
-        m_OptionLocalPower->Enable( true );
     }
     else
     {
@@ -999,7 +976,6 @@ void DIALOG_LIB_SYMBOL_PROPERTIES::onPowerCheckBox( wxCommandEvent& aEvent )
         m_excludeFromBoardCheckBox->Enable( true );
         m_excludeFromSimCheckBox->Enable( true );
         m_spiceFieldsButton->Show( true );
-        m_OptionLocalPower->Enable( false );
     }
 
     OnModify();

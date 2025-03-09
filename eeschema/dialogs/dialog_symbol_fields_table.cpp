@@ -38,6 +38,7 @@
 #include <sch_commit.h>
 #include <sch_edit_frame.h>
 #include <sch_reference_list.h>
+#include <schematic.h>
 #include <tools/sch_editor_control.h>
 #include <kiplatform/ui.h>
 #include <widgets/grid_text_button_helpers.h>
@@ -89,15 +90,13 @@ public:
 protected:
     void showPopupMenu( wxMenu& menu, wxGridEvent& aEvent ) override
     {
-        int col = m_grid->GetGridCursorCol();
-
-        if( m_dataModel->GetColFieldName( col ) == GetCanonicalFieldName( FIELD_T::FOOTPRINT ) )
+        if( m_grid->GetGridCursorCol() == FOOTPRINT_FIELD )
         {
             menu.Append( MYID_SELECT_FOOTPRINT, _( "Select Footprint..." ),
                          _( "Browse for footprint" ) );
             menu.AppendSeparator();
         }
-        else if( m_dataModel->GetColFieldName( col ) == GetCanonicalFieldName( FIELD_T::DATASHEET ) )
+        else if( m_grid->GetGridCursorCol() == DATASHEET_FIELD )
         {
             menu.Append( MYID_SHOW_DATASHEET, _( "Show Datasheet" ),
                          _( "Show datasheet in browser" ) );
@@ -109,26 +108,24 @@ protected:
 
     void doPopupSelection( wxCommandEvent& event ) override
     {
-        int row = m_grid->GetGridCursorRow();
-        int col = m_grid->GetGridCursorCol();
-
         if( event.GetId() == MYID_SELECT_FOOTPRINT )
         {
             // pick a footprint using the footprint picker.
-            wxString fpid = m_grid->GetCellValue( row, col );
+            wxString fpid = m_grid->GetCellValue( m_grid->GetGridCursorRow(), FOOTPRINT_FIELD );
 
             if( KIWAY_PLAYER* frame = m_dlg->Kiway().Player( FRAME_FOOTPRINT_CHOOSER, true,
                                                              m_dlg ) )
             {
                 if( frame->ShowModal( &fpid, m_dlg ) )
-                    m_grid->SetCellValue( row, col, fpid );
+                    m_grid->SetCellValue( m_grid->GetGridCursorRow(), FOOTPRINT_FIELD, fpid );
 
                 frame->Destroy();
             }
         }
         else if (event.GetId() == MYID_SHOW_DATASHEET )
         {
-            wxString datasheet_uri = m_grid->GetCellValue( row, col );
+            wxString datasheet_uri = m_grid->GetCellValue( m_grid->GetGridCursorRow(),
+                                                           DATASHEET_FIELD );
             GetAssociatedDocument( m_dlg, datasheet_uri, &m_dlg->Prj(),
                                    PROJECT_SCH::SchSearchS( &m_dlg->Prj() ) );
         }
@@ -141,7 +138,7 @@ protected:
             {
                 // Pop-up column order is the order of the shown fields, not the
                 // fieldsCtrl order
-                col = event.GetId() - GRIDTRICKS_FIRST_SHOWHIDE;
+                int col = event.GetId() - GRIDTRICKS_FIRST_SHOWHIDE;
 
                 bool show = !m_dataModel->GetShowColumn( col );
 
@@ -149,7 +146,7 @@ protected:
                 // and finding the matching field name
                 wxString fieldName = m_dataModel->GetColFieldName( col );
 
-                for( row = 0; row < m_fieldsCtrl->GetItemCount(); row++ )
+                for( int row = 0; row < m_fieldsCtrl->GetItemCount(); row++ )
                 {
                     if( m_fieldsCtrl->GetTextValue( row, FIELD_NAME_COLUMN ) == fieldName )
                     {
@@ -193,6 +190,9 @@ DIALOG_SYMBOL_FIELDS_TABLE::DIALOG_SYMBOL_FIELDS_TABLE( SCH_EDIT_FRAME* parent,
     m_removeFieldButton->SetBitmap( KiBitmapBundle( BITMAPS::small_trash ) );
     m_renameFieldButton->SetBitmap( KiBitmapBundle( BITMAPS::small_edit ) );
 
+    m_removeFieldButton->Enable( false );
+    m_renameFieldButton->Enable( false );
+
     m_bomPresetsLabel->SetFont( KIUI::GetInfoFont( this ) );
     m_labelBomExportPresets->SetFont( KIUI::GetInfoFont( this ) );
 
@@ -222,11 +222,7 @@ DIALOG_SYMBOL_FIELDS_TABLE::DIALOG_SYMBOL_FIELDS_TABLE( SCH_EDIT_FRAME* parent,
     m_fieldsCtrl->SetIndent( 0 );
 
     m_filter->SetDescriptiveText( _( "Filter" ) );
-
-    wxGridCellAttr* attr = new wxGridCellAttr;
-    attr->SetEditor( new GRID_CELL_URL_EDITOR( this, PROJECT_SCH::SchSearchS( &Prj() ),
-                                               &m_parent->Schematic() ) );
-    m_dataModel = new FIELDS_EDITOR_GRID_DATA_MODEL( m_symbolsList, attr );
+    m_dataModel = new FIELDS_EDITOR_GRID_DATA_MODEL( m_symbolsList );
 
     LoadFieldNames();   // loads rows into m_fieldsCtrl and columns into m_dataModel
 
@@ -299,7 +295,9 @@ DIALOG_SYMBOL_FIELDS_TABLE::DIALOG_SYMBOL_FIELDS_TABLE( SCH_EDIT_FRAME* parent,
             BOM_FIELD field;
             field.name = fieldName;
             field.show = !fieldName.StartsWith( wxT( "__" ), &field.name );
-            field.groupBy = alg::contains( m_job->m_fieldsGroupBy, field.name );
+            field.groupBy = std::find( m_job->m_fieldsGroupBy.begin(), m_job->m_fieldsGroupBy.end(),
+                                       field.name )
+                            != m_job->m_fieldsGroupBy.end();
 
             if( ( m_job->m_fieldsLabels.size() > i ) && !m_job->m_fieldsLabels[i].IsEmpty() )
                 field.label = m_job->m_fieldsLabels[i];
@@ -416,43 +414,43 @@ void DIALOG_SYMBOL_FIELDS_TABLE::SetupColumnProperties( int aCol )
     if( m_dataModel->ColIsReference( aCol ) )
     {
         attr->SetReadOnly();
-        m_dataModel->SetColAttr( attr, aCol );
+        m_grid->SetColAttr( aCol, attr );
     }
-    else if( m_dataModel->GetColFieldName( aCol ) == GetCanonicalFieldName( FIELD_T::FOOTPRINT ) )
+    else if( m_dataModel->GetColFieldName( aCol ) == GetCanonicalFieldName( FOOTPRINT_FIELD ) )
     {
         attr->SetEditor( new GRID_CELL_FPID_EDITOR( this, wxEmptyString ) );
-        m_dataModel->SetColAttr( attr, aCol );
+        m_grid->SetColAttr( aCol, attr );
     }
-    else if( m_dataModel->GetColFieldName( aCol ) == GetCanonicalFieldName( FIELD_T::DATASHEET ) )
+    else if( m_dataModel->GetColFieldName( aCol ) == GetCanonicalFieldName( DATASHEET_FIELD ) )
     {
         // set datasheet column viewer button
         attr->SetEditor( new GRID_CELL_URL_EDITOR( this, PROJECT_SCH::SchSearchS( &Prj() ),
                                                    &m_parent->Schematic() ) );
-        m_dataModel->SetColAttr( attr, aCol );
+        m_grid->SetColAttr( aCol, attr );
     }
     else if( m_dataModel->ColIsQuantity( aCol ) || m_dataModel->ColIsItemNumber( aCol ) )
     {
         attr->SetReadOnly();
+        m_grid->SetColAttr( aCol, attr );
         attr->SetAlignment( wxALIGN_RIGHT, wxALIGN_CENTER );
         attr->SetRenderer( new wxGridCellNumberRenderer() );
-        m_dataModel->SetColAttr( attr, aCol );
     }
     else if( m_dataModel->ColIsAttribute( aCol ) )
     {
         attr->SetAlignment( wxALIGN_CENTER, wxALIGN_CENTER );
         attr->SetRenderer( new wxGridCellBoolRenderer() );
         attr->SetReadOnly();    // not really; we delegate interactivity to GRID_TRICKS
-        m_dataModel->SetColAttr( attr, aCol );
+        m_grid->SetColAttr( aCol, attr );
     }
     else if( IsTextVar( m_dataModel->GetColFieldName( aCol ) ) )
     {
         attr->SetReadOnly();
-        m_dataModel->SetColAttr( attr, aCol );
+        m_grid->SetColAttr( aCol, attr );
     }
     else
     {
         attr->SetEditor( m_grid->GetDefaultEditor() );
-        m_dataModel->SetColAttr( attr, aCol );
+        m_grid->SetColAttr( aCol, attr );
     }
 }
 
@@ -630,7 +628,13 @@ bool DIALOG_SYMBOL_FIELDS_TABLE::TransferDataFromWindow()
     SCH_COMMIT     commit( m_parent );
     SCH_SHEET_PATH currentSheet = m_parent->GetCurrentSheet();
 
-    m_dataModel->ApplyData( commit );
+    std::function<void( SCH_SYMBOL&, SCH_SHEET_PATH & aPath )> changeHandler =
+            [&commit]( SCH_SYMBOL& aSymbol, SCH_SHEET_PATH& aPath ) -> void
+            {
+                commit.Modify( &aSymbol, aPath.LastScreen() );
+            };
+
+    m_dataModel->ApplyData( changeHandler );
 
     commit.Push( wxS( "Symbol Fields Table Edit" ) );
 
@@ -678,20 +682,18 @@ void DIALOG_SYMBOL_FIELDS_TABLE::AddField( const wxString& aFieldName, const wxS
 void DIALOG_SYMBOL_FIELDS_TABLE::LoadFieldNames()
 {
     auto addMandatoryField =
-            [&]( FIELD_T fieldId, bool show, bool groupBy )
+            [&]( int fieldId, bool show, bool groupBy )
             {
-                m_mandatoryFieldListIndexes[fieldId] = m_fieldsCtrl->GetItemCount();
-
                 AddField( GetCanonicalFieldName( fieldId ),
                           GetDefaultFieldName( fieldId, DO_TRANSLATE ), show, groupBy );
             };
 
-    // Add mandatory fields first            show   groupBy
-    addMandatoryField( FIELD_T::REFERENCE,   true,   true   );
-    addMandatoryField( FIELD_T::VALUE,       true,   true   );
-    addMandatoryField( FIELD_T::FOOTPRINT,   true,   true   );
-    addMandatoryField( FIELD_T::DATASHEET,   true,   false  );
-    addMandatoryField( FIELD_T::DESCRIPTION, false,  false  );
+    // Add mandatory fields first         show   groupBy
+    addMandatoryField( REFERENCE_FIELD,   true,   true   );
+    addMandatoryField( VALUE_FIELD,       true,   true   );
+    addMandatoryField( FOOTPRINT_FIELD,   true,   true   );
+    addMandatoryField( DATASHEET_FIELD,   true,   false  );
+    addMandatoryField( DESCRIPTION_FIELD, false,  false  );
 
     // Generated fields present only in the fields table
     AddField( FIELDS_EDITOR_GRID_DATA_MODEL::QUANTITY_VARIABLE, _( "Qty" ), true, false );
@@ -766,21 +768,10 @@ void DIALOG_SYMBOL_FIELDS_TABLE::OnRemoveField( wxCommandEvent& event )
     int col = -1;
     int row = m_fieldsCtrl->GetSelectedRow();
 
-    if( row == -1 )
-    {
-        wxBell();
-        return;
-    }
-
-    for( FIELD_T id : MANDATORY_FIELDS )
-    {
-        if( m_mandatoryFieldListIndexes[id] == row )
-        {
-            DisplayError( this, wxString::Format( _( "The first %d fields are mandatory." ),
-                                                  (int) m_mandatoryFieldListIndexes.size() ) );
-            return;
-        }
-    }
+   // Should never occur: "Remove Field..." button should be disabled if invalid selection
+   // via OnFieldsCtrlSelectionChanged()
+    wxCHECK_RET( row != -1, wxS( "Some user defined field must be selected first" ) );
+    wxCHECK_RET( row >= MANDATORY_FIELD_COUNT, wxS( "Mandatory fields cannot be removed" ) );
 
     wxString fieldName = m_fieldsCtrl->GetTextValue( row, FIELD_NAME_COLUMN );
     wxString displayName = m_fieldsCtrl->GetTextValue( row, DISPLAY_NAME_COLUMN );
@@ -805,6 +796,12 @@ void DIALOG_SYMBOL_FIELDS_TABLE::OnRemoveField( wxCommandEvent& event )
     // Safe to decrement row index because we always have mandatory fields.
     m_fieldsCtrl->SelectRow( --row );
 
+    if( row < MANDATORY_FIELD_COUNT )
+    {
+         m_removeFieldButton->Enable( false );
+         m_renameFieldButton->Enable( false );
+    }
+
     wxGridTableMessage msg( m_dataModel, wxGRIDTABLE_NOTIFY_COLS_DELETED, col, 1 );
 
     m_grid->ProcessTableMessage( msg );
@@ -817,23 +814,13 @@ void DIALOG_SYMBOL_FIELDS_TABLE::OnRemoveField( wxCommandEvent& event )
 void DIALOG_SYMBOL_FIELDS_TABLE::OnRenameField( wxCommandEvent& event )
 {
     int row = m_fieldsCtrl->GetSelectedRow();
-
-    if( row == -1 )
-    {
-        wxBell();
-        return;
-    }
-
-    for( FIELD_T id : MANDATORY_FIELDS )
-    {
-        if( m_mandatoryFieldListIndexes[id] == row )
-        {
-            wxBell();
-            return;
-        }
-    }
-
     wxString fieldName = m_fieldsCtrl->GetTextValue( row, FIELD_NAME_COLUMN );
+
+    // Should never occur: "Rename Field..." button should be disabled if invalid selection
+    // via OnFieldsCtrlSelectionChanged()
+    wxCHECK_RET( row != -1, wxS( "Some user defined field must be selected first" ) );
+    wxCHECK_RET( row >= MANDATORY_FIELD_COUNT, wxS( "Mandatory fields cannot be renamed" ) );
+    wxCHECK_RET( !fieldName.IsEmpty(), wxS( "Field must have a name" ) );
 
     int col = m_dataModel->GetFieldNameCol( fieldName );
     wxCHECK_RET( col != -1, wxS( "Existing field name missing from data model" ) );
@@ -891,6 +878,23 @@ void DIALOG_SYMBOL_FIELDS_TABLE::OnFilterMouseMoved( wxMouseEvent& aEvent )
         SetCursor( wxCURSOR_ARROW );
     else
         SetCursor( wxCURSOR_IBEAM );
+}
+
+
+void DIALOG_SYMBOL_FIELDS_TABLE::OnFieldsCtrlSelectionChanged( wxDataViewEvent& event )
+{
+    int row = m_fieldsCtrl->GetSelectedRow();
+
+    if( row >= MANDATORY_FIELD_COUNT )
+    {
+        m_removeFieldButton->Enable( true );
+        m_renameFieldButton->Enable( true );
+    }
+    else
+    {
+        m_removeFieldButton->Enable( false );
+        m_renameFieldButton->Enable( false );
+    }
 }
 
 

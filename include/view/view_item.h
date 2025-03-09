@@ -193,7 +193,13 @@ protected:
      * Because even at zoom 1.0, 1mm in KiCad may not be exactly 1mm on a physical
      * screen, the threshold may not be exact in practice.
      */
-    static double lodScaleForThreshold( const KIGFX::VIEW* aView, int aWhatIu, int aThresholdIu );
+    static constexpr double lodScaleForThreshold( int aWhatIu, int aThresholdIu )
+    {
+        if( aWhatIu == 0 )
+            return LOD_HIDE;
+
+        return double( aThresholdIu ) / aWhatIu;
+    }
 
 private:
     friend class VIEW;

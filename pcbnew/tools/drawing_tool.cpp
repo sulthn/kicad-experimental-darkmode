@@ -931,11 +931,7 @@ int DRAWING_TOOL::PlaceText( const TOOL_EVENT& aEvent )
                                   COORDS_PADDING );
         m_controls->ForceCursorPosition( true, cursorPos );
 
-        if( evt->IsDrag() )
-        {
-            continue;
-        }
-        else if( evt->IsCancelInteractive() || ( text && evt->IsAction( &ACTIONS::undo ) ) )
+        if( evt->IsCancelInteractive() || ( text && evt->IsAction( &ACTIONS::undo ) ) )
         {
             if( text )
             {
@@ -1000,17 +996,16 @@ int DRAWING_TOOL::PlaceText( const TOOL_EVENT& aEvent )
                 text->SetLayer( layer );
                 text->SetAttributes( textAttrs );
                 text->SetTextPos( cursorPos );
-                text->SetFlags( IS_NEW ); // Prevent double undo commits
+                text->SetFlags( IS_NEW );  // Prevent double undo commits
 
                 DIALOG_TEXT_PROPERTIES textDialog( m_frame, text );
-                bool                   cancelled;
+                bool cancelled;
 
-                RunMainStack(
-                        [&]()
-                        {
-                            // QuasiModal required for Scintilla auto-complete
-                            cancelled = !textDialog.ShowQuasiModal();
-                        } );
+                RunMainStack( [&]()
+                              {
+                                  // QuasiModal required for Scintilla auto-complete
+                                  cancelled = !textDialog.ShowQuasiModal();
+                              } );
 
                 if( cancelled || NoPrintableChars( text->GetText() ) )
                 {
@@ -1075,15 +1070,15 @@ int DRAWING_TOOL::PlaceText( const TOOL_EVENT& aEvent )
             m_controls->CaptureCursor( text != nullptr );
             m_controls->SetAutoPan( text != nullptr );
         }
-        else if( text && ( evt->IsMotion() || evt->IsAction( &PCB_ACTIONS::refreshPreview ) ) )
+        else if( text && (   evt->IsMotion()
+                          || evt->IsAction( &PCB_ACTIONS::refreshPreview ) ) )
         {
             text->SetPosition( cursorPos );
             selection().SetReferencePoint( cursorPos );
             m_view->Update( &selection() );
         }
-        else if( text
-                 && ( ZONE_FILLER_TOOL::IsZoneFillAction( evt )
-                      || evt->IsAction( &ACTIONS::redo ) ) )
+        else if( text && (   ZONE_FILLER_TOOL::IsZoneFillAction( evt )
+                          || evt->IsAction( &ACTIONS::redo ) ) )
         {
             wxBell();
         }
@@ -3940,7 +3935,7 @@ int DRAWING_TOOL::DrawVia( const TOOL_EVENT& aEvent )
             {
                 if( PCB_SHAPE* shape = findGraphic( via ) )
                 {
-                    if( shape->IsAnyFill() )
+                    if( shape->IsFilled() )
                     {
                         aItem->SetPosition( shape->GetPosition() );
                     }

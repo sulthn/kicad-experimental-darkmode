@@ -392,36 +392,6 @@ int SCH_DRAWING_TOOLS::PlaceSymbol( const TOOL_EVENT& aEvent )
                                             GRID_HELPER_GRIDS::GRID_CONNECTABLE );
                 }
 
-                EESCHEMA_SETTINGS*    cfg = m_frame->eeconfig();
-
-                if( !libSymbol->IsLocalPower() && cfg->m_Drawing.new_power_symbols == POWER_SYMBOLS::LOCAL )
-                {
-                    libSymbol->SetLocalPower();
-                    wxString keywords = libSymbol->GetKeyWords();
-
-                    // Adjust the KiCad library default fields to match the new power symbol type
-                    if( keywords.Contains( wxT( "global power" ) ) )
-                    {
-                        keywords.Replace( wxT( "global power" ), wxT( "local power" ) );
-                        libSymbol->SetKeyWords( keywords );
-                    }
-
-                    wxString desc = libSymbol->GetDescription();
-
-                    if( desc.Contains( wxT( "global label" ) ) )
-                    {
-                        desc.Replace( wxT( "global label" ), wxT( "local label" ) );
-                        libSymbol->SetDescription( desc );
-                    }
-                }
-                else if( !libSymbol->IsGlobalPower()
-                         && cfg->m_Drawing.new_power_symbols == POWER_SYMBOLS::GLOBAL )
-                {
-                    // We do not currently have local power symbols in the KiCad library, so
-                    // don't update any fields
-                    libSymbol->SetGlobalPower();
-                }
-
                 symbol = new SCH_SYMBOL( *libSymbol, &m_frame->GetCurrentSheet(), sel, cursorPos,
                                          &m_frame->Schematic() );
                 addSymbol( symbol );
@@ -632,8 +602,7 @@ int SCH_DRAWING_TOOLS::PlaceNextSymbolUnit( const TOOL_EVENT& aEvent )
     std::unique_ptr<SCH_SYMBOL> newSymbol = std::make_unique<SCH_SYMBOL>( *symbol );
     const SCH_SHEET_PATH&       sheetPath = m_frame->GetCurrentSheet();
 
-    newSymbol->SetUnitSelection( &sheetPath, nextMissing );
-    newSymbol->SetUnit( nextMissing );
+    newSymbol->SetUnitProp( nextMissing );
     newSymbol->SetRefProp( symbol->GetRef( &sheetPath, false ) );
 
     // Post the new symbol - don't reannotate it - we set the reference ourselves
@@ -1618,19 +1587,23 @@ wxString SCH_DRAWING_TOOLS::findWireLabelDriverName( SCH_LINE* aWire )
 }
 
 
-bool SCH_DRAWING_TOOLS::createNewLabel( const VECTOR2I& aPosition, int aType,
-                                       std::list<std::unique_ptr<SCH_LABEL_BASE>>& aLabelList )
+SCH_TEXT* SCH_DRAWING_TOOLS::createNewText( const VECTOR2I& aPosition, int aType )
 {
     SCHEMATIC*          schematic = getModel<SCHEMATIC>();
     SCHEMATIC_SETTINGS& settings = schematic->Settings();
+    SCH_TEXT*           textItem = nullptr;
     SCH_LABEL_BASE*     labelItem = nullptr;
-    SCH_GLOBALLABEL*    globalLabel = nullptr;
     wxString            netName;
 
     switch( aType )
     {
+    case LAYER_NOTES:
+        textItem = new SCH_TEXT( aPosition );
+        break;
+
     case LAYER_LOCLABEL:
         labelItem = new SCH_LABEL( aPosition );
+        textItem = labelItem;
 
         if( SCH_LINE* wire = findWire( aPosition ) )
             netName = findWireLabelDriverName( wire );
@@ -1640,24 +1613,27 @@ bool SCH_DRAWING_TOOLS::createNewLabel( const VECTOR2I& aPosition, int aType,
     case LAYER_NETCLASS_REFS:
         labelItem = new SCH_DIRECTIVE_LABEL( aPosition );
         labelItem->SetShape( m_lastNetClassFlagShape );
-        labelItem->GetFields().emplace_back( VECTOR2I(), FIELD_T::USER, labelItem, wxT( "Netclass" ) );
-        labelItem->GetFields().emplace_back( VECTOR2I(), FIELD_T::USER, labelItem, wxT( "Component Class" ) );
+        labelItem->GetFields().emplace_back( SCH_FIELD( {0,0}, 0, labelItem, wxT( "Netclass" ) ) );
+        labelItem->GetFields().emplace_back(
+                SCH_FIELD( { 0, 0 }, 0, labelItem, wxT( "Component Class" ) ) );
         labelItem->GetFields().back().SetItalic( true );
         labelItem->GetFields().back().SetVisible( true );
+        textItem = labelItem;
         break;
 
     case LAYER_HIERLABEL:
         labelItem = new SCH_HIERLABEL( aPosition );
         labelItem->SetShape( m_lastGlobalLabelShape );
         labelItem->SetAutoRotateOnPlacement( m_lastAutoLabelRotateOnPlacement );
+        textItem = labelItem;
         break;
 
     case LAYER_GLOBLABEL:
-        globalLabel = new SCH_GLOBALLABEL( aPosition );
-        globalLabel->SetShape( m_lastGlobalLabelShape );
-        globalLabel->GetField( FIELD_T::INTERSHEET_REFS )->SetVisible( settings.m_IntersheetRefsShow );
-        globalLabel->SetAutoRotateOnPlacement( m_lastAutoLabelRotateOnPlacement );
-        labelItem = globalLabel;
+        labelItem = new SCH_GLOBALLABEL( aPosition );
+        labelItem->SetShape( m_lastGlobalLabelShape );
+        labelItem->GetFields()[0].SetVisible( settings.m_IntersheetRefsShow );
+        labelItem->SetAutoRotateOnPlacement( m_lastAutoLabelRotateOnPlacement );
+        textItem = labelItem;
 
         if( SCH_LINE* wire = findWire( aPosition ) )
             netName = findWireLabelDriverName( wire );
@@ -1666,50 +1642,86 @@ bool SCH_DRAWING_TOOLS::createNewLabel( const VECTOR2I& aPosition, int aType,
 
     default:
         wxFAIL_MSG( "SCH_EDIT_FRAME::CreateNewText() unknown layer type" );
-        return false;
+        return nullptr;
     }
 
-    labelItem->SetParent( schematic );
+    textItem->SetParent( schematic );
 
-    labelItem->SetTextSize( VECTOR2I( settings.m_DefaultTextSize, settings.m_DefaultTextSize ) );
+    textItem->SetTextSize( VECTOR2I( settings.m_DefaultTextSize, settings.m_DefaultTextSize ) );
 
     if( aType != LAYER_NETCLASS_REFS )
     {
         // Must be after SetTextSize()
-        labelItem->SetBold( m_lastTextBold );
-        labelItem->SetItalic( m_lastTextItalic );
+        textItem->SetBold( m_lastTextBold );
+        textItem->SetItalic( m_lastTextItalic );
     }
 
-    labelItem->SetSpinStyle( m_lastTextOrientation );
-    labelItem->SetFlags( IS_NEW | IS_MOVING );
-
-    if( !netName.IsEmpty() )
+    if( labelItem )
     {
-        // Auto-create from attached wire
-        labelItem->SetText( netName );
+        labelItem->SetSpinStyle( m_lastTextOrientation );
     }
     else
     {
-        DIALOG_LABEL_PROPERTIES dlg( m_frame, labelItem, true );
+        textItem->SetHorizJustify( m_lastTextHJustify );
+        textItem->SetVertJustify( m_lastTextVJustify );
+        textItem->SetTextAngle( m_lastTextAngle );
+    }
 
-        dlg.SetLabelList( &aLabelList );
+    textItem->SetFlags( IS_NEW | IS_MOVING );
+
+    if( !labelItem )
+    {
+        DIALOG_TEXT_PROPERTIES dlg( m_frame, textItem );
+
+        // QuasiModal required for syntax help and Scintilla auto-complete
+        if( dlg.ShowQuasiModal() != wxID_OK )
+        {
+            delete textItem;
+            return nullptr;
+        }
+    }
+    else if( !netName.IsEmpty() )
+    {
+        // Auto-create from attached wire
+        textItem->SetText( netName );
+    }
+    else
+    {
+        DIALOG_LABEL_PROPERTIES dlg( m_frame, static_cast<SCH_LABEL_BASE*>( textItem ) );
 
         // QuasiModal required for syntax help and Scintilla auto-complete
         if( dlg.ShowQuasiModal() != wxID_OK )
         {
             dlg.GetFieldsGridTable()->DetachFields();
             delete labelItem;
-            return false;
+            return nullptr;
         }
+    }
+
+    wxString text = textItem->GetText();
+
+    if( textItem->Type() != SCH_DIRECTIVE_LABEL_T && NoPrintableChars( text ) )
+    {
+        delete textItem;
+        return nullptr;
     }
 
     if( aType != LAYER_NETCLASS_REFS )
     {
-        m_lastTextBold = labelItem->IsBold();
-        m_lastTextItalic = labelItem->IsItalic();
+        m_lastTextBold = textItem->IsBold();
+        m_lastTextItalic = textItem->IsItalic();
     }
 
-    m_lastTextOrientation = labelItem->GetSpinStyle();
+    if( labelItem )
+    {
+        m_lastTextOrientation = labelItem->GetSpinStyle();
+    }
+    else
+    {
+        m_lastTextHJustify = textItem->GetHorizJustify();
+        m_lastTextVJustify = textItem->GetVertJustify();
+        m_lastTextAngle = textItem->GetTextAngle();
+    }
 
     if( aType == LAYER_GLOBLABEL || aType == LAYER_HIERLABEL )
     {
@@ -1721,43 +1733,6 @@ bool SCH_DRAWING_TOOLS::createNewLabel( const VECTOR2I& aPosition, int aType,
         m_lastNetClassFlagShape = labelItem->GetShape();
     }
 
-    // Return elements are kept in aLabelList
-    delete labelItem;
-    return true;
-}
-
-
-SCH_TEXT* SCH_DRAWING_TOOLS::createNewText( const VECTOR2I& aPosition )
-{
-    SCHEMATIC*          schematic = getModel<SCHEMATIC>();
-    SCHEMATIC_SETTINGS& settings = schematic->Settings();
-    SCH_TEXT*           textItem = nullptr;
-
-    textItem = new SCH_TEXT( aPosition );
-    textItem->SetParent( schematic );
-    textItem->SetTextSize( VECTOR2I( settings.m_DefaultTextSize, settings.m_DefaultTextSize ) );
-    // Must be after SetTextSize()
-    textItem->SetBold( m_lastTextBold );
-    textItem->SetItalic( m_lastTextItalic );
-    textItem->SetHorizJustify( m_lastTextHJustify );
-    textItem->SetVertJustify( m_lastTextVJustify );
-    textItem->SetTextAngle( m_lastTextAngle );
-    textItem->SetFlags( IS_NEW | IS_MOVING );
-
-    DIALOG_TEXT_PROPERTIES dlg( m_frame, textItem );
-
-    // QuasiModal required for syntax help and Scintilla auto-complete
-    if( dlg.ShowQuasiModal() != wxID_OK )
-    {
-        delete textItem;
-        return nullptr;
-    }
-
-    m_lastTextBold = textItem->IsBold();
-    m_lastTextItalic = textItem->IsItalic();
-    m_lastTextHJustify = textItem->GetHorizJustify();
-    m_lastTextVJustify = textItem->GetVertJustify();
-    m_lastTextAngle = textItem->GetTextAngle();
     return textItem;
 }
 
@@ -1862,25 +1837,6 @@ int SCH_DRAWING_TOOLS::TwoClickPlace( const TOOL_EVENT& aEvent )
                 item = nullptr;
             };
 
-    auto prepItemForPlacement =
-            [&]( SCH_ITEM* aItem, const VECTOR2I& cursorPos )
-            {
-                item->SetPosition( cursorPos );
-
-                item->SetFlags( IS_NEW | IS_MOVING );
-
-                // Not placed yet, so pass a nullptr screen reference
-                item->AutoplaceFields( nullptr, AUTOPLACE_AUTO );
-
-                updatePreview();
-                m_selectionTool->AddItemToSel( item );
-                m_toolMgr->PostAction( ACTIONS::refreshPreview );
-
-                // update the cursor so it looks correct before another event
-                setCursor();
-            };
-
-
     Activate();
 
     // Must be done after Activate() so that it gets set into the correct context
@@ -1901,7 +1857,6 @@ int SCH_DRAWING_TOOLS::TwoClickPlace( const TOOL_EVENT& aEvent )
     }
 
     SCH_COMMIT commit( m_toolMgr );
-    std::list<std::unique_ptr<SCH_LABEL_BASE>> itemsToPlace;
 
     // Main loop: keep receiving events
     while( TOOL_EVENT* evt = Wait() )
@@ -1973,7 +1928,7 @@ int SCH_DRAWING_TOOLS::TwoClickPlace( const TOOL_EVENT& aEvent )
 
                 if( isText )
                 {
-                    item = createNewText( cursorPos );
+                    item = createNewText( cursorPos, LAYER_NOTES );
                     description = _( "Add Text" );
                 }
                 else if( isHierLabel )
@@ -1994,28 +1949,28 @@ int SCH_DRAWING_TOOLS::TwoClickPlace( const TOOL_EVENT& aEvent )
                         label->SetTextSize( VECTOR2I( schematic->Settings().m_DefaultTextSize,
                                                       schematic->Settings().m_DefaultTextSize ) );
                         label->SetFlags( IS_NEW | IS_MOVING );
-                        itemsToPlace.push_back( std::unique_ptr<SCH_LABEL_BASE>( label ) );
+                        item = label;
                     }
                     else
                     {
-                        createNewLabel( cursorPos, LAYER_HIERLABEL, itemsToPlace );
+                        item = createNewText( cursorPos, LAYER_HIERLABEL );
                     }
 
                     description = _( "Add Hierarchical Label" );
                 }
                 else if( isNetLabel )
                 {
-                    createNewLabel( cursorPos, LAYER_LOCLABEL, itemsToPlace );
+                    item = createNewText( cursorPos, LAYER_LOCLABEL );
                     description = _( "Add Label" );
                 }
                 else if( isGlobalLabel )
                 {
-                    createNewLabel( cursorPos, LAYER_GLOBLABEL, itemsToPlace );
+                    item = createNewText( cursorPos, LAYER_GLOBLABEL );
                     description = _( "Add Label" );
                 }
                 else if( isClassLabel )
                 {
-                    createNewLabel( cursorPos, LAYER_NETCLASS_REFS, itemsToPlace );
+                    item = createNewText( cursorPos, LAYER_NETCLASS_REFS );
                     description = _( "Add Label" );
                 }
                 else if( isSheetPin )
@@ -2085,14 +2040,22 @@ int SCH_DRAWING_TOOLS::TwoClickPlace( const TOOL_EVENT& aEvent )
                     cursorPos = grid.BestSnapAnchor( cursorPos, snapGrid, item );
                 }
 
-                if( !itemsToPlace.empty() )
-                {
-                    item = itemsToPlace.front().release();
-                    itemsToPlace.pop_front();
-                }
-
                 if( item )
-                    prepItemForPlacement( item, cursorPos );
+                {
+                    item->SetPosition( cursorPos );
+
+                    item->SetFlags( IS_NEW | IS_MOVING );
+
+                    // Not placed yet, so pass a nullptr screen reference
+                    item->AutoplaceFields( nullptr, AUTOPLACE_AUTO );
+
+                    updatePreview();
+                    m_selectionTool->AddItemToSel( item );
+                    m_toolMgr->PostAction( ACTIONS::refreshPreview );
+
+                    // update the cursor so it looks correct before another event
+                    setCursor();
+                }
 
                 controls->SetCursorPosition( cursorPos, false );
             }
@@ -2157,13 +2120,6 @@ int SCH_DRAWING_TOOLS::TwoClickPlace( const TOOL_EVENT& aEvent )
                     }
 
                     item = createNewSheetPinFromLabel( sheet, cursorPos, label );
-                }
-                else if( !itemsToPlace.empty() )
-                {
-
-                    item = itemsToPlace.front().release();
-                    itemsToPlace.pop_front();
-                    prepItemForPlacement( item, cursorPos );
                 }
             }
         }
@@ -3069,30 +3025,35 @@ int SCH_DRAWING_TOOLS::DrawSheet( const TOOL_EVENT& aEvent )
             {
                 wxFileName fn( filename );
 
-                sheet->GetField( FIELD_T::SHEET_NAME )->SetText( fn.GetName() );
-                sheet->GetField( FIELD_T::SHEET_FILENAME )->SetText( fn.GetName() + wxT( "." ) + FILEEXT::KiCadSchematicFileExtension );
+                sheet->GetFields()[SHEETNAME].SetText( fn.GetName() );
+                sheet->GetFields()[SHEETFILENAME].SetText( fn.GetName() + wxT( "." )
+                                                           + FILEEXT::KiCadSchematicFileExtension );
             }
             else if( isDrawSheetFromDesignBlock )
             {
                 wxFileName fn( filename );
 
-                sheet->GetField( FIELD_T::SHEET_NAME )->SetText( designBlock->GetLibId().GetLibItemName() );
-                sheet->GetField( FIELD_T::SHEET_FILENAME )->SetText( fn.GetName() + wxT( "." ) + FILEEXT::KiCadSchematicFileExtension );
+                sheet->GetFields()[SHEETNAME].SetText( designBlock->GetLibId().GetLibItemName() );
+                sheet->GetFields()[SHEETFILENAME].SetText( fn.GetName() + wxT( "." )
+                                                           + FILEEXT::KiCadSchematicFileExtension );
 
                 std::vector<SCH_FIELD>& sheetFields = sheet->GetFields();
 
                 // Copy default fields into the sheet
-                for( const auto& [fieldName, fieldValue] : designBlock->GetFields() )
+                for( const auto& field : designBlock->GetFields() )
                 {
-                    sheetFields.emplace_back( sheet, FIELD_T::USER, fieldName );
-                    sheetFields.back().SetText( fieldValue );
-                    sheetFields.back().SetVisible( false );
+                    SCH_FIELD newField( sheet, sheetFields.size(), field.first );
+                    newField.SetText( field.second );
+                    newField.SetVisible( false );
+
+                    sheetFields.emplace_back( newField );
                 }
             }
             else
             {
-                sheet->GetField( FIELD_T::SHEET_NAME )->SetText( wxT( "Untitled Sheet" ) );
-                sheet->GetField( FIELD_T::SHEET_FILENAME )->SetText( wxString::Format( wxT( "untitled.%s" ), FILEEXT::KiCadSchematicFileExtension ) );
+                sheet->GetFields()[SHEETNAME].SetText( wxT( "Untitled Sheet" ) );
+                sheet->GetFields()[SHEETFILENAME].SetText(
+                    wxString::Format( wxT( "untitled.%s" ), FILEEXT::KiCadSchematicFileExtension ) );
             }
 
             sheet->SetFlags( IS_NEW | IS_MOVING );
@@ -3339,110 +3300,6 @@ int SCH_DRAWING_TOOLS::SyncSheetsPins( const TOOL_EVENT& aEvent )
 }
 
 
-int SCH_DRAWING_TOOLS::AutoPlaceAllSheetPins( const TOOL_EVENT& aEvent )
-{
-    if( m_inDrawingTool )
-        return 0;
-
-    REENTRANCY_GUARD guard( &m_inDrawingTool );
-
-    SCH_SHEET* sheet = dynamic_cast<SCH_SHEET*>( m_selectionTool->GetSelection().Front() );
-    std::vector<SCH_HIERLABEL*> labels = importHierLabels( sheet );
-
-    if( labels.empty() )
-    {
-        m_frame->PushTool( aEvent );
-        m_statusPopup = std::make_unique<STATUS_TEXT_POPUP>( m_frame );
-        m_statusPopup->SetText( _( "No new hierarchical labels found." ) );
-        m_statusPopup->Move( KIPLATFORM::UI::GetMousePosition() + wxPoint( 20, 20 ) );
-        m_statusPopup->PopupFor( 2000 );
-        m_frame->PopTool( aEvent );
-        m_toolMgr->RunAction( EE_ACTIONS::clearSelection );
-        m_view->ClearPreview();
-        return 0;
-    }
-
-    m_toolMgr->RunAction( EE_ACTIONS::clearSelection );
-
-    SCH_COMMIT commit( m_toolMgr );
-    BOX2I      boundingBox = sheet->GetBoundingBox();
-    VECTOR2I   cursorPos = boundingBox.GetPosition();
-    SCH_ITEM*  lastPlacedLabel = nullptr;
-
-    auto calculatePositionForLabel = [&]( const SCH_ITEM* lastLabel,
-                                          const SCH_HIERLABEL* currentLabel ) -> VECTOR2I
-    {
-        if( !lastLabel )
-            return cursorPos;
-
-        int lastX = lastLabel->GetPosition().x;
-        int lastY = lastLabel->GetPosition().y;
-        int lastWidth = lastLabel->GetBoundingBox().GetWidth();
-        int lastHeight = lastLabel->GetBoundingBox().GetHeight();
-
-        int currentWidth = currentLabel->GetBoundingBox().GetWidth();
-        int currentHeight = currentLabel->GetBoundingBox().GetHeight();
-
-        // If there is enough space, place the label to the right of the last placed label
-        if( ( lastX + lastWidth + currentWidth )
-            <= ( boundingBox.GetPosition().x + boundingBox.GetSize().x ) )
-            return { lastX + lastWidth, lastY };
-
-        // If not enough space to the right, move to the next row if vertical space allows
-        if( ( lastY + lastHeight + currentHeight )
-            <= ( boundingBox.GetPosition().y + boundingBox.GetSize().y ) )
-            return { boundingBox.GetPosition().x, lastY + lastHeight };
-
-        return cursorPos;
-    };
-
-    for( SCH_HIERLABEL* label : labels )
-    {
-        if( !lastPlacedLabel )
-        {
-            std::vector<SCH_SHEET_PIN*> existingPins = sheet->GetPins();
-
-            if( !existingPins.empty() )
-            {
-                std::sort( existingPins.begin(), existingPins.end(),
-                           []( const SCH_ITEM* a, const SCH_ITEM* b )
-                           {
-                               return ( a->GetPosition().x < b->GetPosition().x )
-                                      || ( a->GetPosition().x == b->GetPosition().x
-                                           && a->GetPosition().y < b->GetPosition().y );
-                           } );
-
-                lastPlacedLabel = existingPins.back();
-            }
-        }
-
-        cursorPos = calculatePositionForLabel( lastPlacedLabel, label );
-        SCH_ITEM* item = createNewSheetPinFromLabel( sheet, cursorPos, label );
-
-        if( item )
-        {
-            item->SetFlags( IS_NEW | IS_MOVING );
-            item->AutoplaceFields( nullptr, AUTOPLACE_AUTO );
-            item->ClearFlags( IS_MOVING );
-
-            if( item->IsConnectable() )
-                m_frame->AutoRotateItem( m_frame->GetScreen(), item );
-
-            commit.Modify( sheet, m_frame->GetScreen() );
-
-            sheet->AddPin( static_cast<SCH_SHEET_PIN*>( item ) );
-            item->AutoplaceFields( m_frame->GetScreen(), AUTOPLACE_AUTO );
-
-            commit.Push( _( "Add Sheet Pin" ) );
-
-            lastPlacedLabel = item;
-        }
-    }
-
-    return 0;
-}
-
-
 int SCH_DRAWING_TOOLS::SyncAllSheetsPins( const TOOL_EVENT& aEvent )
 {
     static const std::function<void( std::list<SCH_SHEET_PATH>&, SCH_SCREEN*,
@@ -3511,27 +3368,6 @@ SCH_HIERLABEL* SCH_DRAWING_TOOLS::importHierLabel( SCH_SHEET* aSheet )
 }
 
 
-std::vector<SCH_HIERLABEL*> SCH_DRAWING_TOOLS::importHierLabels( SCH_SHEET* aSheet )
-{
-    if( !aSheet->GetScreen() )
-        return {};
-
-    std::vector<SCH_HIERLABEL*> labels;
-
-    for( EDA_ITEM* item : aSheet->GetScreen()->Items().OfType( SCH_HIER_LABEL_T ) )
-    {
-        SCH_HIERLABEL* label = static_cast<SCH_HIERLABEL*>( item );
-
-        if( !aSheet->HasPin( label->GetText() ) )
-        {
-            labels.push_back( label );
-        }
-    }
-
-    return labels;
-}
-
-
 void SCH_DRAWING_TOOLS::setTransitions()
 {
     // clang-format off
@@ -3563,6 +3399,5 @@ void SCH_DRAWING_TOOLS::setTransitions()
     Go( &SCH_DRAWING_TOOLS::ImportGraphics,      EE_ACTIONS::importGraphics.MakeEvent() );
     Go( &SCH_DRAWING_TOOLS::SyncSheetsPins,      EE_ACTIONS::syncSheetPins.MakeEvent() );
     Go( &SCH_DRAWING_TOOLS::SyncAllSheetsPins,   EE_ACTIONS::syncAllSheetsPins.MakeEvent() );
-    Go( &SCH_DRAWING_TOOLS::AutoPlaceAllSheetPins,   EE_ACTIONS::autoplaceAllSheetPins.MakeEvent() );
     // clang-format on
 }

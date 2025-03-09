@@ -635,8 +635,6 @@ bool MULTI_DRAGGER::multidragShove( std::vector<MDRAG_LINE>& aCompletedLines )
                 l.draggedLine = m_shove->GetModifiedHead( i );
 
             // this should not be linked (assert in rt-test)
-            l.draggedLine.ClearLinks();
-
             m_lastNode->Add( l.draggedLine );
         }
     }

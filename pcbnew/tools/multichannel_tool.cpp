@@ -576,8 +576,7 @@ wxString MULTICHANNEL_TOOL::stripComponentIndex( const wxString& aRef ) const
 
 int MULTICHANNEL_TOOL::findRoutedConnections( std::set<BOARD_ITEM*>&             aOutput,
                                               std::shared_ptr<CONNECTIVITY_DATA> aConnectivity,
-                                              const SHAPE_POLY_SET&        aRAPoly,
-                                              RULE_AREA*                   aRA,
+                                              const SHAPE_POLY_SET& aRAPoly, RULE_AREA* aRA,
                                               FOOTPRINT*                   aFp,
                                               const REPEAT_LAYOUT_OPTIONS& aOpts ) const
 {
@@ -585,9 +584,10 @@ int MULTICHANNEL_TOOL::findRoutedConnections( std::set<BOARD_ITEM*>&            
 
     for( PAD* pad : aFp->Pads() )
     {
-        auto connectedItems = aConnectivity->GetConnectedItems( pad, EXCLUDE_ZONES | IGNORE_NETS );
+        const std::vector<BOARD_CONNECTED_ITEM*> connItems = aConnectivity->GetConnectedItems(
+                pad, { PCB_PAD_T, PCB_TRACE_T, PCB_ARC_T, PCB_VIA_T, PCB_SHAPE_T }, true );
 
-        for( BOARD_CONNECTED_ITEM* item : connectedItems )
+        for( BOARD_CONNECTED_ITEM* item : connItems )
             conns.insert( item );
     }
 
@@ -902,7 +902,7 @@ bool MULTICHANNEL_TOOL::copyRuleAreaContents( TMATCH::COMPONENT_MATCHES& aMatche
                 if( !refField->IsVisible() )
                     continue;
 
-                PCB_FIELD* targetField = targetFP->GetField( refField->GetName() );
+                PCB_FIELD* targetField = targetFP->GetFieldById( refField->GetId() );
                 wxCHECK2( targetField, continue );
 
                 targetField->SetAttributes( refField->GetAttributes() );

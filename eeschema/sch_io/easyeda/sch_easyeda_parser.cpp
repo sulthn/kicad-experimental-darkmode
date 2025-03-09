@@ -963,11 +963,11 @@ LIB_SYMBOL* SCH_EASYEDA_PARSER::ParseSymbol( const VECTOR2D&              aOrigi
             if( valOpt->empty() )
                 continue;
 
-            SCH_FIELD* fd = ksymbol->FindFieldCaseInsensitive( attrName );
+            SCH_FIELD* fd = ksymbol->FindField( attrName, true );
 
             if( !fd )
             {
-                fd = new SCH_FIELD( ksymbol.get(), FIELD_T::USER, attrName );
+                fd = new SCH_FIELD( ksymbol.get(), ksymbol->GetNextAvailableFieldId(), attrName );
                 ksymbol->AddField( fd );
             }
 
@@ -990,7 +990,7 @@ std::pair<LIB_SYMBOL*, bool> SCH_EASYEDA_PARSER::MakePowerSymbol( const wxString
 
     LIB_ID libId = EasyEdaToKiCadLibID( wxEmptyString, aNetname );
 
-    ksymbol->SetGlobalPower();
+    ksymbol->SetPower();
     ksymbol->SetLibId( libId );
     ksymbol->SetName( aNetname );
     ksymbol->GetReferenceField().SetText( wxS( "#PWR" ) );
@@ -1245,7 +1245,7 @@ void SCH_EASYEDA_PARSER::ParseSchematic( SCHEMATIC* aSchematic, SCH_SHEET* aRoot
 
                 schSym->SetPosition( RelPos( pos ) );
 
-                SCH_FIELD* valField = schSym->GetField( FIELD_T::VALUE );
+                SCH_FIELD* valField = schSym->GetField( VALUE_FIELD );
 
                 valField->SetPosition( RelPos( valuePos ) );
                 valField->SetTextAngleDegrees( textAngle - angle );

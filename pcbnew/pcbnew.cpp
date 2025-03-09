@@ -66,11 +66,6 @@
 #include <wildcards_and_files_ext.h>
 #include "pcbnew_jobs_handler.h"
 
-#include <dialogs/panel_toolbar_customization.h>
-#include <3d_viewer/toolbars_3d.h>
-#include <toolbars_footprint_editor.h>
-#include <toolbars_pcb_editor.h>
-
 #include <wx/crt.h>
 
 /* init functions defined by swig */
@@ -85,7 +80,7 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
 
     IFACE( const char* aName, KIWAY::FACE_T aType ) :
             KIFACE_BASE( aName, aType ),
-            UNITS_PROVIDER( pcbIUScale, EDA_UNITS::MM )
+            UNITS_PROVIDER( pcbIUScale, EDA_UNITS::MILLIMETRES )
     {}
 
     bool OnKifaceStart( PGM_BASE* aProgram, int aCtlBits, KIWAY* aKiway ) override;
@@ -234,24 +229,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
             return new PANEL_FP_EDITOR_GRAPHICS_DEFAULTS( aParent, this );
         }
 
-        case PANEL_FP_TOOLBARS:
-        {
-            SETTINGS_MANAGER&  mgr = Pgm().GetSettingsManager();
-            APP_SETTINGS_BASE* cfg = mgr.GetAppSettings<FOOTPRINT_EDITOR_SETTINGS>( "fpedit" );
-            TOOLBAR_SETTINGS*  tb  = mgr.GetToolbarSettings<FOOTPRINT_EDIT_TOOLBAR_SETTINGS>( "fpedit-toolbars" );
-
-            std::vector<TOOL_ACTION*>            actions;
-            std::vector<ACTION_TOOLBAR_CONTROL*> controls;
-
-            for( TOOL_ACTION* action : ACTION_MANAGER::GetActionList() )
-                actions.push_back( action );
-
-            for( ACTION_TOOLBAR_CONTROL* control : ACTION_TOOLBAR::GetCustomControlList() )
-                controls.push_back( control );
-
-            return new PANEL_TOOLBAR_CUSTOMIZATION( aParent, cfg, tb, actions, controls );
-        }
-
         case PANEL_FP_COLORS:
             return new PANEL_FP_EDITOR_COLOR_SETTINGS( aParent );
 
@@ -316,24 +293,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
             return new PANEL_PCBNEW_COLOR_SETTINGS( aParent, board );
         }
 
-        case PANEL_PCB_TOOLBARS:
-        {
-            SETTINGS_MANAGER&  mgr = Pgm().GetSettingsManager();
-            APP_SETTINGS_BASE* cfg = mgr.GetAppSettings<PCBNEW_SETTINGS>( "pcbnew" );
-            TOOLBAR_SETTINGS*  tb  = mgr.GetToolbarSettings<PCB_EDIT_TOOLBAR_SETTINGS>( "pcbnew-toolbars" );
-
-            std::vector<TOOL_ACTION*>            actions;
-            std::vector<ACTION_TOOLBAR_CONTROL*> controls;
-
-            for( TOOL_ACTION* action : ACTION_MANAGER::GetActionList() )
-                actions.push_back( action );
-
-            for( ACTION_TOOLBAR_CONTROL* control : ACTION_TOOLBAR::GetCustomControlList() )
-                controls.push_back( control );
-
-            return new PANEL_TOOLBAR_CUSTOMIZATION( aParent, cfg, tb, actions, controls );
-        }
-
         case PANEL_PCB_ACTION_PLUGINS:
             return new PANEL_PCBNEW_ACTION_PLUGINS( aParent );
 
@@ -345,24 +304,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
 
         case PANEL_3DV_RAYTRACING:
             return new PANEL_3D_RAYTRACING_OPTIONS( aParent );
-
-        case PANEL_3DV_TOOLBARS:
-            {
-                SETTINGS_MANAGER&  mgr = Pgm().GetSettingsManager();
-                APP_SETTINGS_BASE* cfg = mgr.GetAppSettings<EDA_3D_VIEWER_SETTINGS>( "3d_viewer" );
-                TOOLBAR_SETTINGS*  tb  = mgr.GetToolbarSettings<EDA_3D_VIEWER_TOOLBAR_SETTINGS>( "3d_viewer-toolbars" );
-
-                std::vector<TOOL_ACTION*>            actions;
-                std::vector<ACTION_TOOLBAR_CONTROL*> controls;
-
-                for( TOOL_ACTION* action : ACTION_MANAGER::GetActionList() )
-                    actions.push_back( action );
-
-                for( ACTION_TOOLBAR_CONTROL* control : ACTION_TOOLBAR::GetCustomControlList() )
-                    controls.push_back( control );
-
-                return new PANEL_TOOLBAR_CUSTOMIZATION( aParent, cfg, tb, actions, controls );
-            }
 
         default:
             return nullptr;

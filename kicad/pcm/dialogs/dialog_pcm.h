@@ -30,18 +30,14 @@
 
 #include <vector>
 
-class EDA_BASE_FRAME;
-
 
 /** Implementing pcm main dialog. */
 class DIALOG_PCM : public DIALOG_PCM_BASE
 {
 public:
     /** Constructor */
-    DIALOG_PCM( EDA_BASE_FRAME* parent, std::shared_ptr<PLUGIN_CONTENT_MANAGER> pcm );
+    DIALOG_PCM( wxWindow* parent, std::shared_ptr<PLUGIN_CONTENT_MANAGER> pcm );
     ~DIALOG_PCM();
-
-    EDA_BASE_FRAME* ParentFrame() const { return m_parentFrame; }
 
     ///< Closes the window, asks user confirmation if there are pending actions
     void OnCloseClicked( wxCommandEvent& event ) override;
@@ -106,7 +102,6 @@ private:
     ///< Discards specified pending action
     void discardAction( int aIndex );
 
-    EDA_BASE_FRAME*                                            m_parentFrame;
     std::shared_ptr<PLUGIN_CONTENT_MANAGER>                    m_pcm;
     ActionCallback                                             m_actionCallback;
     PinCallback                                                m_pinCallback;

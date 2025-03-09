@@ -107,21 +107,28 @@ static inline long parseInt( const wxString& aValue, double aScalar )
  * footprint portion of the PLUGIN API, and only for the #PCB_IO_KICAD_SEXPR plugin.  It is
  * private to this implementation file so it is not placed into a header.
  */
-class GPCB_FPL_CACHE_ENTRY
+class GPCB_FPL_CACHE_ITEM
 {
 public:
-    GPCB_FPL_CACHE_ENTRY( FOOTPRINT* aFootprint, const WX_FILENAME& aFileName ) :
-            m_filename( aFileName ),
-            m_footprint( aFootprint )
-    { }
+    GPCB_FPL_CACHE_ITEM( FOOTPRINT* aFootprint, const WX_FILENAME& aFileName );
 
-    WX_FILENAME GetFileName() const  { return m_filename; }
-    std::unique_ptr<FOOTPRINT>& GetFootprint() { return m_footprint; }
+    WX_FILENAME  GetFileName() const  { return m_filename; }
+    FOOTPRINT*      GetFootprint() const { return m_footprint.get(); }
 
 private:
     WX_FILENAME m_filename;       ///< The full file name and path of the footprint to cache.
     std::unique_ptr<FOOTPRINT> m_footprint;
 };
+
+
+GPCB_FPL_CACHE_ITEM::GPCB_FPL_CACHE_ITEM( FOOTPRINT* aFootprint, const WX_FILENAME& aFileName ) :
+        m_filename( aFileName ),
+        m_footprint( aFootprint )
+{
+}
+
+
+typedef boost::ptr_map< std::string, GPCB_FPL_CACHE_ITEM >  FOOTPRINT_MAP;
 
 
 class GPCB_FPL_CACHE
@@ -131,7 +138,7 @@ public:
 
     wxString GetPath() const { return m_lib_path.GetPath(); }
     bool IsWritable() const { return m_lib_path.IsOk() && m_lib_path.IsDirWritable(); }
-    boost::ptr_map<std::string, GPCB_FPL_CACHE_ENTRY>& GetFootprints() { return m_footprints; }
+    FOOTPRINT_MAP& GetFootprints() { return m_footprints; }
 
     // Most all functions in this class throw IO_ERROR exceptions.  There are no
     // error codes nor user interface calls from here, nor in any PLUGIN.
@@ -190,9 +197,7 @@ private:
 
     PCB_IO_GEDA*    m_owner;            ///< Plugin object that owns the cache.
     wxFileName      m_lib_path;         ///< The path of the library.
-
-    boost::ptr_map<std::string, GPCB_FPL_CACHE_ENTRY> m_footprints;  ///< Map of footprint filename
-                                                                     ///<   to cache entries.
+    FOOTPRINT_MAP   m_footprints;       ///< Map of footprint file name to FOOTPRINT*.
 
     bool            m_cache_dirty;      ///< Stored separately because it's expensive to check
                                         ///< m_cache_timestamp against all the files.
@@ -252,7 +257,7 @@ void GPCB_FPL_CACHE::Load()
 
             // The footprint name is the file name without the extension.
             footprint->SetFPID( LIB_ID( wxEmptyString, fn.GetName() ) );
-            m_footprints.insert( name, new GPCB_FPL_CACHE_ENTRY( footprint, fn ) );
+            m_footprints.insert( name, new GPCB_FPL_CACHE_ITEM( footprint, fn ) );
         }
         catch( const IO_ERROR& ioe )
         {
@@ -272,7 +277,7 @@ void GPCB_FPL_CACHE::Remove( const wxString& aFootprintName )
 {
     std::string footprintName = TO_UTF8( aFootprintName );
 
-    auto it = m_footprints.find( footprintName );
+    FOOTPRINT_MAP::const_iterator it = m_footprints.find( footprintName );
 
     if( it == m_footprints.end() )
     {
@@ -908,12 +913,14 @@ const FOOTPRINT* PCB_IO_GEDA::getFootprint( const wxString& aLibraryPath,
 
     validateCache( aLibraryPath, checkModified );
 
-    auto it = m_cache->GetFootprints().find( TO_UTF8( aFootprintName ) );
+    const FOOTPRINT_MAP& mods = m_cache->GetFootprints();
 
-    if( it == m_cache->GetFootprints().end() )
+    FOOTPRINT_MAP::const_iterator it = mods.find( TO_UTF8( aFootprintName ) );
+
+    if( it == mods.end() )
         return nullptr;
 
-    return it->second->GetFootprint().get();
+    return it->second->GetFootprint();
 }
 
 

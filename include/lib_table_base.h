@@ -188,8 +188,6 @@ public:
 
     void SetVisible( bool aVisible = true ) { visible = aVisible; }
 
-    virtual bool LibraryExists() const = 0;
-
     virtual bool Refresh() { return false; }
 
     /**

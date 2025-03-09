@@ -45,7 +45,6 @@
 #include <pgm_base.h>
 #include <settings/settings_manager.h>
 #include <tool/tool_manager.h>
-#include <tools/pcb_actions.h>
 #include <tools/pcb_selection_tool.h>
 #include <validators.h>
 #include <widgets/grid_text_button_helpers.h>
@@ -54,8 +53,6 @@
 #include <widgets/wx_grid.h>
 
 #include <fp_lib_table.h>
-#include <project_pcb.h>
-#include <kidialog.h>
 
 PRIVATE_LAYERS_GRID_TABLE::PRIVATE_LAYERS_GRID_TABLE( PCB_BASE_FRAME* aFrame ) :
         m_frame( aFrame )
@@ -66,7 +63,7 @@ PRIVATE_LAYERS_GRID_TABLE::PRIVATE_LAYERS_GRID_TABLE( PCB_BASE_FRAME* aFrame ) :
     LSET forbiddenLayers = LSET::AllCuMask() | LSET::AllTechMask();
     forbiddenLayers.set( Edge_Cuts );
     forbiddenLayers.set( Margin );
-    m_layerColAttr->SetEditor( new GRID_CELL_LAYER_SELECTOR( m_frame, forbiddenLayers, true ) );
+    m_layerColAttr->SetEditor( new GRID_CELL_LAYER_SELECTOR( m_frame, forbiddenLayers ) );
 }
 
 
@@ -384,8 +381,7 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::TransferDataToWindow()
 }
 
 
-bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::checkFootprintName( const wxString& aFootprintName,
-                                                                LIB_ID* doOverwrite )
+bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::checkFootprintName( const wxString& aFootprintName )
 {
     if( aFootprintName.IsEmpty() )
     {
@@ -397,27 +393,6 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::checkFootprintName( const wxString& 
         m_delayedErrorMessage.Printf( _( "Footprint name may not contain '%s'." ),
                                       FOOTPRINT::StringLibNameInvalidChars( true ) );
         return false;
-    }
-
-    LIB_ID        fpID = m_footprint->GetFPID();
-    wxString      libraryName = fpID.GetLibNickname();
-    wxString      originalFPName = fpID.GetLibItemName();
-    FP_LIB_TABLE* tbl = PROJECT_PCB::PcbFootprintLibs( &m_frame->Prj() );
-
-    if( aFootprintName != originalFPName && tbl->FootprintExists( libraryName, aFootprintName ) )
-    {
-        wxString msg = wxString::Format( _( "Footprint '%s' already exists in library '%s'." ),
-                                         aFootprintName, libraryName );
-
-        KIDIALOG errorDlg( m_frame, msg, _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
-        errorDlg.SetOKLabel( _( "Overwrite" ) );
-
-        if( errorDlg.ShowModal() == wxID_OK )
-        {
-            doOverwrite->SetLibNickname( libraryName );
-            doOverwrite->SetLibItemName( aFootprintName );
-            return true;
-        }
     }
 
     return true;
@@ -434,9 +409,8 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::Validate()
 
     // First, test for invalid chars in footprint name
     wxString footprintName = m_FootprintNameCtrl->GetValue();
-    LIB_ID   overwrite;
 
-    if( !checkFootprintName( footprintName, &overwrite ) )
+    if( !checkFootprintName( footprintName ) )
     {
         if( m_NoteBook->GetSelection() != 0 )
             m_NoteBook->SetSelection( 0 );
@@ -448,7 +422,7 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::Validate()
     }
 
     // Check for valid field text properties
-    for( int i = 0; i < (int) m_fields->size(); ++i )
+    for( size_t i = 0; i < m_fields->size(); ++i )
     {
         PCB_FIELD& field = m_fields->at( i );
 
@@ -511,18 +485,15 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::Validate()
     if( !m_netClearance.Validate( 0, INT_MAX ) )
         return false;
 
-    if( overwrite.IsValid() )
-    {
-        if( m_frame->DeleteFootprintFromLibrary( overwrite, false /* already confirmed */ ) )
-            m_frame->SyncLibraryTree( true );
-    }
-
     return true;
 }
 
 
 bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::TransferDataFromWindow()
 {
+    if( !Validate() )
+        return false;
+
     if( !m_itemsGrid->CommitPendingChanges()
             || !m_privateLayersGrid->CommitPendingChanges()
             || !m_padGroupsGrid->CommitPendingChanges() )
@@ -530,9 +501,8 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::TransferDataFromWindow()
         return false;
     }
 
-    KIGFX::PCB_VIEW*    view = m_frame->GetCanvas()->GetView();
-    PCB_SELECTION_TOOL* selectionTool = m_frame->GetToolManager()->GetTool<PCB_SELECTION_TOOL>();
-    BOARD_COMMIT        commit( m_frame );
+    KIGFX::PCB_VIEW* view = m_frame->GetCanvas()->GetView();
+    BOARD_COMMIT     commit( m_frame );
     commit.Modify( m_footprint );
 
     // Must be done inside the commit to capture the undo state
@@ -546,10 +516,12 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::TransferDataFromWindow()
     std::set<wxString> files_to_delete;
 
     // Get the new files from the footprint fields
-    for( const PCB_FIELD& field : *m_fields )
+    for( size_t ii = 0; ii < m_fields->size(); ++ii )
     {
-        if( field.GetText().StartsWith( FILEEXT::KiCadUriPrefix ) )
-            files.insert( field.GetText() );
+        const wxString& name = m_fields->at( ii ).GetText();
+
+        if( name.StartsWith( FILEEXT::KiCadUriPrefix ) )
+            files.insert( name );
     }
 
     // Find any files referenced in the old fields that are not in the new fields
@@ -576,29 +548,32 @@ bool DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::TransferDataFromWindow()
     m_footprint->SetKeywords( m_KeywordCtrl->GetValue() );
 
     // Update fields
-    m_frame->GetToolManager()->RunAction( PCB_ACTIONS::selectionClear );
 
-    for( PCB_FIELD* existing : m_footprint->GetFields() )
+    std::vector<PCB_FIELD*> items_to_remove;
+    size_t                  i = 0;
+
+    for( PCB_FIELD* field : m_footprint->GetFields() )
     {
-        m_footprint->Remove( existing );
-        view->Remove( existing );
-        delete existing;
+        // copy grid table entries till we run out, then delete any remaining texts
+        if( i < m_fields->size() )
+            *field = m_fields->at( i++ );
+        else
+            items_to_remove.push_back( field );
     }
 
-    for( PCB_FIELD& field : *m_fields )
-    {
-        PCB_FIELD* newField = field.CloneField();
-        m_footprint->Add( newField );
-        view->Add( newField );
+    // Remove text items:
+    PCB_SELECTION_TOOL* selTool = m_frame->GetToolManager()->GetTool<PCB_SELECTION_TOOL>();
 
-        if( newField->IsSelected() )
-        {
-            // The old copy was in the selection list, but this one is not.  Remove the
-            // out-of-sync selection flag so we can re-add the field to the selection.
-            newField->ClearSelected();
-            selectionTool->AddItemToSel( newField, true );
-        }
+    for( PCB_TEXT* item : items_to_remove )
+    {
+        selTool->RemoveItemFromSel( item );
+        view->Remove( item );
+        item->DeleteStructure();
     }
+
+    // if there are still grid table entries, create new fields for them
+    while( i < m_fields->size() )
+        view->Add( m_footprint->AddField( m_fields->at( i++ ) ) );
 
     LSET privateLayers;
 
@@ -695,7 +670,7 @@ void DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::OnAddField( wxCommandEvent& event )
 
     const BOARD_DESIGN_SETTINGS& dsnSettings = m_frame->GetDesignSettings();
 
-    PCB_FIELD newField( m_footprint, FIELD_T::USER,
+    PCB_FIELD newField( m_footprint, m_footprint->GetNextFieldId(),
                         GetUserFieldName( m_fields->GetNumberRows(), DO_TRANSLATE ) );
 
     // Set active layer if legal; otherwise copy layer from previous text item
@@ -715,8 +690,8 @@ void DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::OnAddField( wxCommandEvent& event )
     m_itemsGrid->ProcessTableMessage( msg );
 
     m_itemsGrid->SetFocus();
-    m_itemsGrid->MakeCellVisible( (int) m_fields->size() - 1, 0 );
-    m_itemsGrid->SetGridCursor( (int) m_fields->size() - 1, 0 );
+    m_itemsGrid->MakeCellVisible( m_fields->size() - 1, 0 );
+    m_itemsGrid->SetGridCursor( m_fields->size() - 1, 0 );
 
     m_itemsGrid->EnableCellEditControl( true );
     m_itemsGrid->ShowCellEditControl();
@@ -793,8 +768,8 @@ void DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::OnAddLayer( wxCommandEvent& event )
     m_privateLayersGrid->ProcessTableMessage( msg );
 
     m_privateLayersGrid->SetFocus();
-    m_privateLayersGrid->MakeCellVisible( (int) m_privateLayers->size() - 1, 0 );
-    m_privateLayersGrid->SetGridCursor( (int) m_privateLayers->size() - 1, 0 );
+    m_privateLayersGrid->MakeCellVisible( m_privateLayers->size() - 1, 0 );
+    m_privateLayersGrid->SetGridCursor( m_privateLayers->size() - 1, 0 );
 
     OnModify();
 }
@@ -857,7 +832,7 @@ void DIALOG_FOOTPRINT_PROPERTIES_FP_EDITOR::OnRemovePadGroup( wxCommandEvent& ev
     if( selectedRows.empty() && curRow >= 0 && curRow < m_padGroupsGrid->GetNumberRows() )
         selectedRows.Add( curRow );
 
-    for( int ii = (int) selectedRows.Count() - 1; ii >= 0; --ii )
+    for( int ii = selectedRows.Count() - 1; ii >= 0; --ii )
     {
         int row = selectedRows.Item( ii );
         m_padGroupsGrid->DeleteRows( row, 1 );

@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 4.2.1-62-g497c85bd-dirty)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -51,11 +51,11 @@ class PANEL_JOBSET_BASE : public PANEL_NOTEBOOK_BASE
 		STD_BITMAP_BUTTON* m_buttonUp;
 		STD_BITMAP_BUTTON* m_buttonDown;
 		STD_BITMAP_BUTTON* m_buttonDelete;
-		wxScrolledWindow* m_destinationList;
-		wxBoxSizer* m_destinationListSizer;
-		STD_BITMAP_BUTTON* m_buttonAddDestination;
+		wxScrolledWindow* m_outputList;
+		wxBoxSizer* m_outputListSizer;
+		STD_BITMAP_BUTTON* m_buttonOutputAdd;
 		wxButton* m_buttonSave;
-		wxButton* m_buttonGenerateAllDestinations;
+		wxButton* m_buttonRunAllOutputs;
 
 		// Virtual event handlers, override them in your derived class
 		virtual void OnGridCellChange( wxGridEvent& event ) { event.Skip(); }
@@ -64,9 +64,9 @@ class PANEL_JOBSET_BASE : public PANEL_NOTEBOOK_BASE
 		virtual void OnJobButtonUp( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnJobButtonDown( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnJobButtonDelete( wxCommandEvent& event ) { event.Skip(); }
-		virtual void OnAddDestinationClick( wxCommandEvent& event ) { event.Skip(); }
+		virtual void OnAddOutputClick( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnSaveButtonClick( wxCommandEvent& event ) { event.Skip(); }
-		virtual void OnGenerateAllDestinationsClick( wxCommandEvent& event ) { event.Skip(); }
+		virtual void OnGenerateAllOutputsClick( wxCommandEvent& event ) { event.Skip(); }
 
 
 	public:
@@ -78,9 +78,9 @@ class PANEL_JOBSET_BASE : public PANEL_NOTEBOOK_BASE
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Class PANEL_DESTINATION_BASE
+/// Class PANEL_JOBSET_OUTPUT_BASE
 ///////////////////////////////////////////////////////////////////////////////
-class PANEL_DESTINATION_BASE : public wxPanel
+class PANEL_JOBSET_OUTPUT_BASE : public wxPanel
 {
 	private:
 
@@ -102,16 +102,16 @@ class PANEL_DESTINATION_BASE : public wxPanel
 
 	public:
 
-		PANEL_DESTINATION_BASE( wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1,-1 ), long style = wxBORDER_SUNKEN|wxTAB_TRAVERSAL, const wxString& name = wxEmptyString );
+		PANEL_JOBSET_OUTPUT_BASE( wxWindow* parent, wxWindowID id = wxID_ANY, const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1,-1 ), long style = wxBORDER_SUNKEN|wxTAB_TRAVERSAL, const wxString& name = wxEmptyString );
 
-		~PANEL_DESTINATION_BASE();
+		~PANEL_JOBSET_OUTPUT_BASE();
 
 };
 
 ///////////////////////////////////////////////////////////////////////////////
-/// Class DIALOG_JOBSET_RUN_LOG_BASE
+/// Class DIALOG_OUTPUT_RUN_RESULTS_BASE
 ///////////////////////////////////////////////////////////////////////////////
-class DIALOG_JOBSET_RUN_LOG_BASE : public DIALOG_SHIM
+class DIALOG_OUTPUT_RUN_RESULTS_BASE : public DIALOG_SHIM
 {
 	private:
 
@@ -123,16 +123,16 @@ class DIALOG_JOBSET_RUN_LOG_BASE : public DIALOG_SHIM
 		wxButton* m_sdbSizerOK;
 
 		// Virtual event handlers, override them in your derived class
-		virtual void OnUpdateUI( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void OnJobListItemSelected( wxListEvent& event ) { event.Skip(); }
+		virtual void onJobListSize( wxSizeEvent& event ) { event.Skip(); }
 		virtual void OnButtonOk( wxCommandEvent& event ) { event.Skip(); }
 
 
 	public:
 
-		DIALOG_JOBSET_RUN_LOG_BASE( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Jobset Run Log"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER );
+		DIALOG_OUTPUT_RUN_RESULTS_BASE( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Job Output Run Log"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize, long style = wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER );
 
-		~DIALOG_JOBSET_RUN_LOG_BASE();
+		~DIALOG_OUTPUT_RUN_RESULTS_BASE();
 
 };
 

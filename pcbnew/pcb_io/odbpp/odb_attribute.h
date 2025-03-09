@@ -285,7 +285,7 @@ USED_BY_FEATURE_ENTITY( VIA_TYPE )
 enum class COMP_MOUNT_TYPE
 {
     OTHER,
-    MT_SMD,
+    SMD,
     THT,
     PRESSFIT
 };

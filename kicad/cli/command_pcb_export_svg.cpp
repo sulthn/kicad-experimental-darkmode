@@ -32,7 +32,6 @@
 
 #define ARG_EXCLUDE_DRAWING_SHEET "--exclude-drawing-sheet"
 #define ARG_PAGE_SIZE "--page-size-mode"
-#define ARG_FIT_PAGE_TO_BOARD "--fit-page-to-board"
 #define ARG_MODE_SINGLE "--mode-single"
 #define ARG_MODE_MULTI "--mode-multi"
 
@@ -43,10 +42,6 @@ CLI::PCB_EXPORT_SVG_COMMAND::PCB_EXPORT_SVG_COMMAND() : PCB_EXPORT_BASE_COMMAND(
     addLayerArg( true );
     addDrawingSheetArg();
     addDefineArg();
-
-    m_argParser.add_argument( ARG_SUBTRACT_SOLDERMASK )
-            .help( UTF8STDSTR( _( "Subtract soldermask from silkscreen" ) ) )
-            .flag();
 
     m_argParser.add_argument( "-m", ARG_MIRROR )
             .help( UTF8STDSTR( _( "Mirror the board (useful for trying to show bottom layers)" ) ) )
@@ -88,10 +83,6 @@ CLI::PCB_EXPORT_SVG_COMMAND::PCB_EXPORT_SVG_COMMAND() : PCB_EXPORT_BASE_COMMAND(
             .default_value( 0 )
             .metavar( "MODE" );
 
-    m_argParser.add_argument( ARG_FIT_PAGE_TO_BOARD )
-            .help( UTF8STDSTR( _( "Fit the page to the board" ) ) )
-            .flag();
-
     m_argParser.add_argument( ARG_EXCLUDE_DRAWING_SHEET )
             .help( UTF8STDSTR( _( "No drawing sheet" ) ) )
             .flag();
@@ -124,8 +115,9 @@ CLI::PCB_EXPORT_SVG_COMMAND::PCB_EXPORT_SVG_COMMAND() : PCB_EXPORT_BASE_COMMAND(
                                   "which files may be output." ) ) )
             .flag();
 
-    m_argParser.add_argument( DEPRECATED_ARG_PLOT_INVISIBLE_TEXT )
-            .help( UTF8STDSTR( _( DEPRECATED_ARG_PLOT_INVISIBLE_TEXT_DESC ) ) )
+
+    m_argParser.add_argument( ARG_PLOT_INVISIBLE_TEXT )
+            .help( UTF8STDSTR( _( ARG_PLOT_INVISIBLE_TEXT_DESC ) ) )
             .flag();
 }
 
@@ -140,6 +132,7 @@ int CLI::PCB_EXPORT_SVG_COMMAND::doPerform( KIWAY& aKiway )
 
     svgJob->m_mirror = m_argParser.get<bool>( ARG_MIRROR );
     svgJob->m_blackAndWhite = m_argParser.get<bool>( ARG_BLACKANDWHITE );
+    svgJob->m_pageSizeMode = m_argParser.get<int>( ARG_PAGE_SIZE );
     svgJob->m_negative = m_argParser.get<bool>( ARG_NEGATIVE );
     svgJob->m_sketchPadsOnFabLayers = m_argParser.get<bool>( ARG_SKETCH_PADS_ON_FAB_LAYERS );
     svgJob->m_hideDNPFPsOnFabLayers = m_argParser.get<bool>( ARG_HIDE_DNP_FPS_ON_FAB_LAYERS );
@@ -148,29 +141,7 @@ int CLI::PCB_EXPORT_SVG_COMMAND::doPerform( KIWAY& aKiway )
     int drillShape = m_argParser.get<int>( ARG_DRILL_SHAPE_OPTION );
     svgJob->m_drillShapeOption = static_cast<JOB_EXPORT_PCB_SVG::DRILL_MARKS>( drillShape );
     svgJob->m_drawingSheet = m_argDrawingSheet;
-    svgJob->m_subtractSolderMaskFromSilk = m_argParser.get<bool>( ARG_SUBTRACT_SOLDERMASK );
-
-    if( m_argParser.get<bool>( DEPRECATED_ARG_PLOT_INVISIBLE_TEXT ) )
-        wxFprintf( stdout, DEPRECATED_ARD_PLOT_INVISIBLE_TEXT_WARNING );
-
-    svgJob->m_fitPageToBoard = m_argParser.get<bool>( ARG_FIT_PAGE_TO_BOARD );
-
-    // legacy compat, should eliminate this arg eventually
-    int legacyPageSizeMode = m_argParser.get<int>( ARG_PAGE_SIZE );
-
-    if( legacyPageSizeMode == 0 )
-    {
-        svgJob->m_plotDrawingSheet = true;
-    }
-    else if( legacyPageSizeMode == 1 )
-    {
-        svgJob->m_plotDrawingSheet = false;
-    }
-    else if( legacyPageSizeMode == 2 )
-    {
-        svgJob->m_fitPageToBoard = true;
-        svgJob->m_plotDrawingSheet = false;
-    }
+    svgJob->m_plotInvisibleText = m_argParser.get<bool>( ARG_PLOT_INVISIBLE_TEXT );
 
     svgJob->m_filename = m_argInput;
     svgJob->SetConfiguredOutputPath( m_argOutput );
@@ -179,7 +150,8 @@ int CLI::PCB_EXPORT_SVG_COMMAND::doPerform( KIWAY& aKiway )
     svgJob->SetVarOverrides( m_argDefineVars );
 
     wxString layers = From_UTF8( m_argParser.get<std::string>( ARG_COMMON_LAYERS ).c_str() );
-    svgJob->m_plotOnAllLayersSequence = convertLayerStringList( layers );
+    bool     blah = false;
+    svgJob->m_printMaskLayersToIncludeOnAllLayers = convertLayerStringList( layers, blah );
 
     if( !wxFile::Exists( svgJob->m_filename ) )
     {
@@ -187,15 +159,15 @@ int CLI::PCB_EXPORT_SVG_COMMAND::doPerform( KIWAY& aKiway )
         return EXIT_CODES::ERR_INVALID_INPUT_FILE;
     }
 
-    svgJob->m_plotLayerSequence = m_selectedLayers;
+    svgJob->m_printMaskLayer = m_selectedLayers;
 
     if( m_argParser.get<bool>( ARG_MODE_MULTI ) )
         svgJob->m_genMode = JOB_EXPORT_PCB_SVG::GEN_MODE::MULTI;
-    else if( m_argParser.get<bool>( ARG_MODE_SINGLE ) )
+    else
         svgJob->m_genMode = JOB_EXPORT_PCB_SVG::GEN_MODE::SINGLE;
-    else if( svgJob->m_genMode == JOB_EXPORT_PCB_SVG::GEN_MODE::SINGLE )
+
+    if( svgJob->m_genMode == JOB_EXPORT_PCB_SVG::GEN_MODE::SINGLE )
     {
-        // TODO remove this block when changing the default for JOB_EXPORT_PCB_SVG::m_genMode
         wxFprintf( stdout, wxT( "\033[33;1m%s\033[0m\n" ),
                    _( "This command has deprecated behavior as of KiCad 9.0, the default behavior "
                       "of this command will change in a future release." ) );

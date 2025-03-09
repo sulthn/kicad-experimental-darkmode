@@ -116,7 +116,6 @@
 #include <view/wx_view_controls.h>
 #include <footprint_viewer_frame.h>
 #include <footprint_chooser_frame.h>
-#include <toolbars_pcb_editor.h>
 
 #ifdef KICAD_IPC_API
 #include <api/api_server.h>
@@ -175,6 +174,8 @@ BEGIN_EVENT_TABLE( PCB_EDIT_FRAME, PCB_BASE_FRAME )
     EVT_MENU( ID_PCB_GEN_CMP_FILE, PCB_EDIT_FRAME::RecreateCmpFileFromBoard )
 
     // Horizontal toolbar
+    EVT_TOOL( ID_AUX_TOOLBAR_PCB_SELECT_AUTO_WIDTH, PCB_EDIT_FRAME::Tracks_and_Vias_Size_Event )
+    EVT_COMBOBOX( ID_TOOLBARH_PCB_SELECT_LAYER, PCB_EDIT_FRAME::Process_Special_Functions )
     EVT_CHOICE( ID_AUX_TOOLBAR_PCB_TRACK_WIDTH, PCB_EDIT_FRAME::Tracks_and_Vias_Size_Event )
     EVT_CHOICE( ID_AUX_TOOLBAR_PCB_VIA_SIZE, PCB_EDIT_FRAME::Tracks_and_Vias_Size_Event )
 
@@ -183,8 +184,10 @@ BEGIN_EVENT_TABLE( PCB_EDIT_FRAME, PCB_BASE_FRAME )
                     PCB_EDIT_FRAME::Tracks_and_Vias_Size_Event )
 
     // User interface update event handlers.
+    EVT_UPDATE_UI( ID_TOOLBARH_PCB_SELECT_LAYER, PCB_EDIT_FRAME::OnUpdateLayerSelectBox )
     EVT_UPDATE_UI( ID_AUX_TOOLBAR_PCB_TRACK_WIDTH, PCB_EDIT_FRAME::OnUpdateSelectTrackWidth )
     EVT_UPDATE_UI( ID_AUX_TOOLBAR_PCB_VIA_SIZE, PCB_EDIT_FRAME::OnUpdateSelectViaSize )
+    EVT_UPDATE_UI( ID_AUX_TOOLBAR_PCB_SELECT_AUTO_WIDTH, PCB_EDIT_FRAME::OnUpdateSelectAutoWidth )
     EVT_UPDATE_UI_RANGE( ID_POPUP_PCB_SELECT_WIDTH1, ID_POPUP_PCB_SELECT_WIDTH8,
                          PCB_EDIT_FRAME::OnUpdateSelectTrackWidth )
     EVT_UPDATE_UI_RANGE( ID_POPUP_PCB_SELECT_VIASIZE1, ID_POPUP_PCB_SELECT_VIASIZE8,
@@ -212,6 +215,7 @@ PCB_EDIT_FRAME::PCB_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_showBorderAndTitleBlock = true;   // true to display sheet references
     m_SelTrackWidthBox = nullptr;
     m_SelViaSizeBox = nullptr;
+    m_SelLayerBox = nullptr;
     m_show_layer_manager_tools = true;
     m_supportsAutoSave = true;
     m_probingSchToPcb = false;
@@ -268,24 +272,21 @@ PCB_EDIT_FRAME::PCB_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     setupTools();
     setupUIConditions();
 
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<PCB_EDIT_TOOLBAR_SETTINGS>( "pcbnew-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
-    PrepareLayerIndicator( true );
-
     ReCreateMenuBar();
+    ReCreateHToolbar();
+    ReCreateAuxiliaryToolbar();
+    ReCreateVToolbar();
+    ReCreateOptToolbar();
 
 #ifdef KICAD_IPC_API
     wxTheApp->Bind( EDA_EVT_PLUGIN_AVAILABILITY_CHANGED,
                     &PCB_EDIT_FRAME::onPluginAvailabilityChanged, this );
 #endif
 
-    // Fetch a COPY of the config as a lot of these initializations are going to overwrite our
-    // data.
-    PCBNEW_SETTINGS::AUI_PANELS aui_cfg = GetPcbNewSettings()->m_AuiPanels;
-
     m_propertiesPanel = new PCB_PROPERTIES_PANEL( this, this );
-    m_propertiesPanel->SetSplitterProportion( aui_cfg.properties_splitter );
+
+    float proportion = GetPcbNewSettings()->m_AuiPanels.properties_splitter;
+    m_propertiesPanel->SetSplitterProportion( proportion );
 
     m_selectionFilterPanel = new PANEL_SELECTION_FILTER( this );
 
@@ -306,39 +307,34 @@ PCB_EDIT_FRAME::PCB_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_auimgr.SetFlags( auiFlags );
 
     // Rows; layers 4 - 6
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( wxS( "TopMainToolbar" ) )
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( wxS( "MainToolbar" ) )
                       .Top().Layer( 6 ) );
-    m_auimgr.AddPane( m_tbTopAux, EDA_PANE().HToolbar().Name( wxS( "TopAuxToolbar" ) )
+    m_auimgr.AddPane( m_auxiliaryToolBar, EDA_PANE().HToolbar().Name( wxS( "AuxToolbar" ) )
                       .Top().Layer( 5 ) );
     m_auimgr.AddPane( m_messagePanel, EDA_PANE().Messages().Name( wxS( "MsgPanel" ) )
                       .Bottom().Layer( 6 ) );
 
     // Columns; layers 1 - 3
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().VToolbar().Name( wxS( "LeftToolbar" ) )
+    m_auimgr.AddPane( m_optionsToolBar, EDA_PANE().VToolbar().Name( wxS( "OptToolbar" ) )
                       .Left().Layer( 3 ) );
 
-    m_auimgr.AddPane( m_tbRight, EDA_PANE().VToolbar().Name( wxS( "RightToolbar" ) )
+    m_auimgr.AddPane( m_drawToolBar, EDA_PANE().VToolbar().Name( wxS( "ToolsToolbar" ) )
                       .Right().Layer( 3 ) );
 
     m_auimgr.AddPane( m_appearancePanel, EDA_PANE().Name( wxS( "LayersManager" ) )
                       .Right().Layer( 4 )
                       .Caption( _( "Appearance" ) ).PaneBorder( false )
-                      .MinSize( m_appearancePanel->GetMinSize().x, -1 )
-#ifdef __WXMAC__
-                      // Best size for this pane is calculated larger than necessary on wxMac
-                      .BestSize( m_appearancePanel->GetMinSize().x, -1 )
-#else
-                      .BestSize( m_appearancePanel->GetBestSize().x, -1 )
-#endif
-                      .FloatingSize( m_appearancePanel->GetBestSize() )
+                      .MinSize( FromDIP( 180 ), -1 )
+                      .BestSize( FromDIP( 180 ), -1 )
+                      .FloatingSize( FromDIP( 180 ), -1 )
                       .CloseButton( false ) );
 
     m_auimgr.AddPane( m_selectionFilterPanel, EDA_PANE().Name( wxS( "SelectionFilter" ) )
                       .Right().Layer( 4 ).Position( 2 )
                       .Caption( _( "Selection Filter" ) ).PaneBorder( false )
-                      .MinSize( m_selectionFilterPanel->GetMinSize().x, -1  )
-                      .BestSize( m_selectionFilterPanel->GetBestSize().x, -1 )
-                      .FloatingSize( m_selectionFilterPanel->GetBestSize() )
+                      .MinSize( FromDIP( 180 ), -1 )
+                      .BestSize( FromDIP( 180 ), -1 )
+                      .FloatingSize( FromDIP( 180 ), -1 )
                       .CloseButton( false ) );
 
     m_auimgr.AddPane( m_propertiesPanel, EDA_PANE().Name( PropertiesPaneName() )
@@ -384,36 +380,40 @@ PCB_EDIT_FRAME::PCB_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
 
     FinishAUIInitialization();
 
-    if( aui_cfg.right_panel_width > 0 )
+    if( PCBNEW_SETTINGS* settings = dynamic_cast<PCBNEW_SETTINGS*>( config() ) )
     {
-        wxAuiPaneInfo& layersManager = m_auimgr.GetPane( wxS( "LayersManager" ) );
-        SetAuiPaneSize( m_auimgr, layersManager, aui_cfg.right_panel_width, -1 );
-    }
+        if( settings->m_AuiPanels.right_panel_width > 0 )
+        {
+            wxAuiPaneInfo& layersManager = m_auimgr.GetPane( wxS( "LayersManager" ) );
+            SetAuiPaneSize( m_auimgr, layersManager, settings->m_AuiPanels.right_panel_width, -1 );
+        }
 
-    if( aui_cfg.properties_panel_width > 0 && m_propertiesPanel )
-    {
-        wxAuiPaneInfo& propertiesPanel = m_auimgr.GetPane( PropertiesPaneName() );
-        SetAuiPaneSize( m_auimgr, propertiesPanel, aui_cfg.properties_panel_width, -1 );
-    }
+        if( settings->m_AuiPanels.properties_panel_width > 0 && m_propertiesPanel )
+        {
+            wxAuiPaneInfo& propertiesPanel = m_auimgr.GetPane( PropertiesPaneName() );
+            SetAuiPaneSize( m_auimgr, propertiesPanel,
+                            settings->m_AuiPanels.properties_panel_width, -1 );
+        }
 
-    if( aui_cfg.search_panel_height > 0
-        && ( aui_cfg.search_panel_dock_direction == wxAUI_DOCK_TOP
-            || aui_cfg.search_panel_dock_direction == wxAUI_DOCK_BOTTOM ) )
-    {
-        wxAuiPaneInfo& searchPane = m_auimgr.GetPane( SearchPaneName() );
-        searchPane.Direction( aui_cfg.search_panel_dock_direction );
-        SetAuiPaneSize( m_auimgr, searchPane, -1, aui_cfg.search_panel_height );
-    }
-    else if( aui_cfg.search_panel_width > 0
-            && ( aui_cfg.search_panel_dock_direction == wxAUI_DOCK_LEFT
-                || aui_cfg.search_panel_dock_direction == wxAUI_DOCK_RIGHT ) )
-    {
-        wxAuiPaneInfo& searchPane = m_auimgr.GetPane( SearchPaneName() );
-        searchPane.Direction( aui_cfg.search_panel_dock_direction );
-        SetAuiPaneSize( m_auimgr, searchPane, aui_cfg.search_panel_width, -1 );
-    }
+        if( settings->m_AuiPanels.search_panel_height > 0
+            && ( settings->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_TOP
+                || settings->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_BOTTOM ) )
+        {
+            wxAuiPaneInfo& searchPane = m_auimgr.GetPane( SearchPaneName() );
+            searchPane.Direction( settings->m_AuiPanels.search_panel_dock_direction );
+            SetAuiPaneSize( m_auimgr, searchPane, -1, settings->m_AuiPanels.search_panel_height );
+        }
+        else if( settings->m_AuiPanels.search_panel_width > 0
+                && ( settings->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_LEFT
+                    || settings->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_RIGHT ) )
+        {
+            wxAuiPaneInfo& searchPane = m_auimgr.GetPane( SearchPaneName() );
+            searchPane.Direction( settings->m_AuiPanels.search_panel_dock_direction );
+            SetAuiPaneSize( m_auimgr, searchPane, settings->m_AuiPanels.search_panel_width, -1 );
+        }
 
-    m_appearancePanel->SetTabIndex( aui_cfg.appearance_panel_tab );
+        m_appearancePanel->SetTabIndex( settings->m_AuiPanels.appearance_panel_tab );
+    }
 
     {
         m_layerPairSettings = std::make_unique<LAYER_PAIR_SETTINGS>();
@@ -809,8 +809,8 @@ void PCB_EDIT_FRAME::setupUIConditions()
     mgr->SetConditions( ACTIONS::toggleGridOverrides, CHECK( cond.GridOverrides() ) );
     mgr->SetConditions( ACTIONS::toggleCursorStyle,   CHECK( cond.FullscreenCursor() ) );
     mgr->SetConditions( ACTIONS::togglePolarCoords,   CHECK( cond.PolarCoordinates() ) );
-    mgr->SetConditions( ACTIONS::millimetersUnits,    CHECK( cond.Units( EDA_UNITS::MM ) ) );
-    mgr->SetConditions( ACTIONS::inchesUnits,         CHECK( cond.Units( EDA_UNITS::INCH ) ) );
+    mgr->SetConditions( ACTIONS::millimetersUnits,    CHECK( cond.Units( EDA_UNITS::MILLIMETRES ) ) );
+    mgr->SetConditions( ACTIONS::inchesUnits,         CHECK( cond.Units( EDA_UNITS::INCHES ) ) );
     mgr->SetConditions( ACTIONS::milsUnits,           CHECK( cond.Units( EDA_UNITS::MILS ) ) );
 
     mgr->SetConditions( ACTIONS::cut,          ENABLE( cond.HasItems() ) );
@@ -936,7 +936,7 @@ void PCB_EDIT_FRAME::setupUIConditions()
     mgr->SetConditions( PCB_ACTIONS::ratsnestLineMode,     CHECK( curvedRatsnestCond ) );
     mgr->SetConditions( PCB_ACTIONS::toggleNetHighlight,   CHECK( netHighlightCond )
                                                            .Enable( enableNetHighlightCond ) );
-    mgr->SetConditions( ACTIONS::showProperties,           CHECK( propertiesCond ) );
+    mgr->SetConditions( PCB_ACTIONS::showProperties,       CHECK( propertiesCond ) );
     mgr->SetConditions( PCB_ACTIONS::showNetInspector,     CHECK( netInspectorCond ) );
     mgr->SetConditions( PCB_ACTIONS::showSearch,           CHECK( searchPaneCond ) );
 
@@ -979,14 +979,6 @@ void PCB_EDIT_FRAME::setupUIConditions()
     mgr->SetConditions( PCB_ACTIONS::routerHighlightMode,  CHECK( isHighlightMode ) );
     mgr->SetConditions( PCB_ACTIONS::routerShoveMode,      CHECK( isShoveMode ) );
     mgr->SetConditions( PCB_ACTIONS::routerWalkaroundMode, CHECK( isWalkaroundMode ) );
-
-    auto isAutoTrackWidth =
-            [this]( const SELECTION& )
-            {
-                return GetDesignSettings().m_UseConnectedTrackWidth;
-            };
-
-    mgr->SetConditions( PCB_ACTIONS::autoTrackWidth, CHECK( isAutoTrackWidth ) );
 
     auto haveNetCond =
             [] ( const SELECTION& aSel )
@@ -1081,7 +1073,7 @@ void PCB_EDIT_FRAME::setupUIConditions()
     CURRENT_EDIT_TOOL( PCB_ACTIONS::drawRadialDimension );
     CURRENT_EDIT_TOOL( PCB_ACTIONS::drawLeader );
     CURRENT_EDIT_TOOL( PCB_ACTIONS::drillOrigin );
-    CURRENT_EDIT_TOOL( ACTIONS::gridSetOrigin );
+    CURRENT_EDIT_TOOL( PCB_ACTIONS::gridSetOrigin );
     CURRENT_EDIT_TOOL( PCB_ACTIONS::createArray );
 
     CURRENT_EDIT_TOOL( PCB_ACTIONS::microwaveCreateLine );
@@ -1427,12 +1419,6 @@ void PCB_EDIT_FRAME::ShowBoardSetupDialog( const wxString& aInitialPage )
 }
 
 
-void PCB_EDIT_FRAME::FocusSearch()
-{
-    m_searchPane->FocusSearch();
-}
-
-
 void PCB_EDIT_FRAME::LoadSettings( APP_SETTINGS_BASE* aCfg )
 {
     PCB_BASE_FRAME::LoadSettings( aCfg );
@@ -1516,11 +1502,11 @@ void PCB_EDIT_FRAME::SetGridColor( const COLOR4D& aColor )
 }
 
 
-void PCB_EDIT_FRAME::SetActiveLayer( PCB_LAYER_ID aLayer, bool aForceRedraw )
+void PCB_EDIT_FRAME::SetActiveLayer( PCB_LAYER_ID aLayer )
 {
     const PCB_LAYER_ID oldLayer = GetActiveLayer();
 
-    if( oldLayer == aLayer && !aForceRedraw )
+    if( oldLayer == aLayer )
         return;
 
     PCB_BASE_FRAME::SetActiveLayer( aLayer );
@@ -1539,7 +1525,7 @@ void PCB_EDIT_FRAME::SetActiveLayer( PCB_LAYER_ID aLayer, bool aForceRedraw )
     *
     * For pads/vias, this is to avoid clutter when there are pad/via layers
     * that vary in flash (i.e. clearance from the hole or pad edge), padstack
-    * shape on each layer or clearances on each layer.
+    * shape on eahc layer or clearances on each layer.
     *
     * For tracks, this follows the same logic as pads/vias, but in theory could
     * have their own set of independent clearance layers to allow track clearance
@@ -1661,9 +1647,7 @@ void PCB_EDIT_FRAME::onBoardLoaded()
     m_appearancePanel->ApplyLayerPreset( localSettings.m_ActiveLayerPreset );
 
     if( GetBoard()->GetDesignSettings().IsLayerEnabled( localSettings.m_ActiveLayer ) )
-        SetActiveLayer( localSettings.m_ActiveLayer, true );
-    else
-        SetActiveLayer( GetActiveLayer(), true );   // Make sure to repaint even if not switching
+        SetActiveLayer( localSettings.m_ActiveLayer );
 
     PROJECT_FILE& projectFile = Prj().GetProjectFile();
 
@@ -2289,8 +2273,10 @@ static void processTextItem( const PCB_TEXT& aSrc, PCB_TEXT& aDest,
     }
     else
     {
-        // Careful: SetAttributes() will clobber the position
+        // Careful: the visible bit and position are also set by SetAttributes()
+        bool visible = aDest.IsVisible();
         aDest.SetAttributes( aSrc );
+        aDest.SetVisible( visible );
         aDest.SetFPRelativePosition( aSrc.GetFPRelativePosition() );
     }
 
@@ -2470,7 +2456,7 @@ void PCB_EDIT_FRAME::ExchangeFootprint( FOOTPRINT* aExisting, FOOTPRINT* aNew,
         if( oldField->IsReference() || oldField->IsValue() )
             continue;
 
-        PCB_FIELD* newField = aNew->GetField( oldField->GetName() );
+        PCB_FIELD* newField = aNew->GetFieldByName( oldField->GetName() );
 
         if( newField )
         {

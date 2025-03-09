@@ -345,7 +345,6 @@ public:
     static TOOL_ACTION zoneDisplayTriangulated;
     static TOOL_ACTION zoneDisplayToggle;
     static TOOL_ACTION showPadNumbers;
-    static TOOL_ACTION fpAutoZoom;
 
     // Layer control
     static TOOL_ACTION layerTop;
@@ -399,8 +398,6 @@ public:
     static TOOL_ACTION trackWidthDec;
     static TOOL_ACTION viaSizeInc;
     static TOOL_ACTION viaSizeDec;
-
-    static TOOL_ACTION autoTrackWidth;
 
     static TOOL_ACTION trackViaSizeChanged;   // notification
 
@@ -483,12 +480,6 @@ public:
 
     static TOOL_ACTION checkFootprint;
 
-    static TOOL_ACTION loadFpFromBoard;
-    static TOOL_ACTION saveFpToBoard;
-
-    static TOOL_ACTION previousFootprint;
-    static TOOL_ACTION nextFootprint;
-
     /// Activation of the drawing tool (placing a PAD)
     static TOOL_ACTION placePad;
 
@@ -550,7 +541,7 @@ public:
     static TOOL_ACTION measureTool;
     static TOOL_ACTION drillOrigin;
     static TOOL_ACTION drillResetOrigin;
-    static TOOL_ACTION drillSetOrigin;
+    static TOOL_ACTION placeFileOrigin;
     static TOOL_ACTION appendBoard;
     static TOOL_ACTION showEeschema;
     static TOOL_ACTION boardStatistics;

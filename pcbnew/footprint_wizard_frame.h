@@ -148,6 +148,8 @@ private:
     void DisplayWizardInfos();
 
     void doCloseWindow() override;
+    void ReCreateHToolbar() override;
+    void ReCreateVToolbar() override;
     void ClickOnPageList( wxCommandEvent& event );
 
     void LoadSettings( APP_SETTINGS_BASE* aCfg ) override;

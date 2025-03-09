@@ -55,6 +55,7 @@ PCBNEW_SETTINGS::PCBNEW_SETTINGS()
           m_ExportIdf(),
           m_ExportStep(),
           m_ExportODBPP(),
+          m_ExportSvg(),
           m_ExportVrml(),
           m_FootprintWizardList(),
           m_GenDrill(),
@@ -80,6 +81,8 @@ PCBNEW_SETTINGS::PCBNEW_SETTINGS()
           m_AutoRefillZones( false ),
           m_AllowFreePads( false ),
           m_PnsSettings( nullptr ),
+          m_FootprintViewerZoom( 1.0 ),
+          m_FootprintViewerAutoZoomOnSelect( true ),
           m_FootprintViewerLibListWidth( 200 ),
           m_FootprintViewerFPListWidth( 300 )
 {
@@ -346,9 +349,6 @@ PCBNEW_SETTINGS::PCBNEW_SETTINGS()
     m_params.emplace_back( new PARAM<bool>( "gen_drill.generate_map",
             &m_GenDrill.generate_map, false ) );
 
-    m_params.emplace_back( new PARAM<bool>( "gen_drill.generate_tenting",
-            &m_GenDrill.generate_tenting, false ) );
-
     m_params.emplace_back( new PARAM<int>( "export_2581.units",
             &m_Export2581.units, 0 ) );
 
@@ -408,6 +408,33 @@ PCBNEW_SETTINGS::PCBNEW_SETTINGS()
 
     m_params.emplace_back( new PARAM<bool>( "export_step.overwrite_file",
             &m_ExportStep.overwrite_file, true ) );
+
+    m_params.emplace_back( new PARAM<bool>( "export_svg.black_and_white",
+            &m_ExportSvg.black_and_white, false ) );
+
+    m_params.emplace_back( new PARAM<bool>( "export_svg.use_theme",
+            &m_ExportSvg.use_selected_theme, true ) );
+
+    m_params.emplace_back( new PARAM<wxString>( "export_svg.color_theme",
+            &m_ExportSvg.color_theme, "" ) );
+
+    m_params.emplace_back( new PARAM<bool>( "export_svg.mirror",
+            &m_ExportSvg.mirror, false ) );
+
+    m_params.emplace_back( new PARAM<bool>( "export_svg.one_file",
+            &m_ExportSvg.one_file, false ) );
+
+    m_params.emplace_back(new PARAM<bool>( "export_svg.plot_board_edges",
+            &m_ExportSvg.plot_board_edges, true ) );
+
+    m_params.emplace_back( new PARAM<int>( "export_svg.page_size",
+            &m_ExportSvg.page_size, 0 ) );
+
+    m_params.emplace_back( new PARAM<wxString>( "export_svg.output_dir",
+            &m_ExportSvg.output_dir, "" ) );
+
+    m_params.emplace_back( new PARAM_LIST<int>( "export_svg.layers",
+            &m_ExportSvg.layers, {} ) );
 
     m_params.emplace_back( new PARAM<int>( "export_vrml.units",
             &m_ExportVrml.units, 1 ) );
@@ -963,7 +990,7 @@ bool PCBNEW_SETTINGS::MigrateFromLegacy( wxConfigBase* aCfg )
     if( aCfg->Read( f + "PcbUserGrid_X", &x ) && aCfg->Read( f + "PcbUserGrid_Y", &y ) )
     {
         EDA_UNITS u = static_cast<EDA_UNITS>( aCfg->ReadLong( f + "PcbUserGrid_Unit",
-                                                              static_cast<long>( EDA_UNITS::INCH ) ) );
+                static_cast<long>( EDA_UNITS::INCHES ) ) );
 
         // Convert to internal units
         x = EDA_UNIT_UTILS::UI::FromUserUnit( pcbIUScale, u, x );

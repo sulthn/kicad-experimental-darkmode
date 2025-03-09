@@ -182,10 +182,10 @@ public:
 enum class DXF_IMPORT_UNITS
 {
     DEFAULT = 0,
-    INCH = 1,
+    INCHES = 1,
     FEET = 2,
-    MM = 4,
-    CM = 5,
+    MILLIMETERS = 4,
+    CENTIMETERS = 5,
     METERS = 6,
     MICROINCHES = 8,
     MILS = 9,

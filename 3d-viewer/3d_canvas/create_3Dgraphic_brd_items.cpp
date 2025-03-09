@@ -188,23 +188,23 @@ void BOARD_ADAPTER::addShape( const PCB_DIMENSION_BASE* aDimension, CONTAINER_2D
 
 void BOARD_ADAPTER::addFootprintShapes( const FOOTPRINT* aFootprint, CONTAINER_2D_BASE* aContainer,
                                         PCB_LAYER_ID aLayerId,
-                                        const std::bitset<LAYER_3D_END>& aFlags )
+                                        const std::bitset<LAYER_3D_END>& aVisibilityFlags )
 {
     KIGFX::GAL_DISPLAY_OPTIONS empty_opts;
 
     for( PCB_FIELD* field : aFootprint->GetFields() )
     {
-        if( !aFlags.test( LAYER_FP_TEXT ) )
-            continue;
-
-        if( field->IsReference() && !aFlags.test( LAYER_FP_REFERENCES ) )
-            continue;
-
-        if( field->IsValue() && !aFlags.test( LAYER_FP_VALUES ) )
-            continue;
-
         if( field->GetLayer() == aLayerId && field->IsVisible() )
+        {
+            if( !aVisibilityFlags.test( LAYER_FP_TEXT ) )
+                continue;
+            else if( field->IsReference() && !aVisibilityFlags.test( LAYER_FP_REFERENCES ) )
+                continue;
+            else if( field->IsValue() && !aVisibilityFlags.test( LAYER_FP_VALUES ) )
+                continue;
+
             addText( field, aContainer, field );
+        }
     }
 
     for( BOARD_ITEM* item : aFootprint->GraphicalItems() )
@@ -215,17 +215,19 @@ void BOARD_ADAPTER::addFootprintShapes( const FOOTPRINT* aFootprint, CONTAINER_2
         {
             PCB_TEXT* text = static_cast<PCB_TEXT*>( item );
 
-            if( !aFlags.test( LAYER_FP_TEXT ) )
-                continue;
+            if( text->GetLayer() == aLayerId && text->IsVisible() )
+            {
+                if( !aVisibilityFlags.test( LAYER_FP_TEXT ) )
+                    continue;
+                else if( text->GetText() == wxT( "${REFERENCE}" )
+                         && !aVisibilityFlags.test( LAYER_FP_REFERENCES ) )
+                    continue;
+                else if( text->GetText() == wxT( "${VALUE}" )
+                         && !aVisibilityFlags.test( LAYER_FP_VALUES ) )
+                    continue;
 
-            if( text->GetText() == wxT( "${REFERENCE}" ) && !aFlags.test( LAYER_FP_REFERENCES ) )
-                continue;
-
-            if( text->GetText() == wxT( "${VALUE}" ) && !aFlags.test( LAYER_FP_VALUES ) )
-                continue;
-
-            if( text->GetLayer() == aLayerId )
                 addText( text, aContainer, text );
+            }
 
             break;
         }
@@ -281,7 +283,7 @@ void BOARD_ADAPTER::addFootprintShapes( const FOOTPRINT* aFootprint, CONTAINER_2
 }
 
 
-void BOARD_ADAPTER::createTrackWithMargin( const PCB_TRACK* aTrack,
+void BOARD_ADAPTER::createTrackWithMargin( const PCB_TRACK*   aTrack,
                                            CONTAINER_2D_BASE* aDstContainer, PCB_LAYER_ID aLayer,
                                            int aMargin )
 {
@@ -643,7 +645,7 @@ void BOARD_ADAPTER::addShape( const PCB_SHAPE* aShape, CONTAINER_2D_BASE* aConta
             float   innerR3DU = TO_3DU( aShape->GetRadius() ) - linewidth3DU / 2.0;
             float   outerR3DU = TO_3DU( aShape->GetRadius() ) + linewidth3DU / 2.0;
 
-            if( aShape->IsSolidFill() || innerR3DU <= 0.0 )
+            if( aShape->IsFilled() || innerR3DU <= 0.0 )
                 addFILLED_CIRCLE_2D( aContainer, center3DU, outerR3DU, *aOwner );
             else
                 addRING_2D( aContainer, center3DU, innerR3DU, outerR3DU, *aOwner );
@@ -652,11 +654,11 @@ void BOARD_ADAPTER::addShape( const PCB_SHAPE* aShape, CONTAINER_2D_BASE* aConta
         }
 
         case SHAPE_T::RECTANGLE:
-            if( aShape->IsSolidFill() )
+            if( aShape->IsFilled() )
             {
                 SHAPE_POLY_SET polyList;
 
-                aShape->TransformShapeToPolySet( polyList, UNDEFINED_LAYER, 0, ARC_HIGH_DEF,
+                aShape->TransformShapeToPolygon( polyList, UNDEFINED_LAYER, 0, ARC_HIGH_DEF,
                                                  ERROR_INSIDE );
 
                 polyList.Simplify();
@@ -757,9 +759,6 @@ void BOARD_ADAPTER::addShape( const PCB_SHAPE* aShape, CONTAINER_2D_BASE* aConta
         for( SHAPE* shape : shapes )
             delete shape;
     }
-
-    if( aShape->IsHatchedFill() )
-        ConvertPolygonToTriangles( aShape->GetHatching(), *aContainer, m_biuTo3Dunits, *aOwner );
 }
 
 

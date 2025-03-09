@@ -83,10 +83,15 @@ public:
     {
     }
 
-    const wxString GetType() const override { return m_type; }
-    void SetType( const wxString& aType ) override { m_type = aType; }
+    const wxString GetType() const override
+    {
+        return m_type;
+    }
 
-    bool LibraryExists() const override { return true; }
+    void SetType( const wxString& aType ) override
+    {
+        m_type = aType;
+    }
 
 private:
     LIB_TABLE_ROW* do_clone() const override

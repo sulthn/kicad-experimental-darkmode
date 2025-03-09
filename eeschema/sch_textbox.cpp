@@ -84,8 +84,6 @@ int SCH_TEXTBOX::GetLegacyTextMargin() const
 
 void SCH_TEXTBOX::MirrorHorizontally( int aCenter )
 {
-    SCH_SHAPE::MirrorHorizontally( aCenter );
-
     // Text is NOT really mirrored; it just has its justification flipped
     if( GetTextAngle() == ANGLE_HORIZONTAL )
     {
@@ -99,8 +97,6 @@ void SCH_TEXTBOX::MirrorHorizontally( int aCenter )
 
 void SCH_TEXTBOX::MirrorVertically( int aCenter )
 {
-    SCH_SHAPE::MirrorVertically( aCenter );
-
     // Text is NOT really mirrored; it just has its justification flipped
     if( GetTextAngle() == ANGLE_VERTICAL )
     {
@@ -269,6 +265,82 @@ KIFONT::FONT* SCH_TEXTBOX::getDrawFont() const
 }
 
 
+void SCH_TEXTBOX::Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                         const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed )
+{
+    if( IsPrivate() )
+        return;
+
+    wxDC*      DC = aSettings->GetPrintDC();
+    int        penWidth = GetEffectivePenWidth( aSettings );
+    bool       blackAndWhiteMode = GetGRForceBlackPenState();
+    VECTOR2I   pt1 = GetStart();
+    VECTOR2I   pt2 = GetEnd();
+    COLOR4D    color = GetStroke().GetColor();
+    COLOR4D    bg = aSettings->GetBackgroundColor();
+    LINE_STYLE lineStyle = GetStroke().GetLineStyle();
+
+    if( bg == COLOR4D::UNSPECIFIED || GetGRForceBlackPenState() )
+        bg = COLOR4D::WHITE;
+
+    if( GetFillMode() == FILL_T::FILLED_WITH_COLOR && !blackAndWhiteMode && !aForceNoFill )
+        GRFilledRect( DC, pt1, pt2, 0, GetFillColor(), GetFillColor() );
+
+    if( penWidth > 0 )
+    {
+        penWidth = std::max( penWidth, aSettings->GetMinPenWidth() );
+
+        if( blackAndWhiteMode || color == COLOR4D::UNSPECIFIED )
+            color = aSettings->GetLayerColor( m_layer );
+
+        if( aDimmed )
+        {
+            color.Desaturate( );
+            color = color.Mix( bg, 0.5f );
+        }
+
+        if( lineStyle == LINE_STYLE::DEFAULT )
+            lineStyle = LINE_STYLE::SOLID;
+
+        if( lineStyle == LINE_STYLE::SOLID )
+        {
+            GRRect( DC, pt1, pt2, penWidth, color );
+        }
+        else
+        {
+            std::vector<SHAPE*> shapes = MakeEffectiveShapes( true );
+
+            for( SHAPE* shape : shapes )
+            {
+                STROKE_PARAMS::Stroke( shape, lineStyle, penWidth, aSettings,
+                        [&]( const VECTOR2I& a, const VECTOR2I& b )
+                        {
+                            VECTOR2I ptA = aSettings->TransformCoordinate( a ) + aOffset;
+                            VECTOR2I ptB = aSettings->TransformCoordinate( b ) + aOffset;
+                            GRLine( DC, ptA.x, ptA.y, ptB.x, ptB.y, penWidth, color );
+                        } );
+            }
+
+            for( SHAPE* shape : shapes )
+                delete shape;
+        }
+    }
+
+    color = GetTextColor();
+
+    if( blackAndWhiteMode || color == COLOR4D::UNSPECIFIED )
+        color = aSettings->GetLayerColor( m_layer );
+
+    if( aDimmed )
+    {
+        color.Desaturate( );
+        color = color.Mix( bg, 0.5f );
+    }
+
+    EDA_TEXT::Print( aSettings, aOffset, color );
+}
+
+
 wxString SCH_TEXTBOX::GetShownText( const SCH_SHEET_PATH* aPath, bool aAllowExtraText,
                                     int aDepth ) const
 {
@@ -335,26 +407,13 @@ bool SCH_TEXTBOX::HitTest( const BOX2I& aRect, bool aContained, int aAccuracy ) 
 }
 
 
-bool SCH_TEXTBOX::IsHypertext() const
-{
-    if( HasHyperlink() )
-        return true;
-
-    return IsURL( GetShownText( false ) );
-}
-
-
 void SCH_TEXTBOX::DoHypertextAction( EDA_DRAW_FRAME* aFrame ) const
 {
     wxCHECK_MSG( IsHypertext(), /* void */,
                  wxT( "Calling a hypertext menu on a SCH_TEXTBOX with no hyperlink?" ) );
 
     SCH_NAVIGATE_TOOL* navTool = aFrame->GetToolManager()->GetTool<SCH_NAVIGATE_TOOL>();
-
-    if( HasHyperlink() )
-        navTool->HypertextCommand( m_hyperlink );
-    else
-        navTool->HypertextCommand( GetShownText( false ) );
+    navTool->HypertextCommand( m_hyperlink );
 }
 
 
@@ -388,8 +447,7 @@ void SCH_TEXTBOX::Plot( PLOTTER* aPlotter, bool aBackground, const SCH_PLOT_OPTS
     COLOR4D              bg = renderSettings->GetBackgroundColor();
     LINE_STYLE           lineStyle = GetStroke().GetLineStyle();
 
-    // Do not plot border for SCH_TABLECELL_T: borders are plotted separately.
-    if( penWidth > 0 && Type() != SCH_TABLECELL_T )
+    if( penWidth > 0 )
     {
         if( !aPlotter->GetColorMode() || color == COLOR4D::UNSPECIFIED )
             color = renderSettings->GetLayerColor( m_layer );
@@ -624,6 +682,7 @@ static struct SCH_TEXTBOX_DESC
 
         propMgr.Mask( TYPE_HASH( SCH_TEXTBOX ), TYPE_HASH( EDA_SHAPE ), _HKI( "Shape" ) );
 
+        propMgr.Mask( TYPE_HASH( SCH_TEXTBOX ), TYPE_HASH( EDA_TEXT ), _HKI( "Visible" ) );
         propMgr.Mask( TYPE_HASH( SCH_TEXTBOX ), TYPE_HASH( EDA_TEXT ), _HKI( "Width" ) );
         propMgr.Mask( TYPE_HASH( SCH_TEXTBOX ), TYPE_HASH( EDA_TEXT ), _HKI( "Height" ) );
         propMgr.Mask( TYPE_HASH( SCH_TEXTBOX ), TYPE_HASH( EDA_TEXT ), _HKI( "Thickness" ) );

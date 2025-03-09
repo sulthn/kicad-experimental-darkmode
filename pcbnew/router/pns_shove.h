@@ -170,13 +170,10 @@ private:
 
     bool pruneLineFromOptimizerQueue( const LINE& aLine );
 
-    bool shoveLineToHullSet( const LINE& aCurLine, const LINE& aObstacleLine, LINE& aResultLine,
-                             const HULL_SET& aHulls, bool aPermitAdjustingStart = false,
-                             bool aPermitAdjustingEnd = false );
+    bool shoveLineToHullSet( const LINE& aCurLine, const LINE& aObstacleLine,
+                                     LINE& aResultLine, const HULL_SET& aHulls, bool aPermitAdjustingEndpoints = false );
 
     NODE* reduceSpringback( const ITEM_SET& aHeadSet );
-
-    bool patchTadpoleVia( ITEM* nearest, LINE& current );
 
     bool pushSpringback( NODE* aNode, const OPT_BOX2I& aAffectedArea );
 

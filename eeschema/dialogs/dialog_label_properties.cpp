@@ -42,8 +42,7 @@
 
 
 DIALOG_LABEL_PROPERTIES::DIALOG_LABEL_PROPERTIES( SCH_EDIT_FRAME* aParent,
-                                                  SCH_LABEL_BASE* aLabel,
-                                                  bool aNew ) :
+                                                  SCH_LABEL_BASE* aLabel ) :
         DIALOG_LABEL_PROPERTIES_BASE( aParent ),
         m_Parent( aParent ),
         m_currentLabel( aLabel ),
@@ -55,12 +54,6 @@ DIALOG_LABEL_PROPERTIES::DIALOG_LABEL_PROPERTIES( SCH_EDIT_FRAME* aParent,
 {
     COLOR_SETTINGS* colorSettings = m_Parent->GetColorSettings();
     COLOR4D         schematicBackground = colorSettings->GetColor( LAYER_SCHEMATIC_BACKGROUND );
-    bool            multiLine = false;
-
-    if( EESCHEMA_SETTINGS* cfg = dynamic_cast<EESCHEMA_SETTINGS*>( Kiface().KifaceSettings() ) )
-        multiLine = cfg->m_Appearance.edit_label_multiple;
-
-    m_cbMultiLine->SetValue( multiLine );
 
     m_fields = new FIELDS_GRID_TABLE( this, aParent, m_grid, m_currentLabel );
     m_width = 100;  // Will be later set to a better value
@@ -75,19 +68,7 @@ DIALOG_LABEL_PROPERTIES::DIALOG_LABEL_PROPERTIES( SCH_EDIT_FRAME* aParent,
         m_labelSingleLine->Show( false );
         m_valueSingleLine->Show( false );
 
-        if( multiLine && aNew )
-        {
-            m_activeTextEntry = m_valueMultiLine;
-            SetInitialFocus( m_valueMultiLine );
-            m_labelCombo->Show( false );
-            m_valueCombo->Show( false );
-        }
-        else
-        {
-            m_labelMultiLine->Show( false );
-            m_valueMultiLine->Show( false );
-            m_valueCombo->SetValidator( m_netNameValidator );
-        }
+        m_valueCombo->SetValidator( m_netNameValidator );
     }
     else if( m_currentLabel->Type() == SCH_HIER_LABEL_T )
     {
@@ -97,19 +78,7 @@ DIALOG_LABEL_PROPERTIES::DIALOG_LABEL_PROPERTIES( SCH_EDIT_FRAME* aParent,
         m_labelCombo->Show( false );
         m_valueCombo->Show( false );
 
-        if( multiLine && aNew )
-        {
-            m_activeTextEntry = m_valueMultiLine;
-            SetInitialFocus( m_valueMultiLine );
-            m_labelSingleLine->Show( false );
-            m_valueSingleLine->Show( false );
-        }
-        else
-        {
-            m_labelMultiLine->Show( false );
-            m_valueMultiLine->Show( false );
-            m_valueSingleLine->SetValidator( m_netNameValidator );
-        }
+        m_valueSingleLine->SetValidator( m_netNameValidator );
     }
     else if( m_currentLabel->Type() == SCH_DIRECTIVE_LABEL_T )
     {
@@ -122,15 +91,9 @@ DIALOG_LABEL_PROPERTIES::DIALOG_LABEL_PROPERTIES( SCH_EDIT_FRAME* aParent,
         m_valueCombo->Show( false );
         m_syntaxHelp->Show( false );
         m_textEntrySizer->Show( false );
-        m_labelCombo->Show( false );
-        m_valueCombo->Show( false );
-        m_cbMultiLine->Show( false );
 
         m_textSizeLabel->SetLabel( _( "Pin length:" ) );
     }
-
-    if( !aNew )
-        m_cbMultiLine->Show( false );
 
     switch( m_currentLabel->Type() )
     {
@@ -260,10 +223,6 @@ DIALOG_LABEL_PROPERTIES::DIALOG_LABEL_PROPERTIES( SCH_EDIT_FRAME* aParent,
         if( cfg->m_Appearance.edit_label_width > 0 && cfg->m_Appearance.edit_label_height > 0 )
             SetSize( cfg->m_Appearance.edit_label_width, cfg->m_Appearance.edit_label_height );
     }
-
-    // Bind the event to handle filtering
-    m_valueCombo->Bind( wxEVT_TEXT, &DIALOG_LABEL_PROPERTIES::OnLabelFilter, this );
-    m_valueCombo->Bind( wxEVT_COMBOBOX, &DIALOG_LABEL_PROPERTIES::OnLabelItemSelected, this );
 }
 
 
@@ -274,7 +233,6 @@ DIALOG_LABEL_PROPERTIES::~DIALOG_LABEL_PROPERTIES()
         cfg->m_Appearance.edit_label_visible_columns = m_grid->GetShownColumnsAsString();
         cfg->m_Appearance.edit_label_width = GetSize().x;
         cfg->m_Appearance.edit_label_height = GetSize().y;
-        cfg->m_Appearance.edit_label_multiple = m_cbMultiLine->IsChecked();
     }
 
     // Prevents crash bug in wxGrid's d'tor
@@ -285,9 +243,6 @@ DIALOG_LABEL_PROPERTIES::~DIALOG_LABEL_PROPERTIES()
 
     if( m_helpWindow )
         m_helpWindow->Destroy();
-
-    m_valueCombo->Unbind( wxEVT_TEXT, &DIALOG_LABEL_PROPERTIES::OnLabelFilter, this );
-    m_valueCombo->Unbind( wxEVT_COMBOBOX, &DIALOG_LABEL_PROPERTIES::OnLabelItemSelected, this );
 }
 
 
@@ -332,30 +287,10 @@ bool DIALOG_LABEL_PROPERTIES::TransferDataToWindow()
                     // Ensure the symbol has the Power (i.e. equivalent to a global label
                     // before adding its value in list
                     if( power->IsSymbolLikePowerGlobalLabel() )
-                    {
-                        const SCH_FIELD* valueField = power->GetField( FIELD_T::VALUE );
-                        existingLabels.insert( UnescapeString( valueField->GetText() ) );
-                    }
+                        existingLabels.insert(
+                                UnescapeString( power->GetField( VALUE_FIELD )->GetText() ) );
                 }
             }
-
-            // Add local power labels from power symbols
-            if( m_currentLabel->Type() == SCH_LABEL_T )
-            {
-                for( SCH_ITEM* item : screen->Items().OfType( SCH_SYMBOL_LOCATE_POWER_T ) )
-                {
-                    const SCH_SYMBOL* power = static_cast<const SCH_SYMBOL*>( item );
-
-                    // Ensure the symbol has the Power (i.e. equivalent to a local label
-                    // before adding its value in list
-                    if( power->IsSymbolLikePowerLocalLabel() )
-                    {
-                        const SCH_FIELD* valueField = power->GetField( FIELD_T::VALUE );
-                        existingLabels.insert( UnescapeString( valueField->GetText() ) );
-                    }
-                }
-            }
-            // Add bus aliases from the current screen
 
             auto& sheetAliases = screen->GetBusAliases();
             busAliases.insert( busAliases.end(), sheetAliases.begin(), sheetAliases.end() );
@@ -365,10 +300,12 @@ bool DIALOG_LABEL_PROPERTIES::TransferDataToWindow()
         for( const std::shared_ptr<BUS_ALIAS>& busAlias : busAliases )
             existingLabels.insert( wxT( "{" ) + busAlias->GetName() + wxT( "}" ) );
 
-        for( const wxString& label : existingLabels )
-            m_existingLabelArray.push_back( label );
+        wxArrayString existingLabelArray;
 
-        m_valueCombo->Append( m_existingLabelArray );
+        for( const wxString& label : existingLabels )
+            existingLabelArray.push_back( label );
+
+        m_valueCombo->Append( existingLabelArray );
     }
 
     // Push a copy of each field into m_updateFields
@@ -491,7 +428,7 @@ bool DIALOG_LABEL_PROPERTIES::TransferDataFromWindow()
         return false;
 
     // Don't allow text to disappear; it can be difficult to correct if you can't select it
-    if( !m_textSize.Validate( 0.01, 1000.0, EDA_UNITS::MM ) )
+    if( !m_textSize.Validate( 0.01, 1000.0, EDA_UNITS::MILLIMETRES ) )
         return false;
 
     SCH_COMMIT commit( m_Parent );
@@ -534,7 +471,7 @@ bool DIALOG_LABEL_PROPERTIES::TransferDataFromWindow()
         {
             field.SetLayer( LAYER_NETCLASS_REFS );
         }
-        else if( field.GetId() == FIELD_T::INTERSHEET_REFS )
+        else if( field.GetCanonicalName() == wxT( "Intersheetrefs" ) )
         {
             if( field.IsVisible() != m_Parent->Schematic().Settings().m_IntersheetRefsShow )
             {
@@ -584,14 +521,6 @@ bool DIALOG_LABEL_PROPERTIES::TransferDataFromWindow()
             // give non-empty, unnamed fields a name
             field.SetName( _( "untitled" ) );
         }
-    }
-
-    int ordinal = 42;   // Arbitrarily larger than any mandatory FIELD_T ids.
-
-    for( SCH_FIELD& field : *m_fields )
-    {
-        if( !field.IsMandatory() )
-            field.SetOrdinal( ordinal++ );
     }
 
     m_currentLabel->SetFields( *m_fields );
@@ -668,59 +597,6 @@ bool DIALOG_LABEL_PROPERTIES::TransferDataFromWindow()
     if( !commit.Empty() )
         commit.Push( _( "Edit Label Properties" ) );
 
-    else if( m_activeTextEntry && m_labelList )
-    {
-        text = m_activeTextEntry->GetValue();
-        // On macOS CTRL+Enter produces '\r' instead of '\n' regardless of EOL setting
-        text.Replace( wxS( "\r" ), wxS( "\n" ) );
-        wxArrayString lines = wxSplit( text, '\n' );
-
-        for( const wxString& line : lines )
-        {
-            text = EscapeString( line, CTX_NETNAME );
-            text.Trim( false ).Trim( true );
-
-            if( text.empty() )
-                continue;
-
-            // convert any text variable cross-references to their UUIDs
-            text = m_currentLabel->Schematic()->ConvertRefsToKIIDs( text );
-
-            switch ( m_currentLabel->Type() )
-            {
-            case SCH_GLOBAL_LABEL_T:
-            {
-                SCH_GLOBALLABEL* label = new SCH_GLOBALLABEL( *static_cast<SCH_GLOBALLABEL*>( m_currentLabel ) );
-                label->SetText( text );
-                m_labelList->push_back( std::unique_ptr<SCH_LABEL_BASE>( label ) );
-                break;
-            }
-            case SCH_HIER_LABEL_T:
-            {
-                SCH_HIERLABEL* label = new SCH_HIERLABEL( *static_cast<SCH_HIERLABEL*>( m_currentLabel ) );
-                label->SetText( text );
-                m_labelList->push_back( std::unique_ptr<SCH_LABEL_BASE>( label ) );
-                break;
-            }
-            case SCH_LABEL_T:
-            {
-                SCH_LABEL* label = new SCH_LABEL( *static_cast<SCH_LABEL*>( m_currentLabel ) );
-                label->SetText( text );
-                m_labelList->push_back( std::unique_ptr<SCH_LABEL_BASE>( label ) );
-                break;
-            }
-            default:
-                break;
-            }
-        }
-    }
-    else if( m_labelList && m_currentLabel->Type() == SCH_DIRECTIVE_LABEL_T )
-    {
-        SCH_DIRECTIVE_LABEL* label =
-                new SCH_DIRECTIVE_LABEL( *static_cast<SCH_DIRECTIVE_LABEL*>( m_currentLabel ) );
-        m_labelList->push_back( std::unique_ptr<SCH_LABEL_BASE>( label ) );
-    }
-
     return true;
 }
 
@@ -746,20 +622,20 @@ void DIALOG_LABEL_PROPERTIES::OnAddField( wxCommandEvent& event )
     if( !m_grid->CommitPendingChanges() )
         return;
 
-    wxString fieldName = wxT( "Netclass" );
+    int      fieldID = (int) m_fields->size();
+    wxString fieldName;
 
-    for( SCH_FIELD& field : *m_fields )
+    if( (int) fieldID == m_currentLabel->GetMandatoryFieldCount()
+            || m_fields->at( m_fields->size()-1 ).GetCanonicalName() == wxT( "Netclass" ) )
     {
-        if( field.GetId() != FIELD_T::INTERSHEET_REFS && field.GetName() != wxT( "Netclass" ) )
-        {
-            fieldName = wxEmptyString;
-            break;
-        }
+        fieldName = wxT( "Netclass" );
+    }
+    else
+    {
+        fieldName = SCH_LABEL_BASE::GetDefaultFieldName( fieldName, true );
     }
 
-    fieldName = SCH_LABEL_BASE::GetDefaultFieldName( fieldName, true );
-
-    SCH_FIELD newField( VECTOR2I( 0, 0 ), FIELD_T::USER, m_currentLabel, fieldName );
+    SCH_FIELD newField( VECTOR2I( 0, 0 ), fieldID, m_currentLabel, fieldName );
 
     if( m_fields->size() > 0 )
     {
@@ -937,130 +813,3 @@ void DIALOG_LABEL_PROPERTIES::OnSizeGrid( wxSizeEvent& event )
 }
 
 
-/**
- * Handles the filtering of items in the wxComboBox based on user input.
- *
- * This function is triggered by the wxEVT_TEXT event whenever the user types
- * or modifies the text in the combo box. It filters the dropdown list
- * to show only those items that match the user's input.
- *
- * Key Steps:
- * - Prevents re-entry using a static flag `isFiltering` to avoid recursion
- *   caused by wxComboBox events triggered during item updates.
- * - Compares the current input with the previously entered text to avoid
- *   unnecessary filtering if the text hasn't changed.
- * - Filters the items from `m_existingLabelArray` to match the user's input.
- * - Updates the combo box with the filtered items while preserving the user's
- *   input and cursor position.
- *
- * @param event The wxCommandEvent associated with the wxEVT_TEXT event.
- */
-void DIALOG_LABEL_PROPERTIES::OnLabelFilter( wxCommandEvent& event )
-{
-    static bool isFiltering = false; // Prevent re-entry
-
-    if( isFiltering )
-        return;
-
-    isFiltering = true; // Set the flag
-
-    wxString currentLabelText = m_valueCombo->GetValue();
-
-    // Check if the text has changed compared to the previous value
-    if( currentLabelText != m_previousLabelText )
-    {
-        m_previousLabelText = currentLabelText; // Update the previous text
-
-        // Save the current cursor position
-        long insertionPoint = m_valueCombo->GetInsertionPoint();
-
-        wxArrayString filteredLabels;
-
-        if( currentLabelText.IsEmpty() )
-        {
-            // If the input is empty, append all existing labels
-            filteredLabels = m_existingLabelArray;
-        }
-        else
-        {
-            // Filter the items based on the user input
-            wxString filterText = currentLabelText.Lower();
-
-            std::copy_if( m_existingLabelArray.begin(), m_existingLabelArray.end(),
-                          std::back_inserter( filteredLabels ),
-                          [&filterText]( const wxString& label )
-                          {
-                              return label.Lower().Contains( filterText );
-                          } );
-        }
-
-        // Update the dropdown items
-        m_valueCombo->Freeze(); // Prevent visual flickering
-        m_valueCombo->Clear();
-        m_valueCombo->Append( filteredLabels );
-        m_valueCombo->Thaw(); // Resume rendering
-
-        // Restore the user's input and cursor position
-        m_valueCombo->ChangeValue( currentLabelText ); // Set without triggering wxEVT_TEXT
-        m_valueCombo->SetInsertionPoint( insertionPoint );
-    }
-
-    isFiltering = false; // Reset the flag
-}
-
-
-void DIALOG_LABEL_PROPERTIES::OnLabelItemSelected( wxCommandEvent& event )
-{
-    // Get the selected item's value
-    wxString selectedValue = m_valueCombo->GetValue();
-    m_previousLabelText = selectedValue; // Update the previous text to match the selected value
-}
-
-
-void DIALOG_LABEL_PROPERTIES::onMultiLabelCheck( wxCommandEvent& event )
-{
-    if( m_currentLabel->Type() == SCH_GLOBAL_LABEL_T || m_currentLabel->Type() == SCH_LABEL_T )
-    {
-        m_labelCombo->Show( !m_cbMultiLine->IsChecked() );
-        m_valueCombo->Show( !m_cbMultiLine->IsChecked() );
-        m_labelMultiLine->Show( m_cbMultiLine->IsChecked() );
-        m_valueMultiLine->Show( m_cbMultiLine->IsChecked() );
-
-        if( m_cbMultiLine->IsChecked() )
-        {
-            m_valueMultiLine->SetValue( m_valueCombo->GetValue() );
-            m_activeTextEntry = m_valueMultiLine;
-            SetInitialFocus( m_valueMultiLine );
-        }
-        else
-        {
-            wxString multiText = m_valueMultiLine->GetValue();
-            m_valueCombo->SetValue( multiText.BeforeFirst( '\n' ) );
-            m_activeTextEntry = m_valueCombo;
-            SetInitialFocus( m_valueCombo );
-        }
-    }
-    else if( m_currentLabel->Type() == SCH_HIER_LABEL_T )
-    {
-        m_labelSingleLine->Show( !m_cbMultiLine->IsChecked() );
-        m_valueSingleLine->Show( !m_cbMultiLine->IsChecked() );
-        m_labelMultiLine->Show( m_cbMultiLine->IsChecked() );
-        m_valueMultiLine->Show( m_cbMultiLine->IsChecked() );
-
-        if( m_cbMultiLine->IsChecked() )
-        {
-            m_valueMultiLine->SetValue( m_valueSingleLine->GetValue() );
-            m_activeTextEntry = m_valueMultiLine;
-            SetInitialFocus( m_valueMultiLine );
-        }
-        else
-        {
-            wxString multiText = m_valueMultiLine->GetValue();
-            m_valueSingleLine->SetValue( multiText.BeforeFirst( '\n' ) );
-            m_activeTextEntry = m_valueSingleLine;
-            SetInitialFocus( m_valueSingleLine );
-        }
-    }
-
-    Layout();
-}

@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 4.1.0-0-g733bf3d)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -23,19 +23,19 @@ class WX_INFOBAR;
 #include <wx/settings.h>
 #include <wx/string.h>
 #include <wx/stattext.h>
-#include <wx/stc/stc.h>
-#include <wx/sizer.h>
 #include <wx/bmpbuttn.h>
 #include <wx/bitmap.h>
 #include <wx/image.h>
 #include <wx/icon.h>
 #include <wx/button.h>
+#include <wx/sizer.h>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/textctrl.h>
 #include <wx/gbsizer.h>
 #include <wx/panel.h>
 #include <wx/simplebook.h>
+#include <wx/statline.h>
 #include <wx/dialog.h>
 
 ///////////////////////////////////////////////////////////////////////////
@@ -49,8 +49,6 @@ class DIALOG_TABLECELL_PROPERTIES_BASE : public DIALOG_SHIM
 
 	protected:
 		WX_INFOBAR* m_infoBar;
-		wxStaticText* m_cellTextLabel;
-		wxStyledTextCtrl* m_cellTextCtrl;
 		BITMAP_BUTTON* m_hAlignLeft;
 		BITMAP_BUTTON* m_hAlignCenter;
 		BITMAP_BUTTON* m_hAlignRight;
@@ -83,13 +81,13 @@ class DIALOG_TABLECELL_PROPERTIES_BASE : public DIALOG_SHIM
 		wxTextCtrl* m_marginLeftCtrl;
 		wxTextCtrl* m_marginRightCtrl;
 		wxTextCtrl* m_marginBottomCtrl;
+		wxStaticLine* m_staticline1;
 		wxButton* m_editTable;
 		wxStdDialogButtonSizer* m_sdbSizer1;
 		wxButton* m_sdbSizer1OK;
 		wxButton* m_sdbSizer1Cancel;
 
 		// Virtual event handlers, override them in your derived class
-		virtual void onMultiLineTCLostFocus( wxFocusEvent& event ) { event.Skip(); }
 		virtual void onTextColorPopup( wxCommandEvent& event ) { event.Skip(); }
 		virtual void onFillColorPopup( wxCommandEvent& event ) { event.Skip(); }
 		virtual void onEditTable( wxCommandEvent& event ) { event.Skip(); }

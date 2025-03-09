@@ -48,12 +48,13 @@ DIALOG_SCH_FIND::DIALOG_SCH_FIND( SCH_EDIT_FRAME* aParent, SCH_SEARCH_DATA* aDat
         m_comboReplace->Show( true );
         m_checkSelectedOnly->Show( true );
         m_checkReplaceReferences->Show( true );
-        m_checkRegexMatch->Show( true );
+        m_checkWildcardMatch->Show( false );  // Wildcard replace is not implemented.
     }
 
     m_checkMatchCase->SetValue( m_findReplaceData->matchCase );
     m_checkWholeWord->SetValue( m_findReplaceData->matchMode == EDA_SEARCH_MATCH_MODE::WHOLEWORD );
-    m_checkRegexMatch->SetValue( m_findReplaceData->matchMode == EDA_SEARCH_MATCH_MODE::REGEX );
+    m_checkWildcardMatch->SetValue( m_findReplaceData->matchMode
+                                    == EDA_SEARCH_MATCH_MODE::WILDCARD );
 
     m_checkAllFields->SetValue( m_findReplaceData->searchAllFields );
     m_checkReplaceReferences->SetValue( m_findReplaceData->replaceReferences );
@@ -61,13 +62,6 @@ DIALOG_SCH_FIND::DIALOG_SCH_FIND( SCH_EDIT_FRAME* aParent, SCH_SEARCH_DATA* aDat
     m_checkCurrentSheetOnly->SetValue( m_findReplaceData->searchCurrentSheetOnly );
     m_checkCurrentSheetOnly->Enable( !m_findReplaceData->searchSelectedOnly );
     m_checkSelectedOnly->SetValue( m_findReplaceData->searchSelectedOnly );
-    m_checkConnections->SetValue( m_findReplaceData->searchNetNames );
-
-    if( int hotkey = ACTIONS::showSearch.GetHotKey() )
-    {
-        wxString hotkeyHint = wxString::Format( wxT( " (%s)" ), KeyNameFromKeyCode( hotkey ) );
-        m_searchPanelLink->SetLabel( m_searchPanelLink->GetLabel() + hotkeyHint );
-    }
 
     m_buttonFind->SetDefault();
     SetInitialFocus( m_comboFind );
@@ -89,11 +83,14 @@ DIALOG_SCH_FIND::DIALOG_SCH_FIND( SCH_EDIT_FRAME* aParent, SCH_SEARCH_DATA* aDat
     SetSize( size );
 
     GetSizer()->Fit( this ); // Needed on Ubuntu/Unity to display the dialog
+
+    Connect( wxEVT_CHAR, wxKeyEventHandler( DIALOG_SCH_FIND::OnChar ), nullptr, this );
 }
 
 
 DIALOG_SCH_FIND::~DIALOG_SCH_FIND()
 {
+    Disconnect( wxEVT_CHAR, wxKeyEventHandler( DIALOG_SCH_FIND::OnChar ), nullptr, this );
 }
 
 
@@ -121,26 +118,6 @@ void DIALOG_SCH_FIND::OnCancel( wxCommandEvent& aEvent )
 }
 
 
-void DIALOG_SCH_FIND::onShowSearchPanel( wxHyperlinkEvent& event )
-{
-    if( m_frame->IsSearchPaneShown() )
-    {
-        EndModal( wxID_CANCEL );
-
-        CallAfter(
-                []()
-                {
-                    if( wxWindow* frame = wxWindow::FindWindowByName( SCH_EDIT_FRAME_NAME ) )
-                        static_cast<SCH_EDIT_FRAME*>( frame )->FocusSearch();
-                } );
-    }
-    else
-    {
-        m_frame->GetToolManager()->RunAction( ACTIONS::showSearch );
-    }
-}
-
-
 void DIALOG_SCH_FIND::OnUpdateReplaceUI( wxUpdateUIEvent& aEvent )
 {
     aEvent.Enable( HasFlag( wxFR_REPLACEDIALOG ) && !m_comboFind->GetValue().empty()
@@ -151,6 +128,16 @@ void DIALOG_SCH_FIND::OnUpdateReplaceUI( wxUpdateUIEvent& aEvent )
 void DIALOG_SCH_FIND::OnUpdateReplaceAllUI( wxUpdateUIEvent& aEvent )
 {
     aEvent.Enable( HasFlag( wxFR_REPLACEDIALOG ) && !m_comboFind->GetValue().empty() );
+}
+
+
+void DIALOG_SCH_FIND::OnChar( wxKeyEvent& aEvent )
+{
+    if( aEvent.GetKeyCode() == WXK_RETURN || aEvent.GetKeyCode() == WXK_NUMPAD_ENTER )
+    {
+        wxCommandEvent dummyCommand;
+        OnFind( dummyCommand );
+    }
 }
 
 
@@ -225,12 +212,11 @@ void DIALOG_SCH_FIND::updateFlags()
     m_findReplaceData->searchAllPins            = m_checkAllPins->GetValue();
     m_findReplaceData->searchCurrentSheetOnly   = m_checkCurrentSheetOnly->GetValue();
     m_findReplaceData->replaceReferences        = m_checkReplaceReferences->GetValue();
-    m_findReplaceData->searchNetNames           = m_checkConnections->GetValue();
 
     if( m_checkWholeWord->GetValue() )
         m_findReplaceData->matchMode = EDA_SEARCH_MATCH_MODE::WHOLEWORD;
-    else if( m_checkRegexMatch->IsShown() && m_checkRegexMatch->GetValue() )
-        m_findReplaceData->matchMode = EDA_SEARCH_MATCH_MODE::REGEX;
+    else if( m_checkWildcardMatch->IsShown() && m_checkWildcardMatch->GetValue() )
+        m_findReplaceData->matchMode = EDA_SEARCH_MATCH_MODE::WILDCARD;
     else
         m_findReplaceData->matchMode = EDA_SEARCH_MATCH_MODE::PLAIN;
 

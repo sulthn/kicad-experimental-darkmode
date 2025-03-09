@@ -19,7 +19,7 @@
  */
 
 #include "panel_jobset.h"
-#include "dialog_destination.h"
+#include "dialog_jobset_output_options.h"
 #include "dialog_copyfiles_job_settings.h"
 #include <wx/aui/auibook.h>
 #include <jobs/jobset.h>
@@ -46,31 +46,27 @@
 #include <dialogs/dialog_executecommand_job_settings.h>
 
 
-extern KICOMMON_API
-std::map<JOBSET_DESTINATION_T, JOBSET_DESTINATION_T_INFO> JobsetDestinationTypeInfos;
+extern KICOMMON_API std::map<JOBSET_OUTPUT_TYPE, JOBSET_OUTPUT_TYPE_INFO> JobsetOutputTypeInfos;
 
 
-class DIALOG_JOBSET_RUN_LOG : public DIALOG_JOBSET_RUN_LOG_BASE
+class DIALOG_OUTPUT_RUN_RESULTS : public DIALOG_OUTPUT_RUN_RESULTS_BASE
 {
 public:
-    DIALOG_JOBSET_RUN_LOG( wxWindow* aParent, JOBSET* aJobsFile,
-                           JOBSET_DESTINATION* aDestination ) :
-            DIALOG_JOBSET_RUN_LOG_BASE( aParent ),
+    DIALOG_OUTPUT_RUN_RESULTS( wxWindow* aParent, JOBSET* aJobsFile, JOBSET_OUTPUT* aOutput ) :
+            DIALOG_OUTPUT_RUN_RESULTS_BASE( aParent ),
             m_jobsFile( aJobsFile ),
-            m_destination( aDestination ),
-            m_lastWidth( -1 ),
-            m_marginsWidth( -1 )
+            m_output( aOutput )
     {
-        m_staticTextOutputName->SetLabel( wxString::Format( _( "Destination: %s" ),
-                                                            aDestination->GetDescription() ) );
+        m_staticTextOutputName->SetLabel( wxString::Format( _( "Output: %s" ),
+                                                            aOutput->GetDescription() ) );
 
         int jobBmpColId = m_jobList->AppendColumn( wxT( "" ) );
         int jobNoColId = m_jobList->AppendColumn( _( "No." ) );
         int jobDescColId = m_jobList->AppendColumn( _( "Job Description" ) );
-        int jobSourceColId = m_jobList->AppendColumn( _( "Source" ) );
-        m_jobList->SetColumnWidth( jobBmpColId, 26 );
-        m_jobList->SetColumnWidth( jobNoColId, GetTextExtent( wxT( "XXXX" ) ).GetWidth() );
-        m_jobList->SetColumnWidth( jobSourceColId, GetTextExtent( wxT( "XXXXXX" ) ).GetWidth() );
+        int jobSourceColId = m_jobList->AppendColumn( wxT( "Source" ) );
+        m_jobList->SetColumnWidth( jobBmpColId, wxLIST_AUTOSIZE_USEHEADER );
+        m_jobList->SetColumnWidth( jobNoColId, wxLIST_AUTOSIZE_USEHEADER );
+        m_jobList->SetColumnWidth( jobDescColId, wxLIST_AUTOSIZE_USEHEADER );
 
         wxImageList* imageList = new wxImageList( 16, 16, true, 3 );
         imageList->Add( KiBitmapBundle( BITMAPS::ercerr ).GetBitmap( wxSize( 16, 16 ) ) );
@@ -78,13 +74,12 @@ public:
         m_jobList->SetImageList( imageList, wxIMAGE_LIST_SMALL );
 
         int num = 1;
-        for( auto& job : aJobsFile->GetJobsForDestination( aDestination ) )
+        for( auto& job : aJobsFile->GetJobsForOutput( aOutput ) )
         {
             int imageIdx = -1;
-
-            if( aDestination->m_lastRunSuccessMap.contains( job.m_id ) )
+            if( aOutput->m_lastRunSuccessMap.contains( job.m_id ) )
             {
-                if( aDestination->m_lastRunSuccessMap[job.m_id].value() )
+                if( aOutput->m_lastRunSuccessMap[job.m_id].value() )
                     imageIdx = 1;
                 else
                     imageIdx = 0;
@@ -97,15 +92,18 @@ public:
 
             KIWAY::FACE_T iface = JOB_REGISTRY::GetKifaceType( job.m_type );
             wxString source = wxEmptyString;
-
             if( iface < KIWAY::KIWAY_FACE_COUNT )
             {
+                
                 if( iface == KIWAY::FACE_PCB )
+                {
                     source = wxT( "PCB" );
+                }
                 else if( iface == KIWAY::FACE_SCH )
+				{
 					source = wxT( "SCH" );
+				}
             }
-
             m_jobList->SetItem( itemIndex, jobSourceColId, source );
         }
 
@@ -113,23 +111,13 @@ public:
         finishDialogSettings();
     }
 
-    virtual void OnUpdateUI( wxUpdateUIEvent& event ) override
+    void onJobListSize( wxSizeEvent& event ) override
     {
-        if( GetSize().GetWidth() != m_lastWidth )
-        {
-            m_lastWidth = GetSize().GetWidth();
+        int width = m_jobList->GetSize().x;
+        width -= m_jobList->GetColumnWidth( 0 );
+        width -= m_jobList->GetColumnWidth( 1 );
 
-            if( m_marginsWidth < 0 )
-                m_marginsWidth = m_lastWidth - ( m_jobList->GetSize().GetWidth() * 2 );
-
-            int width = ( m_lastWidth / 2 );
-            width -= m_marginsWidth;
-            width -= m_jobList->GetColumnWidth( 0 );
-            width -= m_jobList->GetColumnWidth( 1 );
-            width -= m_jobList->GetColumnWidth( 3 );
-
-            m_jobList->SetColumnWidth( 2, width );
-        }
+        m_jobList->SetColumnWidth( 2, width );
     }
 
     void OnJobListItemSelected( wxListEvent& event ) override
@@ -140,16 +128,16 @@ public:
         if( itemIndex < 0 )
             return;
 
-        std::vector<JOBSET_JOB> jobs = m_jobsFile->GetJobsForDestination( m_destination );
+        std::vector<JOBSET_JOB> jobs = m_jobsFile->GetJobsForOutput( m_output );
 
         if( static_cast<size_t>( itemIndex ) < jobs.size() )
         {
-            wxString jobId = jobs[itemIndex].m_id;
+            JOBSET_JOB& job = jobs[itemIndex];
 
-            if( m_destination->m_lastRunReporters.contains( jobId ) )
+            if( m_output->m_lastRunReporters.contains( job.m_id ) )
             {
                 WX_STRING_REPORTER* reporter =
-                        static_cast<WX_STRING_REPORTER*>( m_destination->m_lastRunReporters[jobId] );
+                        static_cast<WX_STRING_REPORTER*>( m_output->m_lastRunReporters[job.m_id] );
 
                 if( reporter )
                     m_textCtrlOutput->SetValue( reporter->GetMessages() );
@@ -162,22 +150,19 @@ public:
     }
 
 private:
-    JOBSET*             m_jobsFile;
-    JOBSET_DESTINATION* m_destination;
-
-    int                 m_lastWidth;
-    int                 m_marginsWidth;
+    JOBSET*        m_jobsFile;
+    JOBSET_OUTPUT* m_output;
 };
 
 
-class PANEL_DESTINATION : public PANEL_DESTINATION_BASE
+class PANEL_JOBSET_OUTPUT : public PANEL_JOBSET_OUTPUT_BASE
 {
 public:
-    PANEL_DESTINATION( wxWindow* aParent, PANEL_JOBSET* aPanelParent, KICAD_MANAGER_FRAME* aFrame,
-                       JOBSET* aFile, JOBSET_DESTINATION* aDestination ) :
-            PANEL_DESTINATION_BASE( aParent ),
+    PANEL_JOBSET_OUTPUT( wxWindow* aParent, PANEL_JOBSET* aPanelParent, KICAD_MANAGER_FRAME* aFrame,
+                         JOBSET* aFile, JOBSET_OUTPUT* aOutput ) :
+            PANEL_JOBSET_OUTPUT_BASE( aParent ),
             m_jobsFile( aFile ),
-            m_destinationId( aDestination->m_id ),
+            m_outputId( aOutput->m_id ),
             m_frame( aFrame ),
             m_panelParent( aPanelParent )
     {
@@ -192,40 +177,41 @@ public:
         SetWindowStyleFlag( style );
 #endif //  _WIN32
 
-        Connect( wxEVT_MENU, wxCommandEventHandler( PANEL_DESTINATION::onMenu ), nullptr, this );
+        Connect( wxEVT_MENU, wxCommandEventHandler( PANEL_JOBSET_OUTPUT::onMenu ), nullptr, this );
 
-        if( JobsetDestinationTypeInfos.contains( aDestination->m_type ) )
+        if( JobsetOutputTypeInfos.contains( aOutput->m_type ) )
         {
-            JOBSET_DESTINATION_T_INFO& jobTypeInfo = JobsetDestinationTypeInfos[aDestination->m_type];
-            m_textOutputType->SetLabel( aDestination->GetDescription() );
+            JOBSET_OUTPUT_TYPE_INFO& jobTypeInfo = JobsetOutputTypeInfos[aOutput->m_type];
+            m_textOutputType->SetLabel( aOutput->GetDescription() );
             m_bitmapOutputType->SetBitmap( KiBitmapBundle( jobTypeInfo.bitmap ) );
         }
 
         UpdateStatus();
     }
 
-    ~PANEL_DESTINATION()
+
+    ~PANEL_JOBSET_OUTPUT()
     {
-        Disconnect( wxEVT_MENU, wxCommandEventHandler( PANEL_DESTINATION::onMenu ), nullptr, this );
+        Disconnect( wxEVT_MENU, wxCommandEventHandler( PANEL_JOBSET_OUTPUT::onMenu ), nullptr, this );
     }
 
     void ClearStatus()
     {
-        JOBSET_DESTINATION* destination = GetDestination();
-        wxCHECK( destination, /*void*/ );
+        JOBSET_OUTPUT* output = GetOutput();
+        wxCHECK( output, /*void*/ );
 
-        destination->m_lastRunSuccess = std::nullopt;
+        output->m_lastRunSuccess = std::nullopt;
         m_statusBitmap->SetBitmap( wxNullBitmap );
     }
 
     void UpdateStatus()
     {
-        JOBSET_DESTINATION* destination = GetDestination();
-        wxCHECK( destination, /*void*/ );
+        JOBSET_OUTPUT* output = GetOutput();
+        wxCHECK( output, /*void*/ );
 
-        if( destination->m_lastRunSuccess.has_value() )
+        if( output->m_lastRunSuccess.has_value() )
         {
-            if( destination->m_lastRunSuccess.value() )
+            if( output->m_lastRunSuccess.value() )
             {
                 m_statusBitmap->SetBitmap( KiBitmapBundle( BITMAPS::checked_ok ) );
                 m_statusBitmap->Show();
@@ -243,7 +229,7 @@ public:
             m_statusBitmap->SetBitmap( wxNullBitmap );
         }
 
-        m_buttonGenerate->Enable( !m_jobsFile->GetJobsForDestination( destination ).empty() );
+        m_buttonGenerate->Enable( !m_jobsFile->GetJobsForOutput( output ).empty() );
     }
 
     virtual void OnGenerate( wxCommandEvent& event ) override
@@ -262,11 +248,11 @@ public:
 
                     JOBS_RUNNER jobRunner( &( m_frame->Kiway() ), m_jobsFile, &project );
 
-                    auto* progressReporter = new WX_PROGRESS_REPORTER( m_frame, _( "Running jobs" ),
-                                                                       1 );
+                    WX_PROGRESS_REPORTER* progressReporter =
+                            new WX_PROGRESS_REPORTER( m_frame, _( "Running jobs" ), 1 );
 
-                    if( JOBSET_DESTINATION* destination = GetDestination() )
-                        jobRunner.RunJobsForDestination( destination );
+                    if( JOBSET_OUTPUT* output = GetOutput() )
+                        jobRunner.RunJobsForOutput( output );
 
                     UpdateStatus();
 
@@ -279,40 +265,40 @@ public:
 
     virtual void OnLastStatusClick( wxMouseEvent& aEvent ) override
     {
-        JOBSET_DESTINATION* destination = GetDestination();
-        wxCHECK( destination, /*void*/ );
+        JOBSET_OUTPUT* output = GetOutput();
+        wxCHECK( output, /*void*/ );
 
-        DIALOG_JOBSET_RUN_LOG dialog( m_frame, m_jobsFile, destination );
+        DIALOG_OUTPUT_RUN_RESULTS dialog( m_frame, m_jobsFile, output );
         dialog.ShowModal();
     }
 
     void OnRightDown( wxMouseEvent& aEvent ) override
     {
-        JOBSET_DESTINATION* destination = GetDestination();
-        wxCHECK( destination, /*void*/ );
+        JOBSET_OUTPUT* output = GetOutput();
+        wxCHECK( output, /*void*/ );
 
         wxMenu menu;
-        menu.Append( wxID_EDIT, _( "Edit Destination Options..." ) );
-        menu.Append( wxID_DELETE, _( "Delete Destination" ) );
+        menu.Append( wxID_EDIT, _( "Edit Output Options..." ) );
+        menu.Append( wxID_DELETE, _( "Delete Output" ) );
 
         menu.AppendSeparator();
-        menu.Append( wxID_VIEW_DETAILS, _( "View Last Run Log..." ) );
+        menu.Append( wxID_VIEW_DETAILS, _( "View Last Run Results..." ) );
 
-        menu.Enable( wxID_VIEW_DETAILS, destination->m_lastRunSuccess.has_value() );
+        menu.Enable( wxID_VIEW_DETAILS, output->m_lastRunSuccess.has_value() );
 
         PopupMenu( &menu );
     }
 
     void OnProperties( wxCommandEvent& aEvent ) override
     {
-        JOBSET_DESTINATION* destination = GetDestination();
-        wxCHECK( destination, /*void*/ );
+        JOBSET_OUTPUT* output = GetOutput();
+        wxCHECK( output, /*void*/ );
 
-        DIALOG_DESTINATION dialog( m_frame, m_jobsFile, destination );
+        DIALOG_JOBSET_OUTPUT_OPTIONS dialog( m_frame, m_jobsFile, output );
 
         if( dialog.ShowModal() == wxID_OK )
         {
-            m_textOutputType->SetLabel( destination->GetDescription() );
+            m_textOutputType->SetLabel( output->GetDescription() );
             m_jobsFile->SetDirty();
             m_panelParent->UpdateTitle();
         }
@@ -320,15 +306,15 @@ public:
 
     virtual void OnDelete( wxCommandEvent& aEvent ) override
     {
-        m_panelParent->RemoveDestination( this );
+        m_panelParent->RemoveOutput( this );
     }
 
-    JOBSET_DESTINATION* GetDestination()
+    JOBSET_OUTPUT* GetOutput()
     {
-        for( JOBSET_DESTINATION& destination : m_jobsFile->GetDestinations() )
+        for( JOBSET_OUTPUT& jobset : m_jobsFile->GetOutputs() )
         {
-            if( destination.m_id == m_destinationId )
-                return &destination;
+            if( jobset.m_id == m_outputId )
+                return &jobset;
         }
 
         return nullptr;
@@ -367,7 +353,7 @@ private:
 
 private:
     JOBSET*              m_jobsFile;
-    wxString             m_destinationId;
+    wxString             m_outputId;
     KICAD_MANAGER_FRAME* m_frame;
     PANEL_JOBSET*        m_panelParent;
 };
@@ -440,7 +426,7 @@ bool JOBS_GRID_TRICKS::handleDoubleClick( wxGridEvent& aEvent )
     int curr_col = aEvent.GetCol();
     int curr_row = aEvent.GetRow();
 
-    if( ( curr_col == COL_NUMBER || curr_col == COL_SOURCE || curr_col == COL_DESCR )
+    if( ( curr_col == 0 || curr_col == 1 || curr_col == 2 )
         && curr_row >= 0 && curr_row < (int) m_parent->GetJobsFile()->GetJobs().size() )
     {
         m_doubleClickRow = curr_row;
@@ -480,17 +466,20 @@ PANEL_JOBSET::PANEL_JOBSET( wxAuiNotebook* aParent, KICAD_MANAGER_FRAME* aFrame,
     m_jobsGrid->SetSelectionMode( wxGrid::wxGridSelectRows );
 
     // 'm' for margins
-    m_jobsGrid->SetColSize( COL_NUMBER, GetTextExtent( wxT( "99m" ) ).x );
-    m_jobsGrid->SetColSize( COL_SOURCE, GetTextExtent( wxT( "PCBm" ) ).x );
+    m_jobsGrid->SetColSize( 0, GetTextExtent( wxT( "99m" ) ).x );
+    m_jobsGrid->SetColSize( 1, GetTextExtent( wxT( "PCBm" ) ).x );
 
     m_buttonAddJob->SetBitmap( KiBitmapBundle( BITMAPS::small_plus ) );
     m_buttonUp->SetBitmap( KiBitmapBundle( BITMAPS::small_up ) );
     m_buttonDown->SetBitmap( KiBitmapBundle( BITMAPS::small_down ) );
     m_buttonDelete->SetBitmap( KiBitmapBundle( BITMAPS::small_trash ) );
-    m_buttonAddDestination->SetBitmap( KiBitmapBundle( BITMAPS::small_plus ) );
+    m_buttonOutputAdd->SetBitmap( KiBitmapBundle( BITMAPS::small_plus ) );
 
     rebuildJobList();
-    buildDestinationList();
+    buildOutputList();
+
+    m_buttonRunAllOutputs->Enable( !m_jobsFile->GetOutputs().empty()
+                                        && !m_jobsFile->GetJobs().empty() );
 }
 
 
@@ -501,18 +490,20 @@ PANEL_JOBSET::~PANEL_JOBSET()
 }
 
 
-void PANEL_JOBSET::RemoveDestination( PANEL_DESTINATION* aPanel )
+void PANEL_JOBSET::RemoveOutput( PANEL_JOBSET_OUTPUT* aPanel )
 {
-    JOBSET_DESTINATION* output = aPanel->GetDestination();
+    JOBSET_OUTPUT* output = aPanel->GetOutput();
 
-    m_destinationListSizer->Detach( aPanel );
+    m_outputListSizer->Detach( aPanel );
     aPanel->Destroy();
 
     // ensure the window contents get shifted as needed
-    m_destinationList->Layout();
+    m_outputList->Layout();
     Layout();
 
-    m_jobsFile->RemoveDestination( output );
+    m_jobsFile->RemoveOutput( output );
+
+    m_buttonRunAllOutputs->Enable( !m_jobsFile->GetOutputs().empty() );
 }
 
 
@@ -521,31 +512,34 @@ void PANEL_JOBSET::rebuildJobList()
     if( m_jobsGrid->GetNumberRows() )
         m_jobsGrid->DeleteRows( 0, m_jobsGrid->GetNumberRows() );
 
-    m_jobsGrid->AppendRows( (int) m_jobsFile->GetJobs().size() );
+    m_jobsGrid->AppendRows( m_jobsFile->GetJobs().size() );
 
     int num = 1;
 
     for( JOBSET_JOB& job : m_jobsFile->GetJobs() )
     {
-        m_jobsGrid->SetCellValue( num - 1, COL_NUMBER, wxString::Format( "%d", num ) );
-        m_jobsGrid->SetReadOnly( num - 1, COL_NUMBER );
+        m_jobsGrid->SetCellValue( num - 1, 0, wxString::Format( "%d", num ) );
+        m_jobsGrid->SetReadOnly( num - 1, 0 );
 
-        m_jobsGrid->SetCellValue( num - 1, COL_DESCR, job.GetDescription() );
+        m_jobsGrid->SetCellValue( num - 1, 2, job.GetDescription() );
 
-        m_jobsGrid->SetReadOnly( num - 1, COL_SOURCE );
-
+        m_jobsGrid->SetReadOnly( num - 1, 1 );
+        
         KIWAY::FACE_T iface = JOB_REGISTRY::GetKifaceType( job.m_type );
         wxString      source = wxEmptyString;
-
         if( iface < KIWAY::KIWAY_FACE_COUNT )
         {
             if( iface == KIWAY::FACE_PCB )
+            {
                 source = wxT( "PCB" );
+            }
             else if( iface == KIWAY::FACE_SCH )
+            {
                 source = wxT( "SCH" );
+            }
         }
 
-        m_jobsGrid->SetCellValue( num - 1, COL_SOURCE, source );
+        m_jobsGrid->SetCellValue( num - 1, 1, source );
 
         num++;
     }
@@ -553,7 +547,7 @@ void PANEL_JOBSET::rebuildJobList()
     UpdateTitle();
 
     // Ensure the outputs get their Run-ability status updated
-    for( PANEL_DESTINATION* panel : GetDestinationPanels() )
+    for( PANEL_JOBSET_OUTPUT* panel : GetOutputPanels() )
         panel->UpdateStatus();
 }
 
@@ -570,28 +564,28 @@ void PANEL_JOBSET::UpdateTitle()
 }
 
 
-void PANEL_JOBSET::addDestinationPanel( JOBSET_DESTINATION* aOutput )
+void PANEL_JOBSET::addJobOutputPanel( JOBSET_OUTPUT* aOutput )
 {
-    PANEL_DESTINATION* destinationPanel = new PANEL_DESTINATION( m_destinationList, this, m_frame,
-                                                                 m_jobsFile.get(), aOutput );
+    PANEL_JOBSET_OUTPUT* outputPanel = new PANEL_JOBSET_OUTPUT( m_outputList, this, m_frame,
+                                                                m_jobsFile.get(), aOutput );
 
 #if __OSX__
-    m_outputListSizer->Add( destinationPanel, 0, wxEXPAND, 5 );
+    m_outputListSizer->Add( outputPanel, 0, wxEXPAND, 5 );
 #else
-    m_destinationListSizer->Add( destinationPanel, 0, wxEXPAND|wxLEFT|wxRIGHT|wxBOTTOM, 5 );
+    m_outputListSizer->Add( outputPanel, 0, wxEXPAND|wxLEFT|wxRIGHT|wxBOTTOM, 5 );
 #endif
 
-    m_destinationList->Layout();
+    m_outputList->Layout();
 }
 
 
-std::vector<PANEL_DESTINATION*> PANEL_JOBSET::GetDestinationPanels()
+std::vector<PANEL_JOBSET_OUTPUT*> PANEL_JOBSET::GetOutputPanels()
 {
-    std::vector<PANEL_DESTINATION*> panels;
+    std::vector<PANEL_JOBSET_OUTPUT*> panels;
 
-    for( const wxSizerItem* item : m_destinationListSizer->GetChildren() )
+    for( const wxSizerItem* item : m_outputListSizer->GetChildren() )
     {
-        if( PANEL_DESTINATION* panel = dynamic_cast<PANEL_DESTINATION*>( item->GetWindow() ) )
+        if( PANEL_JOBSET_OUTPUT* panel = dynamic_cast<PANEL_JOBSET_OUTPUT*>( item->GetWindow() ) )
             panels.push_back( panel );
     }
 
@@ -599,12 +593,12 @@ std::vector<PANEL_DESTINATION*> PANEL_JOBSET::GetDestinationPanels()
 }
 
 
-void PANEL_JOBSET::buildDestinationList()
+void PANEL_JOBSET::buildOutputList()
 {
     Freeze();
 
-    for( JOBSET_DESTINATION& job : m_jobsFile->GetDestinations() )
-        addDestinationPanel( &job );
+    for( JOBSET_OUTPUT& job : m_jobsFile->GetOutputs() )
+        addJobOutputPanel( &job );
 
     // ensure the window contents get shifted as needed
     Layout();
@@ -664,7 +658,7 @@ void PANEL_JOBSET::OnGridCellChange( wxGridEvent& aEvent )
     int row = aEvent.GetRow();
     int col = aEvent.GetCol();
 
-    if( col == COL_DESCR )
+    if( col == 1 )
         m_jobsFile->GetJobs()[row].SetDescription( m_jobsGrid->GetCellValue( row, col ) );
 }
 
@@ -706,7 +700,6 @@ void PANEL_JOBSET::OnAddJobClick( wxCommandEvent& aEvent )
         wxString selectedString = dlg.GetTextSelection();
 
         wxString jobKey;
-
         if( !selectedString.IsEmpty() )
         {
             for( const std::pair<const wxString, JOB_REGISTRY_ENTRY>& entry : jobMap )
@@ -775,46 +768,46 @@ void PANEL_JOBSET::OnJobButtonDelete( wxCommandEvent& aEvent )
 }
 
 
-void PANEL_JOBSET::OnAddDestinationClick( wxCommandEvent& aEvent )
+void PANEL_JOBSET::OnAddOutputClick( wxCommandEvent& aEvent )
 {
     wxArrayString              headers;
     std::vector<wxArrayString> items;
 
-    headers.Add( _( "Destination Types" ) );
+    headers.Add( _( "Output Types" ) );
 
-    for( const auto& [destinationType, destinationTypeInfo] : JobsetDestinationTypeInfos )
+    for( const std::pair<const JOBSET_OUTPUT_TYPE, JOBSET_OUTPUT_TYPE_INFO>& outputType : JobsetOutputTypeInfos )
     {
         wxArrayString item;
-        item.Add( wxGetTranslation( destinationTypeInfo.name ) );
+        item.Add( wxGetTranslation( outputType.second.name ) );
         items.emplace_back( item );
     }
 
-    EDA_LIST_DIALOG dlg( this, _( "Add New Destination" ), headers, items );
-    dlg.SetListLabel( _( "Select destination type:" ) );
+    EDA_LIST_DIALOG dlg( this, _( "Add New Output" ), headers, items );
+    dlg.SetListLabel( _( "Select output type:" ) );
     dlg.HideFilter();
 
     if( dlg.ShowModal() == wxID_OK )
     {
         wxString selectedString = dlg.GetTextSelection();
 
-        for( const auto& [destinationType, destinationTypeInfo] : JobsetDestinationTypeInfos )
+        for( const std::pair<const JOBSET_OUTPUT_TYPE, JOBSET_OUTPUT_TYPE_INFO>& jobType : JobsetOutputTypeInfos )
         {
-            if( wxGetTranslation( destinationTypeInfo.name ) == selectedString )
+            if( wxGetTranslation( jobType.second.name ) == selectedString )
             {
-                JOBSET_DESTINATION* destination = m_jobsFile->AddNewDestination( destinationType );
+                JOBSET_OUTPUT* output = m_jobsFile->AddNewJobOutput( jobType.first );
 
-                DIALOG_DESTINATION dialog( m_frame, m_jobsFile.get(), destination );
-
+                DIALOG_JOBSET_OUTPUT_OPTIONS dialog( m_frame, m_jobsFile.get(), output );
                 if (dialog.ShowModal() == wxID_OK)
                 {
                     Freeze();
-                    addDestinationPanel( destination );
+                    addJobOutputPanel( output );
+                    m_buttonRunAllOutputs->Enable( !m_jobsFile->GetOutputs().empty() );
                     Thaw();
                 }
                 else
                 {
                     // canceled
-                    m_jobsFile->RemoveDestination( destination );
+                    m_jobsFile->RemoveOutput( output );
                 }
             }
         }
@@ -947,19 +940,19 @@ void PANEL_JOBSET::OnJobButtonDown( wxCommandEvent& aEvent )
 }
 
 
-void PANEL_JOBSET::OnGenerateAllDestinationsClick( wxCommandEvent& event )
+void PANEL_JOBSET::OnGenerateAllOutputsClick( wxCommandEvent& event )
 {
     if( !m_jobsGrid->CommitPendingChanges() )
         return;
 
     // sanity
-    if( m_jobsFile->GetDestinations().empty() )
+    if( m_jobsFile->GetOutputs().empty() )
 	{
-		DisplayError( this, _( "No destinations defined" ) );
+		DisplayError( this, _( "No outputs defined" ) );
 		return;
 	}
 
-    for( PANEL_DESTINATION* panel : GetDestinationPanels() )
+    for( PANEL_JOBSET_OUTPUT* panel : GetOutputPanels() )
         panel->ClearStatus();
 
     Refresh();
@@ -978,9 +971,9 @@ void PANEL_JOBSET::OnGenerateAllDestinationsClick( wxCommandEvent& event )
 				WX_PROGRESS_REPORTER* progressReporter =
 						new WX_PROGRESS_REPORTER( m_frame, _( "Running jobs" ), 1 );
 
-                jobRunner.RunJobsAllDestinations();
+				jobRunner.RunJobsAllOutputs();
 
-                for( PANEL_DESTINATION* panel : GetDestinationPanels() )
+                for( PANEL_JOBSET_OUTPUT* panel : GetOutputPanels() )
                     panel->UpdateStatus();
 
 				delete progressReporter;
@@ -993,9 +986,8 @@ void PANEL_JOBSET::OnGenerateAllDestinationsClick( wxCommandEvent& event )
 
 void PANEL_JOBSET::OnSizeGrid( wxSizeEvent& aEvent )
 {
-    m_jobsGrid->SetColSize( COL_DESCR, m_jobsGrid->GetSize().x
-                                               - m_jobsGrid->GetColSize( COL_SOURCE )
-                                               - m_jobsGrid->GetColSize( COL_NUMBER ) );
+    m_jobsGrid->SetColSize( 2, m_jobsGrid->GetSize().x - m_jobsGrid->GetColSize( 1 )
+                                       - m_jobsGrid->GetColSize( 0 ) );
 
     // Always propagate for a grid repaint (needed if the height changes, as well as width)
     aEvent.Skip();

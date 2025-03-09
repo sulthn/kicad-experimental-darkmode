@@ -362,13 +362,6 @@ ACOMPONENT6::ACOMPONENT6( ALTIUM_BINARY_PARSER& aReader )
     commenton        = ALTIUM_PROPS_UTILS::ReadBool( props, wxT( "COMMENTON" ), false );
     sourcedesignator = ALTIUM_PROPS_UTILS::ReadString( props, wxT( "SOURCEDESIGNATOR" ), wxT( "" ) );
 
-    sourceUniqueID = ALTIUM_PROPS_UTILS::ReadString( props, wxT( "SOURCEUNIQUEID" ), wxT( "" ) );
-
-    // Remove leading backslash from sourceUniqueID to match schematic component unique IDs
-    if( sourceUniqueID.starts_with( wxT( "\\" ) ) )
-        sourceUniqueID = sourceUniqueID.Mid( 1 );
-
-    sourceHierachicalPath = ALTIUM_PROPS_UTILS::ReadString( props, wxT( "SOURCEHIERARCHICALPATH" ), wxT( "" ) );
     sourcefootprintlibrary =
             ALTIUM_PROPS_UTILS::ReadUnicodeString( props, wxT( "SOURCEFOOTPRINTLIBRARY" ), wxT( "" ) );
     pattern = ALTIUM_PROPS_UTILS::ReadUnicodeString( props, wxT( "PATTERN" ), wxT( "" ) );
@@ -444,10 +437,10 @@ ADIMENSION6::ADIMENSION6( ALTIUM_BINARY_PARSER& aReader )
 
     wxString dimensionunit = ALTIUM_PROPS_UTILS::ReadString( props, wxT( "TEXTDIMENSIONUNIT" ), wxT( "Millimeters" ) );
 
-    if(      dimensionunit == wxT( "Inches" ) )      textunit = ALTIUM_UNIT::INCH;
+    if(      dimensionunit == wxT( "Inches" ) )      textunit = ALTIUM_UNIT::INCHES;
     else if( dimensionunit == wxT( "Mils" ) )        textunit = ALTIUM_UNIT::MILS;
-    else if( dimensionunit == wxT( "Millimeters" ) ) textunit = ALTIUM_UNIT::MM;
-    else if( dimensionunit == wxT( "Centimeters" ) ) textunit = ALTIUM_UNIT::CM;
+    else if( dimensionunit == wxT( "Millimeters" ) ) textunit = ALTIUM_UNIT::MILLIMETERS;
+    else if( dimensionunit == wxT( "Centimeters" ) ) textunit = ALTIUM_UNIT::CENTIMETER;
     else                                             textunit = ALTIUM_UNIT::UNKNOWN;
 
     if( aReader.HasParsingError() )

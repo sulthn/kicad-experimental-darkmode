@@ -122,7 +122,7 @@ void SCH_PLOTTER::createPDFFile( const SCH_PLOT_OPTS& aPlotOpts,
     if( aPlotOpts.m_plotAll || aPlotOpts.m_plotPages.size() > 0 )
     {
         sheetList.BuildSheetList( &m_schematic->Root(), true );
-        sheetList.SortByHierarchicalPageNumbers();
+        sheetList.SortByPageNumbers();
 
         // remove the non-selected pages if we are in plot pages mode
         if( aPlotOpts.m_plotPages.size() > 0 )
@@ -163,7 +163,7 @@ void SCH_PLOTTER::createPDFFile( const SCH_PLOT_OPTS& aPlotOpts,
         m_schematic->SetSheetNumberAndCount();
 
         SCH_SCREEN* screen = m_schematic->CurrentSheet().LastScreen();
-        wxString    sheetName = sheetList[i].Last()->GetField( FIELD_T::SHEET_NAME )->GetShownText( false );
+        wxString    sheetName = sheetList[i].Last()->GetFields()[SHEETNAME].GetShownText( false );
 
         if( aPlotOpts.m_PDFMetadata )
         {
@@ -226,20 +226,7 @@ void SCH_PLOTTER::createPDFFile( const SCH_PLOT_OPTS& aPlotOpts,
              *  reconfigure, and then start a new one */
             plotter->ClosePage();
             setupPlotPagePDF( plotter, screen, aPlotOpts );
-            SCH_SHEET_PATH parentSheet = sheetList[i];
-
-            if( parentSheet.size() > 1 )
-            {
-                // The sheet path is the full path to the sheet, so we need to remove the last
-                // sheet name to get the parent sheet path
-                parentSheet.pop_back();
-            }
-
-            wxString parentSheetName =
-                    parentSheet.Last()->GetField( FIELD_T::SHEET_NAME )->GetShownText( false );
-
-            plotter->StartPage( sheetList[i].GetPageNumber(), sheetName,
-                                parentSheet.GetPageNumber(), parentSheetName );
+            plotter->StartPage( sheetList[i].GetPageNumber(), sheetName );
         }
 
         plotOneSheetPDF( plotter, screen, aPlotOpts );
@@ -384,9 +371,7 @@ void SCH_PLOTTER::createPSFiles( const SCH_PLOT_OPTS& aPlotOpts,
             break;
 
         case PAGE_SIZE_AUTO:
-        default:
-            plotPage = actualPage;
-            break;
+        default: plotPage = actualPage; break;
         }
 
         double  scalex = (double) plotPage.GetWidthMils() / actualPage.GetWidthMils();
@@ -409,16 +394,10 @@ void SCH_PLOTTER::createPSFiles( const SCH_PLOT_OPTS& aPlotOpts,
             m_lastOutputFilePath = plotFileName.GetFullPath();
 
             if( !plotFileName.IsOk() )
-            {
-                if( aReporter )
-                {
-                    // Error
-                    msg.Printf( _( "Failed to create file '%s'." ), plotFileName.GetFullPath() );
-                    aReporter->Report( msg, RPT_SEVERITY_ERROR );
-                }
-            }
-            else if( plotOneSheetPS( plotFileName.GetFullPath(), screen, aRenderSettings,
-                                     actualPage, plot_offset, scale, aPlotOpts ) )
+                return;
+
+            if( plotOneSheetPS( plotFileName.GetFullPath(), screen, aRenderSettings, actualPage,
+                                plot_offset, scale, aPlotOpts ) )
             {
                 if( aReporter )
                 {
@@ -447,7 +426,9 @@ void SCH_PLOTTER::createPSFiles( const SCH_PLOT_OPTS& aPlotOpts,
     }
 
     if( aReporter )
+    {
         aReporter->ReportTail( _( "Done." ), RPT_SEVERITY_INFO );
+    }
 
     restoreEnvironment( nullptr, oldsheetpath );
 }

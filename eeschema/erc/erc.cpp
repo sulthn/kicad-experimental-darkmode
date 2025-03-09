@@ -878,7 +878,7 @@ int ERC_TESTER::TestNoConnectPins()
                         addOther( pin->GetPosition(), pin );
                 }
             }
-            else if( item->IsConnectable() && item->Type() != SCH_NO_CONNECT_T )
+            else if( item->IsConnectable() )
             {
                 for( const VECTOR2I& pt : item->GetConnectionPoints() )
                     addOther( pt, item );
@@ -1333,7 +1333,7 @@ int ERC_TESTER::TestSimilarLabels()
                 {
                     SCH_PIN* pin = static_cast<SCH_PIN*>( item );
 
-                    if( !pin->IsPower() )
+                    if( !pin->IsGlobalPower() )
                     {
                         continue;
                     }
@@ -1387,8 +1387,8 @@ int ERC_TESTER::TestLibSymbolIssues()
 
             wxCHECK2( libSymbolInSchematic, continue );
 
-            wxString             libName = symbol->GetLibId().GetLibNickname();
-            const LIB_TABLE_ROW* libTableRow = libTable->FindRow( libName, true );
+            wxString       libName = symbol->GetLibId().GetLibNickname();
+            LIB_TABLE_ROW* libTableRow = libTable->FindRow( libName, true );
 
             if( !libTableRow )
             {
@@ -1411,24 +1411,8 @@ int ERC_TESTER::TestLibSymbolIssues()
                 {
                     std::shared_ptr<ERC_ITEM> ercItem = ERC_ITEM::Create( ERCE_LIB_SYMBOL_ISSUES );
                     ercItem->SetItems( symbol );
-                    msg.Printf( _( "The symbol library '%s' is not enabled in the current configuration" ),
+                    msg.Printf( _( "The library '%s' is not enabled in the current configuration" ),
                                 UnescapeString( libName ) );
-                    ercItem->SetErrorMessage( msg );
-
-                    markers.emplace_back( new SCH_MARKER( ercItem, symbol->GetPosition() ) );
-                }
-
-                continue;
-            }
-            else if( !libTableRow->LibraryExists() )
-            {
-                if( m_settings.IsTestEnabled( ERCE_LIB_SYMBOL_ISSUES ) )
-                {
-                    std::shared_ptr<ERC_ITEM> ercItem = ERC_ITEM::Create( ERCE_LIB_SYMBOL_ISSUES );
-                    ercItem->SetItems( symbol );
-                    msg.Printf( _( "The symbol library '%s' was not found at '%s'." ),
-                                UnescapeString( libName ),
-                                libTableRow->GetFullURI( true ) );
                     ercItem->SetErrorMessage( msg );
 
                     markers.emplace_back( new SCH_MARKER( ercItem, symbol->GetPosition() ) );
@@ -1633,7 +1617,7 @@ int ERC_TESTER::TestFootprintFilters()
             {
                 std::shared_ptr<ERC_ITEM> ercItem = ERC_ITEM::Create( ERCE_FOOTPRINT_LINK_ISSUES );
                 msg.Printf( _( "Assigned footprint (%s) doesn't match footprint filters (%s)." ),
-                            footprint.GetUniStringLibItemName(),
+                            lowerItemName,
                             wxJoin( filters, ' ' ) );
                 ercItem->SetErrorMessage( msg );
                 ercItem->SetItems( sch_symbol );
@@ -1706,9 +1690,6 @@ int ERC_TESTER::TestOffGridEndpoints()
 
                 for( SCH_PIN* pin : symbol->GetPins( nullptr ) )
                 {
-                    if( pin->GetType() == ELECTRICAL_PINTYPE::PT_NC )
-                        continue;
-
                     VECTOR2I pinPos = pin->GetPosition();
 
                     if( ( pinPos.x % gridSize ) != 0 || ( pinPos.y % gridSize ) != 0 )
@@ -1738,7 +1719,7 @@ int ERC_TESTER::TestSimModelIssues()
 {
     WX_STRING_REPORTER reporter;
     int                err_count = 0;
-    SIM_LIB_MGR        libMgr( &m_schematic->Prj(), m_schematic );
+    SIM_LIB_MGR        libMgr( &m_schematic->Prj() );
 
     for( SCH_SHEET_PATH& sheet : m_sheetList )
     {

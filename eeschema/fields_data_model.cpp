@@ -23,8 +23,7 @@
 #include <common.h>
 #include <widgets/wx_grid.h>
 #include <sch_reference_list.h>
-#include <sch_commit.h>
-#include <sch_screen.h>
+#include <schematic_settings.h>
 #include "string_utils.h"
 
 #include "fields_data_model.h"
@@ -58,16 +57,12 @@ void FIELDS_EDITOR_GRID_DATA_MODEL::updateDataStoreSymbolField( const SCH_SYMBOL
     {
         m_dataStore[aSymbol.m_Uuid][aFieldName] = getAttributeValue( aSymbol, aFieldName );
     }
-    else if( const SCH_FIELD* field = aSymbol.GetField( aFieldName ) )
+    else if( const SCH_FIELD* field = aSymbol.GetFieldByName( aFieldName ) )
     {
         if( field->IsPrivate() )
-        {
             m_dataStore[aSymbol.m_Uuid][aFieldName] = wxEmptyString;
-            return;
-        }
-
-        wxString value = aSymbol.Schematic()->ConvertKIIDsToRefs( field->GetText() );
-        m_dataStore[aSymbol.m_Uuid][aFieldName] = value;
+        else
+            m_dataStore[aSymbol.m_Uuid][aFieldName] = field->GetText();
     }
     else if( IsTextVar( aFieldName ) )
     {
@@ -172,29 +167,6 @@ wxString FIELDS_EDITOR_GRID_DATA_MODEL::GetValue( int aRow, int aCol )
     {
         return GetValue( m_rows[aRow], aCol );
     }
-}
-
-
-wxGridCellAttr* FIELDS_EDITOR_GRID_DATA_MODEL::GetAttr( int aRow, int aCol,
-                                                        wxGridCellAttr::wxAttrKind aKind )
-{
-    if( GetColFieldName( aCol ) == GetCanonicalFieldName( FIELD_T::DATASHEET )
-            || IsURL( GetValue( m_rows[aRow], aCol ) ) )
-    {
-        if( m_urlEditor )
-        {
-            m_urlEditor->IncRef();
-            return enhanceAttr( m_urlEditor, aRow, aCol, aKind );
-        }
-    }
-
-    if( m_colAttrs[aCol] )
-    {
-        m_colAttrs[aCol]->IncRef();
-        return enhanceAttr( m_colAttrs[aCol], aRow, aCol, aKind );
-    }
-
-    return nullptr;
 }
 
 
@@ -324,14 +296,14 @@ void FIELDS_EDITOR_GRID_DATA_MODEL::SetValue( int aRow, int aCol, const wxString
 bool FIELDS_EDITOR_GRID_DATA_MODEL::ColIsReference( int aCol )
 {
     wxCHECK( aCol >= 0 && aCol < (int) m_cols.size(), false );
-    return m_cols[aCol].m_fieldName == GetCanonicalFieldName( FIELD_T::REFERENCE );
+    return m_cols[aCol].m_fieldName == GetCanonicalFieldName( REFERENCE_FIELD );
 }
 
 
 bool FIELDS_EDITOR_GRID_DATA_MODEL::ColIsValue( int aCol )
 {
     wxCHECK( aCol >= 0 && aCol < (int) m_cols.size(), false );
-    return m_cols[aCol].m_fieldName == GetCanonicalFieldName( FIELD_T::VALUE );
+    return m_cols[aCol].m_fieldName == GetCanonicalFieldName( VALUE_FIELD );
 }
 
 
@@ -383,7 +355,7 @@ bool FIELDS_EDITOR_GRID_DATA_MODEL::cmp( const DATA_MODEL_ROW&          lhGroup,
     wxString lhs = dataModel->GetValue( lhGroup, sortCol ).Trim( true ).Trim( false );
     wxString rhs = dataModel->GetValue( rhGroup, sortCol ).Trim( true ).Trim( false );
 
-    if( lhs == rhs || dataModel->ColIsReference( sortCol ) )
+    if( lhs == rhs || sortCol == REFERENCE_FIELD )
     {
         wxString lhRef = lhGroup.m_Refs[0].GetRef() + lhGroup.m_Refs[0].GetRefNumber();
         wxString rhRef = rhGroup.m_Refs[0].GetRef() + rhGroup.m_Refs[0].GetRefNumber();
@@ -445,7 +417,7 @@ bool FIELDS_EDITOR_GRID_DATA_MODEL::groupMatch( const SCH_REFERENCE& lhRef,
                                                 const SCH_REFERENCE& rhRef )
 
 {
-    int  refCol = GetFieldNameCol( GetCanonicalFieldName( FIELD_T::REFERENCE ) );
+    int  refCol = GetFieldNameCol( GetCanonicalFieldName( REFERENCE_FIELD ) );
     bool matchFound = false;
 
     if( refCol == -1 )
@@ -516,7 +488,7 @@ bool FIELDS_EDITOR_GRID_DATA_MODEL::groupMatch( const SCH_REFERENCE& lhRef,
 wxString FIELDS_EDITOR_GRID_DATA_MODEL::getFieldShownText( const SCH_REFERENCE& aRef,
                                                            const wxString&      aFieldName )
 {
-    SCH_FIELD* field = aRef.GetSymbol()->GetField( aFieldName );
+    SCH_FIELD* field = aRef.GetSymbol()->GetFieldByName( aFieldName );
 
     if( field )
     {
@@ -785,24 +757,26 @@ void FIELDS_EDITOR_GRID_DATA_MODEL::ExpandAfterSort()
 }
 
 
-void FIELDS_EDITOR_GRID_DATA_MODEL::ApplyData( SCH_COMMIT& aCommit )
+void FIELDS_EDITOR_GRID_DATA_MODEL::ApplyData(
+        std::function<void( SCH_SYMBOL&, SCH_SHEET_PATH& )> symbolChangeHandler )
 {
-
-    for( const SCH_REFERENCE& instance : m_symbolsList )
+    for( unsigned i = 0; i < m_symbolsList.GetCount(); ++i )
     {
-        SCH_SYMBOL&         symbol = *instance.GetSymbol();
-        SCHEMATIC_SETTINGS& settings = symbol.Schematic()->Settings();
+        SCH_SYMBOL& symbol = *m_symbolsList[i].GetSymbol();
 
-        aCommit.Modify( &symbol, instance.GetSheetPath().LastScreen() );
+        symbolChangeHandler( symbol, m_symbolsList[i].GetSheetPath() );
 
         const std::map<wxString, wxString>& fieldStore = m_dataStore[symbol.m_Uuid];
 
-        for( const auto& [srcName, srcValue] : fieldStore )
+        for( const std::pair<wxString, wxString> srcData : fieldStore )
         {
+            const wxString& srcName = srcData.first;
+            const wxString& srcValue = srcData.second;
+
             // Attributes bypass the field logic, so handle them first
             if( isAttribute( srcName ) )
             {
-                setAttributeValue( symbol, srcName, srcValue );
+                setAttributeValue( *m_symbolsList[i].GetSymbol(), srcName, srcValue );
                 continue;
             }
 
@@ -811,7 +785,7 @@ void FIELDS_EDITOR_GRID_DATA_MODEL::ApplyData( SCH_COMMIT& aCommit )
             if( IsTextVar( srcName ) )
                 continue;
 
-            SCH_FIELD* destField = symbol.GetField( srcName );
+            SCH_FIELD* destField = symbol.FindField( srcName );
 
             if( destField && destField->IsPrivate() )
             {
@@ -829,27 +803,34 @@ void FIELDS_EDITOR_GRID_DATA_MODEL::ApplyData( SCH_COMMIT& aCommit )
 
             if( createField )
             {
-                destField = symbol.AddField( SCH_FIELD( symbol.GetPosition(), FIELD_T::USER,
-                                                        &symbol, srcName ) );
-                destField->SetTextAngle( symbol.GetField( FIELD_T::REFERENCE )->GetTextAngle() );
-                destField->SetTextSize( VECTOR2I( settings.m_DefaultTextSize,
-                                                  settings.m_DefaultTextSize ) );
-                destField->SetVisible( false );
+                const VECTOR2I symbolPos = symbol.GetPosition();
+                destField = symbol.AddField( SCH_FIELD( symbolPos, -1, &symbol, srcName ) );
             }
 
             if( !destField )
                 continue;
 
-            if( destField->GetId() == FIELD_T::REFERENCE )
+            if( destField->GetId() == REFERENCE_FIELD )
             {
                 // Reference is not editable from this dialog
-                continue;
             }
-
-            destField->SetText( symbol.Schematic()->ConvertRefsToKIIDs( srcValue ) );
+            else if( destField->GetId() == VALUE_FIELD )
+            {
+                // Value field cannot be empty
+                if( !srcValue.IsEmpty() )
+                    symbol.SetValueFieldText( srcValue );
+            }
+            else if( destField->GetId() == FOOTPRINT_FIELD )
+            {
+                symbol.SetFootprintFieldText( srcValue );
+            }
+            else
+            {
+                destField->SetText( srcValue );
+            }
         }
 
-        for( int ii = (int) symbol.GetFields().size() - 1; ii >= 0; ii-- )
+        for( int ii = symbol.GetFields().size() - 1; ii >= 0; ii-- )
         {
             if( symbol.GetFields()[ii].IsMandatory() || symbol.GetFields()[ii].IsPrivate() )
                 continue;
@@ -934,7 +915,7 @@ void FIELDS_EDITOR_GRID_DATA_MODEL::ApplyBomPreset( const BOM_PRESET& aPreset )
     int sortCol = GetFieldNameCol( aPreset.sortField );
 
     if( sortCol == -1 )
-        sortCol = GetFieldNameCol( GetCanonicalFieldName( FIELD_T::REFERENCE ) );
+        sortCol = GetFieldNameCol( GetCanonicalFieldName( REFERENCE_FIELD ) );
 
     SetSorting( sortCol, aPreset.sortAsc );
 
@@ -997,10 +978,8 @@ wxString FIELDS_EDITOR_GRID_DATA_MODEL::Export( const BOM_FMT_PRESET& settings )
                 }
 
                 if( !settings.stringDelimiter.IsEmpty() )
-                {
                     field.Replace( settings.stringDelimiter,
                                    settings.stringDelimiter + settings.stringDelimiter );
-                }
 
                 return settings.stringDelimiter + field + settings.stringDelimiter
                        + ( last ? wxString( wxS( "\n" ) ) : settings.fieldDelimiter );
@@ -1044,20 +1023,13 @@ void FIELDS_EDITOR_GRID_DATA_MODEL::AddReferences( const SCH_REFERENCE_LIST& aRe
     {
         if( !m_symbolsList.Contains( ref ) )
         {
-            SCH_SYMBOL* symbol = ref.GetSymbol();
-
             m_symbolsList.AddItem( ref );
 
             // Update the fields of every reference
-            for( const SCH_FIELD& field : symbol->GetFields() )
+            for( const SCH_FIELD& field : ref.GetSymbol()->GetFields() )
             {
                 if( !field.IsPrivate() )
-                {
-                    wxString name = field.GetCanonicalName();
-                    wxString value = symbol->Schematic()->ConvertKIIDsToRefs( field.GetText() );
-
-                    m_dataStore[symbol->m_Uuid][name] = value;
-                }
+                    m_dataStore[ref.GetSymbol()->m_Uuid][field.GetCanonicalName()] = field.GetText();
             }
         }
     }

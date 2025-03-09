@@ -70,8 +70,7 @@ public:
         SHEET_PIN,
         HIER_LABEL,
         LOCAL_LABEL,
-        LOCAL_POWER_PIN,
-        GLOBAL_POWER_PIN,
+        POWER_PIN,
         GLOBAL
     };
 
@@ -298,7 +297,6 @@ private:
     std::unordered_set<CONNECTION_SUBGRAPH*> m_hier_children;
 
     /// A cache of escaped netnames from schematic items.
-    mutable std::mutex m_driver_name_cache_mutex;
     mutable std::unordered_map<SCH_ITEM*, wxString> m_driver_name_cache;
 
     /// Fully-resolved driver for the subgraph (might not exist in this subgraph).

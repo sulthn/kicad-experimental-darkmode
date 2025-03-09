@@ -34,7 +34,6 @@
 #include <drawing_sheet/ds_proxy_view_item.h>
 #include <lset.h>
 #include <settings/settings_manager.h>
-#include <toolbars_gerber.h>
 #include <tool/tool_manager.h>
 #include <tool/action_toolbar.h>
 #include <tool/tool_dispatcher.h>
@@ -149,19 +148,18 @@ GERBVIEW_FRAME::GERBVIEW_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     setupTools();
     setupUIConditions();
     ReCreateMenuBar();
-
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<GERBVIEW_TOOLBAR_SETTINGS>( "gerbview-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
+    ReCreateHToolbar();
+    ReCreateOptToolbar();
+    ReCreateAuxiliaryToolbar();
 
     m_auimgr.SetManagedWindow( this );
 
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( "TopMainToolbar" ).Top().Layer( 6 ) );
-    m_auimgr.AddPane( m_tbTopAux, EDA_PANE().HToolbar().Name( "TopAuxToolbar" ).Top()
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( "MainToolbar" ).Top().Layer( 6 ) );
+    m_auimgr.AddPane( m_auxiliaryToolBar, EDA_PANE().HToolbar().Name( "AuxToolbar" ).Top()
                       .Layer(4) );
     m_auimgr.AddPane( m_messagePanel, EDA_PANE().Messages().Name( "MsgPanel" ).Bottom()
                       .Layer( 6 ) );
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().VToolbar().Name( "LeftToolbar" ).Left()
+    m_auimgr.AddPane( m_optionsToolBar, EDA_PANE().VToolbar().Name( "OptToolbar" ).Left()
                       .Layer( 3 ) );
     m_auimgr.AddPane( m_LayersManager, EDA_PANE().Palette().Name( "LayersManager" ).Right()
                       .Layer( 3 ).Caption( _( "Layers Manager" ) ).PaneBorder( false )
@@ -406,10 +404,7 @@ void GERBVIEW_FRAME::ReFillLayerWidget()
 
     m_LayersManager->ReFill();
     m_SelLayerBox->Resync();
-
-    // Re-build the various boxes in the toolbars
-    // TODO: Could this be made more precise instead of just blowing away all the toolbars?
-    RecreateToolbars();
+    ReCreateAuxiliaryToolbar();
 
     wxAuiPaneInfo&  lyrs = m_auimgr.GetPane( m_LayersManager );
     wxSize          bestz = m_LayersManager->GetBestSize();
@@ -1075,7 +1070,7 @@ void GERBVIEW_FRAME::ActivateGalCanvas()
     m_LayersManager->ReFill();
     m_LayersManager->ReFillRender();
 
-    RecreateToolbars();
+    ReCreateOptToolbar();
     ReCreateMenuBar();
 
     try
@@ -1135,8 +1130,8 @@ void GERBVIEW_FRAME::setupUIConditions()
     mgr->SetConditions( ACTIONS::togglePolarCoords, CHECK( cond.PolarCoordinates() ) );
     mgr->SetConditions( ACTIONS::toggleCursorStyle, CHECK( cond.FullscreenCursor() ) );
 
-    mgr->SetConditions( ACTIONS::millimetersUnits,  CHECK( cond.Units( EDA_UNITS::MM ) ) );
-    mgr->SetConditions( ACTIONS::inchesUnits,       CHECK( cond.Units( EDA_UNITS::INCH ) ) );
+    mgr->SetConditions( ACTIONS::millimetersUnits,  CHECK( cond.Units( EDA_UNITS::MILLIMETRES ) ) );
+    mgr->SetConditions( ACTIONS::inchesUnits,       CHECK( cond.Units( EDA_UNITS::INCHES ) ) );
     mgr->SetConditions( ACTIONS::milsUnits,         CHECK( cond.Units( EDA_UNITS::MILS ) ) );
 
     auto flashedDisplayOutlinesCond =

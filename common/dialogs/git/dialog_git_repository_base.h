@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 3.10.1-254-gc2ef7767)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -31,6 +31,7 @@
 
 ///////////////////////////////////////////////////////////////////////////
 
+
 ///////////////////////////////////////////////////////////////////////////////
 /// Class DIALOG_GIT_REPOSITORY_BASE
 ///////////////////////////////////////////////////////////////////////////////
@@ -39,7 +40,6 @@ class DIALOG_GIT_REPOSITORY_BASE : public DIALOG_SHIM
 	private:
 
 	protected:
-		wxBoxSizer* bSizerMain;
 		wxStaticText* m_staticText1;
 		wxStaticLine* m_staticline1;
 		wxStaticText* m_staticText3;
@@ -74,7 +74,7 @@ class DIALOG_GIT_REPOSITORY_BASE : public DIALOG_SHIM
 
 	public:
 
-		DIALOG_GIT_REPOSITORY_BASE( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Git Repository"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1,-1 ), long style = wxCAPTION|wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER );
+		DIALOG_GIT_REPOSITORY_BASE( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Git Repository"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( 682,598 ), long style = wxCAPTION|wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER );
 
 		~DIALOG_GIT_REPOSITORY_BASE();
 

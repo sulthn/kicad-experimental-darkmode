@@ -85,6 +85,8 @@ DIALOG_PLOT_SCHEMATIC::DIALOG_PLOT_SCHEMATIC( SCH_EDIT_FRAME* aEditFrame, wxWind
     {
         SetTitle( m_job->GetSettingsDialogTitle() );
 
+        m_outputPathLabel->SetLabel( _( "Output file:" ) );
+
         m_browseButton->Hide();
         m_MessagesBox->Hide();
 

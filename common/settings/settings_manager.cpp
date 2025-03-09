@@ -458,9 +458,6 @@ wxString SETTINGS_MANAGER::GetPathForSettingsFile( JSON_SETTINGS* aSettings )
     case SETTINGS_LOC::COLORS:
         return GetColorSettingsPath();
 
-    case SETTINGS_LOC::TOOLBARS:
-        return GetToolbarSettingsPath();
-
     case SETTINGS_LOC::NONE:
         return "";
 
@@ -817,27 +814,6 @@ wxString SETTINGS_MANAGER::GetColorSettingsPath()
         {
             wxLogTrace( traceSettings,
                         wxT( "GetColorSettingsPath(): Path %s missing and could not be created!" ),
-                        path.GetPath() );
-        }
-    }
-
-    return path.GetPath();
-}
-
-
-wxString SETTINGS_MANAGER::GetToolbarSettingsPath()
-{
-    wxFileName path;
-
-    path.AssignDir( PATHS::GetUserSettingsPath() );
-    path.AppendDir( wxS( "toolbars" ) );
-
-    if( !path.DirExists() )
-    {
-        if( !wxMkdir( path.GetPath() ) )
-        {
-            wxLogTrace( traceSettings,
-                        wxT( "GetToolbarSettingsPath(): Path %s missing and could not be created!" ),
                         path.GetPath() );
         }
     }

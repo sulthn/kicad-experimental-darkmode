@@ -104,7 +104,6 @@
 #include <widgets/wx_aui_utils.h>
 #include <drawing_sheet/ds_proxy_view_item.h>
 #include <project/project_local_settings.h>
-#include <toolbars_sch_editor.h>
 
 #ifdef KICAD_IPC_API
 #include <api/api_plugin_manager.h>
@@ -190,10 +189,9 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     setupTools();
     setupUIConditions();
     ReCreateMenuBar();
-
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<SCH_EDIT_TOOLBAR_SETTINGS>( "eeschema-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
+    ReCreateHToolbar();
+    ReCreateVToolbar();
+    ReCreateOptToolbar();
 
 #ifdef KICAD_IPC_API
     wxTheApp->Bind( EDA_EVT_PLUGIN_AVAILABILITY_CHANGED,
@@ -220,13 +218,8 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
 
     CreateInfoBar();
 
-    // Fetch a COPY of the config as a lot of these initializations are going to overwrite our
-    // data.
-    EESCHEMA_SETTINGS::AUI_PANELS aui_cfg = eeconfig()->m_AuiPanels;
-    EESCHEMA_SETTINGS::APPEARANCE appearance_cfg = eeconfig()->m_Appearance;
-
     // Rows; layers 4 - 6
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( wxS( "TopMainToolbar" ) )
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( wxS( "MainToolbar" ) )
                       .Top().Layer( 6 ) );
 
     m_auimgr.AddPane( m_messagePanel, EDA_PANE().Messages().Name( wxS( "MsgPanel" ) )
@@ -252,10 +245,10 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
 
     m_auimgr.AddPane( createHighlightedNetNavigator(), defaultNetNavigatorPaneInfo() );
 
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().VToolbar().Name( wxS( "LeftToolbar" ) )
+    m_auimgr.AddPane( m_optionsToolBar, EDA_PANE().VToolbar().Name( wxS( "OptToolbar" ) )
                       .Left().Layer( 2 ) );
 
-    m_auimgr.AddPane( m_tbRight, EDA_PANE().VToolbar().Name( wxS( "RightToolbar" ) )
+    m_auimgr.AddPane( m_drawToolBar, EDA_PANE().VToolbar().Name( wxS( "ToolsToolbar" ) )
                       .Right().Layer( 2 ) );
 
     // Center
@@ -276,89 +269,101 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
 
     FinishAUIInitialization();
 
+    resolveCanvasType();
+    SwitchCanvas( m_canvasType );
+
+    GetCanvas()->GetGAL()->SetAxesEnabled( false );
+
+    KIGFX::SCH_VIEW* view = GetCanvas()->GetView();
+    static_cast<KIGFX::SCH_PAINTER*>( view->GetPainter() )->SetSchematic( m_schematic );
+
     wxAuiPaneInfo& hierarchy_pane = m_auimgr.GetPane( SchematicHierarchyPaneName() );
     wxAuiPaneInfo& netNavigatorPane = m_auimgr.GetPane( NetNavigatorPaneName() );
     wxAuiPaneInfo& propertiesPane = m_auimgr.GetPane( PropertiesPaneName() );
     wxAuiPaneInfo& selectionFilterPane = m_auimgr.GetPane( wxS( "SelectionFilter" ) );
     wxAuiPaneInfo& designBlocksPane = m_auimgr.GetPane( DesignBlocksPaneName() );
+    EESCHEMA_SETTINGS* cfg = eeconfig();
 
-    hierarchy_pane.Show( aui_cfg.show_schematic_hierarchy );
-    netNavigatorPane.Show( aui_cfg.show_net_nav_panel );
-    propertiesPane.Show( aui_cfg.show_properties );
-    designBlocksPane.Show( aui_cfg.design_blocks_show );
+    hierarchy_pane.Show( cfg->m_AuiPanels.show_schematic_hierarchy );
+    netNavigatorPane.Show( cfg->m_AuiPanels.show_net_nav_panel );
+    propertiesPane.Show( cfg->m_AuiPanels.show_properties );
+    designBlocksPane.Show( cfg->m_AuiPanels.design_blocks_show );
     updateSelectionFilterVisbility();
 
     // The selection filter doesn't need to grow in the vertical direction when docked
     selectionFilterPane.dock_proportion = 0;
 
-    if( aui_cfg.hierarchy_panel_float_width > 0 && aui_cfg.hierarchy_panel_float_height > 0 )
+    if( cfg->m_AuiPanels.hierarchy_panel_float_width > 0
+            && cfg->m_AuiPanels.hierarchy_panel_float_height > 0 )
     {
         // Show at end, after positioning
-        hierarchy_pane.FloatingSize( aui_cfg.hierarchy_panel_float_width,
-                                     aui_cfg.hierarchy_panel_float_height );
+        hierarchy_pane.FloatingSize( cfg->m_AuiPanels.hierarchy_panel_float_width,
+                                     cfg->m_AuiPanels.hierarchy_panel_float_height );
     }
 
-    if( aui_cfg.net_nav_panel_float_size.GetWidth() > 0
-      && aui_cfg.net_nav_panel_float_size.GetHeight() > 0 )
+    if( cfg->m_AuiPanels.net_nav_panel_float_size.GetWidth() > 0
+      && cfg->m_AuiPanels.net_nav_panel_float_size.GetHeight() > 0 )
     {
-        netNavigatorPane.FloatingSize( aui_cfg.net_nav_panel_float_size );
-        netNavigatorPane.FloatingPosition( aui_cfg.net_nav_panel_float_pos );
+        netNavigatorPane.FloatingSize( cfg->m_AuiPanels.net_nav_panel_float_size );
+        netNavigatorPane.FloatingPosition( cfg->m_AuiPanels.net_nav_panel_float_pos );
     }
 
-    if( aui_cfg.properties_panel_width > 0 )
-        SetAuiPaneSize( m_auimgr, propertiesPane, aui_cfg.properties_panel_width, -1 );
+    if( cfg->m_AuiPanels.properties_panel_width > 0 )
+        SetAuiPaneSize( m_auimgr, propertiesPane, cfg->m_AuiPanels.properties_panel_width, -1 );
 
-    if( aui_cfg.schematic_hierarchy_float )
+    if( cfg->m_AuiPanels.schematic_hierarchy_float )
         hierarchy_pane.Float();
 
-    if( aui_cfg.search_panel_height > 0
-        && ( aui_cfg.search_panel_dock_direction == wxAUI_DOCK_TOP
-            || aui_cfg.search_panel_dock_direction == wxAUI_DOCK_BOTTOM ) )
+    if( cfg->m_AuiPanels.search_panel_height > 0
+        && ( cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_TOP
+            || cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_BOTTOM ) )
     {
         wxAuiPaneInfo& searchPane = m_auimgr.GetPane( SearchPaneName() );
-        searchPane.Direction( aui_cfg.search_panel_dock_direction );
-        SetAuiPaneSize( m_auimgr, searchPane, -1, aui_cfg.search_panel_height );
+        searchPane.Direction( cfg->m_AuiPanels.search_panel_dock_direction );
+        SetAuiPaneSize( m_auimgr, searchPane, -1, cfg->m_AuiPanels.search_panel_height );
     }
 
-    else if( aui_cfg.search_panel_width > 0
-            && ( aui_cfg.search_panel_dock_direction == wxAUI_DOCK_LEFT
-                || aui_cfg.search_panel_dock_direction == wxAUI_DOCK_RIGHT ) )
+    else if( cfg->m_AuiPanels.search_panel_width > 0
+            && ( cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_LEFT
+                || cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_RIGHT ) )
     {
         wxAuiPaneInfo& searchPane = m_auimgr.GetPane( SearchPaneName() );
-        searchPane.Direction( aui_cfg.search_panel_dock_direction );
-        SetAuiPaneSize( m_auimgr, searchPane, aui_cfg.search_panel_width, -1 );
+        searchPane.Direction( cfg->m_AuiPanels.search_panel_dock_direction );
+        SetAuiPaneSize( m_auimgr, searchPane, cfg->m_AuiPanels.search_panel_width, -1 );
     }
 
-    if( aui_cfg.float_net_nav_panel )
+    if( cfg->m_AuiPanels.float_net_nav_panel )
         netNavigatorPane.Float();
 
-    if( aui_cfg.design_blocks_show )
-        SetAuiPaneSize( m_auimgr, designBlocksPane, aui_cfg.design_blocks_panel_docked_width, -1 );
+    if( cfg->m_AuiPanels.design_blocks_show )
+        SetAuiPaneSize( m_auimgr, designBlocksPane,
+                        cfg->m_AuiPanels.design_blocks_panel_docked_width, -1 );
 
-    if( aui_cfg.hierarchy_panel_docked_width > 0 )
+    if( cfg->m_AuiPanels.hierarchy_panel_docked_width > 0 )
     {
         // If the net navigator is not show, let the hierarchy navigator take all of the vertical
         // space.
-        if( !aui_cfg.show_net_nav_panel )
+        if( !cfg->m_AuiPanels.show_net_nav_panel )
         {
-            SetAuiPaneSize( m_auimgr, hierarchy_pane, aui_cfg.hierarchy_panel_docked_width, -1 );
+            SetAuiPaneSize( m_auimgr, hierarchy_pane,
+                            cfg->m_AuiPanels.hierarchy_panel_docked_width, -1 );
         }
         else
         {
             SetAuiPaneSize( m_auimgr, hierarchy_pane,
-                            aui_cfg.hierarchy_panel_docked_width,
-                            aui_cfg.hierarchy_panel_docked_height );
+                            cfg->m_AuiPanels.hierarchy_panel_docked_width,
+                            cfg->m_AuiPanels.hierarchy_panel_docked_height );
 
             SetAuiPaneSize( m_auimgr, netNavigatorPane,
-                            aui_cfg.net_nav_panel_docked_size.GetWidth(),
-                            aui_cfg.net_nav_panel_docked_size.GetHeight() );
+                            cfg->m_AuiPanels.net_nav_panel_docked_size.GetWidth(),
+                            cfg->m_AuiPanels.net_nav_panel_docked_size.GetHeight() );
         }
 
         // wxAUI hack: force width by setting MinSize() and then Fixed()
         // thanks to ZenJu https://github.com/wxWidgets/wxWidgets/issues/13180
-        hierarchy_pane.MinSize( aui_cfg.hierarchy_panel_docked_width, 60 );
+        hierarchy_pane.MinSize( cfg->m_AuiPanels.hierarchy_panel_docked_width, 60 );
         hierarchy_pane.Fixed();
-        netNavigatorPane.MinSize( aui_cfg.net_nav_panel_docked_size.GetWidth(), 60 );
+        netNavigatorPane.MinSize( cfg->m_AuiPanels.net_nav_panel_docked_size.GetWidth(), 60 );
         netNavigatorPane.Fixed();
         m_auimgr.Update();
 
@@ -377,22 +382,14 @@ SCH_EDIT_FRAME::SCH_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
         m_auimgr.Update();
     }
 
-    resolveCanvasType();
-    SwitchCanvas( m_canvasType );
-
-    GetCanvas()->GetGAL()->SetAxesEnabled( false );
-
-    KIGFX::SCH_VIEW* view = GetCanvas()->GetView();
-    static_cast<KIGFX::SCH_PAINTER*>( view->GetPainter() )->SetSchematic( m_schematic );
-
     LoadProjectSettings();
     LoadDrawingSheet();
 
-    view->SetLayerVisible( LAYER_ERC_ERR, appearance_cfg.show_erc_errors );
-    view->SetLayerVisible( LAYER_ERC_WARN, appearance_cfg.show_erc_warnings );
-    view->SetLayerVisible( LAYER_ERC_EXCLUSION, appearance_cfg.show_erc_exclusions );
-    view->SetLayerVisible( LAYER_OP_VOLTAGES, appearance_cfg.show_op_voltages );
-    view->SetLayerVisible( LAYER_OP_CURRENTS, appearance_cfg.show_op_currents );
+    view->SetLayerVisible( LAYER_ERC_ERR, cfg->m_Appearance.show_erc_errors );
+    view->SetLayerVisible( LAYER_ERC_WARN, cfg->m_Appearance.show_erc_warnings );
+    view->SetLayerVisible( LAYER_ERC_EXCLUSION, cfg->m_Appearance.show_erc_exclusions );
+    view->SetLayerVisible( LAYER_OP_VOLTAGES, cfg->m_Appearance.show_op_voltages );
+    view->SetLayerVisible( LAYER_OP_CURRENTS, cfg->m_Appearance.show_op_currents );
 
     initScreenZoom();
 
@@ -630,8 +627,9 @@ void SCH_EDIT_FRAME::setupUIConditions()
     mgr->SetConditions( ACTIONS::toggleGrid,          CHECK( cond.GridVisible() ) );
     mgr->SetConditions( ACTIONS::toggleGridOverrides, CHECK( cond.GridOverrides() ) );
     mgr->SetConditions( ACTIONS::toggleCursorStyle,   CHECK( cond.FullscreenCursor() ) );
-    mgr->SetConditions( ACTIONS::millimetersUnits,    CHECK( cond.Units( EDA_UNITS::MM ) ) );
-    mgr->SetConditions( ACTIONS::inchesUnits,         CHECK( cond.Units( EDA_UNITS::INCH ) ) );
+    mgr->SetConditions( ACTIONS::millimetersUnits,
+                        CHECK( cond.Units( EDA_UNITS::MILLIMETRES ) ) );
+    mgr->SetConditions( ACTIONS::inchesUnits,         CHECK( cond.Units( EDA_UNITS::INCHES ) ) );
     mgr->SetConditions( ACTIONS::milsUnits,           CHECK( cond.Units( EDA_UNITS::MILS ) ) );
 
     mgr->SetConditions( EE_ACTIONS::lineModeFree,
@@ -1166,12 +1164,6 @@ void SCH_EDIT_FRAME::doCloseWindow()
 }
 
 
-void SCH_EDIT_FRAME::FocusSearch()
-{
-    m_searchPane->FocusSearch();
-}
-
-
 SEVERITY SCH_EDIT_FRAME::GetSeverity( int aErrorCode ) const
 {
     return Schematic().ErcSettings().GetSeverity( aErrorCode );
@@ -1237,10 +1229,10 @@ void SCH_EDIT_FRAME::OnUpdatePCB()
 }
 
 
-void SCH_EDIT_FRAME::UpdateHierarchyNavigator( bool aRefreshNetNavigator, bool aClear )
+void SCH_EDIT_FRAME::UpdateHierarchyNavigator( bool aRefreshNetNavigator )
 {
     m_toolManager->GetTool<SCH_NAVIGATE_TOOL>()->CleanHistory();
-    m_hierarchy->UpdateHierarchyTree( aClear );
+    m_hierarchy->UpdateHierarchyTree();
 
     if( aRefreshNetNavigator )
         RefreshNetNavigator();
@@ -1276,7 +1268,7 @@ void SCH_EDIT_FRAME::ShowFindReplaceDialog( bool aReplace )
         case SCH_SYMBOL_T:
         {
             SCH_SYMBOL* symbol = static_cast<SCH_SYMBOL*>( front );
-            findString = UnescapeString( symbol->GetField( FIELD_T::VALUE )->GetText() );
+            findString = UnescapeString( symbol->GetField( VALUE_FIELD )->GetText() );
             break;
         }
 
@@ -1517,10 +1509,26 @@ void SCH_EDIT_FRAME::OnExit( wxCommandEvent& event )
 }
 
 
+void SCH_EDIT_FRAME::PrintPage( const RENDER_SETTINGS* aSettings )
+{
+    wxString                   fileName = Prj().AbsolutePath( GetScreen()->GetFileName() );
+    const SCH_RENDER_SETTINGS* cfg = static_cast<const SCH_RENDER_SETTINGS*>( aSettings );
+    COLOR4D                    bg = GetColorSettings()->GetColor( LAYER_SCHEMATIC_BACKGROUND );
+
+    cfg->GetPrintDC()->SetBackground( wxBrush( bg.ToColour() ) );
+    cfg->GetPrintDC()->Clear();
+
+    cfg->GetPrintDC()->SetLogicalFunction( wxCOPY );
+    GetScreen()->Print( cfg );
+    PrintDrawingSheet( cfg, GetScreen(), Schematic().GetProperties(), schIUScale.IU_PER_MILS,
+                       fileName );
+}
+
+
 void SCH_EDIT_FRAME::RefreshOperatingPointDisplay()
 {
     SCHEMATIC_SETTINGS& settings = m_schematic->Settings();
-    SIM_LIB_MGR         simLibMgr( &Prj(), &Schematic() );
+    SIM_LIB_MGR         simLibMgr( &Prj() );
     NULL_REPORTER       devnull;
 
     // Patch for bug early in V7.99 dev
@@ -2653,159 +2661,7 @@ void SCH_EDIT_FRAME::updateSelectionFilterVisbility()
 void SCH_EDIT_FRAME::onPluginAvailabilityChanged( wxCommandEvent& aEvt )
 {
     wxLogTrace( traceApi, "SCH frame: EDA_EVT_PLUGIN_AVAILABILITY_CHANGED" );
-    RecreateToolbars();
+    ReCreateHToolbar();
     aEvt.Skip();
 }
 #endif
-
-
-void SCH_EDIT_FRAME::ToggleSearch()
-{
-    EESCHEMA_SETTINGS* cfg = eeconfig();
-
-    // Ensure m_show_search is up to date (the pane can be closed outside the menu)
-    m_show_search = m_auimgr.GetPane( SearchPaneName() ).IsShown();
-
-    m_show_search = !m_show_search;
-
-    wxAuiPaneInfo& searchPaneInfo = m_auimgr.GetPane( SearchPaneName() );
-    searchPaneInfo.Show( m_show_search );
-
-    if( m_show_search )
-    {
-        searchPaneInfo.Direction( cfg->m_AuiPanels.search_panel_dock_direction );
-
-        if( cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_TOP
-            || cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_BOTTOM )
-        {
-            SetAuiPaneSize( m_auimgr, searchPaneInfo, -1, cfg->m_AuiPanels.search_panel_height );
-        }
-        else if( cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_LEFT
-                 || cfg->m_AuiPanels.search_panel_dock_direction == wxAUI_DOCK_RIGHT )
-        {
-            SetAuiPaneSize( m_auimgr, searchPaneInfo, cfg->m_AuiPanels.search_panel_width, -1 );
-        }
-
-        m_searchPane->FocusSearch();
-    }
-    else
-    {
-        cfg->m_AuiPanels.search_panel_height = m_searchPane->GetSize().y;
-        cfg->m_AuiPanels.search_panel_width = m_searchPane->GetSize().x;
-        cfg->m_AuiPanels.search_panel_dock_direction = searchPaneInfo.dock_direction;
-        m_auimgr.Update();
-    }
-}
-
-
-void SCH_EDIT_FRAME::ToggleProperties()
-{
-    if( !m_propertiesPanel )
-        return;
-
-    bool show = !m_propertiesPanel->IsShownOnScreen();
-
-    wxAuiPaneInfo& propertiesPaneInfo = m_auimgr.GetPane( PropertiesPaneName() );
-    propertiesPaneInfo.Show( show );
-
-    updateSelectionFilterVisbility();
-
-    EESCHEMA_SETTINGS* settings = eeconfig();
-
-    if( show )
-    {
-        SetAuiPaneSize( m_auimgr, propertiesPaneInfo,
-                        settings->m_AuiPanels.properties_panel_width, -1 );
-    }
-    else
-    {
-        settings->m_AuiPanels.properties_panel_width = m_propertiesPanel->GetSize().x;
-        m_auimgr.Update();
-    }
-}
-
-
-void SCH_EDIT_FRAME::ToggleSchematicHierarchy()
-{
-    EESCHEMA_SETTINGS* cfg = eeconfig();
-
-    wxCHECK( cfg, /* void */ );
-
-    wxAuiPaneInfo&     hierarchy_pane = m_auimgr.GetPane( SchematicHierarchyPaneName() );
-
-    hierarchy_pane.Show( !hierarchy_pane.IsShown() );
-
-    updateSelectionFilterVisbility();
-
-    if( hierarchy_pane.IsShown() )
-    {
-        if( hierarchy_pane.IsFloating() )
-        {
-            hierarchy_pane.FloatingSize( cfg->m_AuiPanels.hierarchy_panel_float_width,
-                                         cfg->m_AuiPanels.hierarchy_panel_float_height );
-            m_auimgr.Update();
-        }
-        else if( cfg->m_AuiPanels.hierarchy_panel_docked_width > 0 )
-        {
-            // SetAuiPaneSize also updates m_auimgr
-            SetAuiPaneSize( m_auimgr, hierarchy_pane,
-                            cfg->m_AuiPanels.hierarchy_panel_docked_width, -1 );
-        }
-    }
-    else
-    {
-        if( hierarchy_pane.IsFloating() )
-        {
-            cfg->m_AuiPanels.hierarchy_panel_float_width  = hierarchy_pane.floating_size.x;
-            cfg->m_AuiPanels.hierarchy_panel_float_height = hierarchy_pane.floating_size.y;
-        }
-        else
-        {
-            cfg->m_AuiPanels.hierarchy_panel_docked_width = m_hierarchy->GetSize().x;
-        }
-
-        m_auimgr.Update();
-    }
-}
-
-
-void SCH_EDIT_FRAME::ToggleLibraryTree()
-{
-    EESCHEMA_SETTINGS* cfg = eeconfig();
-
-    wxCHECK( cfg, /* void */ );
-
-    wxAuiPaneInfo& db_library_pane = m_auimgr.GetPane( DesignBlocksPaneName() );
-
-    db_library_pane.Show( !db_library_pane.IsShown() );
-
-    if( db_library_pane.IsShown() )
-    {
-        if( db_library_pane.IsFloating() )
-        {
-            db_library_pane.FloatingSize( cfg->m_AuiPanels.design_blocks_panel_float_width,
-                                          cfg->m_AuiPanels.design_blocks_panel_float_height );
-            m_auimgr.Update();
-        }
-        else if( cfg->m_AuiPanels.design_blocks_panel_docked_width > 0 )
-        {
-            // SetAuiPaneSize also updates m_auimgr
-            SetAuiPaneSize( m_auimgr, db_library_pane,
-                            cfg->m_AuiPanels.design_blocks_panel_docked_width, -1 );
-        }
-    }
-    else
-    {
-        if( db_library_pane.IsFloating() )
-        {
-            cfg->m_AuiPanels.design_blocks_panel_float_width  = db_library_pane.floating_size.x;
-            cfg->m_AuiPanels.design_blocks_panel_float_height = db_library_pane.floating_size.y;
-        }
-        else
-        {
-            cfg->m_AuiPanels.design_blocks_panel_docked_width = m_designBlocksPane->GetSize().x;
-        }
-
-        m_auimgr.Update();
-    }
-}

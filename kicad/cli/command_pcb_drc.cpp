@@ -131,11 +131,11 @@ int CLI::PCB_DRC_COMMAND::doPerform( KIWAY& aKiway )
 
     if( units == wxS( "mm" ) )
     {
-        drcJob->m_units = JOB_PCB_DRC::UNITS::MM;
+        drcJob->m_units = JOB_PCB_DRC::UNITS::MILLIMETERS;
     }
     else if( units == wxS( "in" ) )
     {
-        drcJob->m_units = JOB_PCB_DRC::UNITS::INCH;
+        drcJob->m_units = JOB_PCB_DRC::UNITS::INCHES;
     }
     else if( units == wxS( "mils" ) )
     {

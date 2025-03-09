@@ -36,8 +36,8 @@ public:
 
     enum class IPC2581_UNITS
     {
-        INCH,
-        MM
+        INCHES,
+        MILLIMETERS
     };
 
     enum class IPC2581_VERSION
@@ -46,21 +46,20 @@ public:
         C
     };
 
-public:
-    wxString        m_filename;
-    wxString        m_drawingSheet;
+    wxString m_filename;
+    wxString m_drawingSheet;
 
-    IPC2581_UNITS   m_units;
+    IPC2581_UNITS m_units;
     IPC2581_VERSION m_version;
-    int             m_precision;
+    int m_precision;
 
-    bool            m_compress;
+    bool m_compress;
 
-    wxString        m_colInternalId;
-    wxString        m_colMfgPn;
-    wxString        m_colMfg;
-    wxString        m_colDistPn;
-    wxString        m_colDist;
+    wxString m_colInternalId;
+    wxString m_colMfgPn;
+    wxString m_colMfg;
+    wxString m_colDistPn;
+    wxString m_colDist;
 };
 
 #endif

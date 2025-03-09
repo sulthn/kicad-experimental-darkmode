@@ -62,7 +62,6 @@ class FOOTPRINT_EDITOR_SETTINGS;
 struct MAGNETIC_SETTINGS;
 class NL_PCBNEW_PLUGIN;
 class PROGRESS_REPORTER;
-class PCB_LAYER_BOX_SELECTOR;
 
 #ifdef wxHAS_INOTIFY
 #define wxFileSystemWatcher wxInotifyFileSystemWatcher

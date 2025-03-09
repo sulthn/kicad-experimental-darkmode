@@ -47,6 +47,7 @@ private:
 
 private:
     SCH_EDIT_FRAME* m_parent;
+    bool            m_useCairo;
 };
 
 

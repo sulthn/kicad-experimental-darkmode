@@ -98,6 +98,8 @@ public:
     // The Tool Framework initialization
     void setupTools();
 
+    // Virtual basic functions:
+    void ReCreateHToolbar() override;
     void UpdateToolbarControlSizes() override;
 
     void SetPageSettings(const PAGE_INFO&) override;
@@ -129,6 +131,18 @@ public:
      * Must be called to initialize parameters when a new drawing sheet is loaded
      */
     void OnNewDrawingSheet();
+
+    /**
+     * Create or update the right vertical toolbar.
+     */
+    void ReCreateVToolbar() override;
+
+    /**
+     * Create or update the left vertical toolbar.
+     *
+     * @note This is currently not used.
+     */
+    void ReCreateOptToolbar() override;
 
     const PL_EDITOR_LAYOUT& GetPageLayout() const { return m_pageLayout; }
     PL_EDITOR_LAYOUT& GetPageLayout() { return m_pageLayout; }
@@ -173,6 +187,13 @@ public:
     void ToPrinter( bool doPreview );
 
     void Files_io( wxCommandEvent& event );
+
+    /**
+     * Print a page.
+     *
+     * @param aDC is the device context used by the print function.
+     */
+    virtual void PrintPage( const RENDER_SETTINGS* aSettings ) override;
 
     void OnFileHistory( wxCommandEvent& event );
     void OnClearFileHistory( wxCommandEvent& aEvent );
@@ -239,8 +260,6 @@ public:
 protected:
     bool saveCurrentPageLayout();
 
-    void configureToolbars() override;
-
     void setupUIConditions() override;
 
     void doReCreateMenuBar() override;
@@ -271,15 +290,6 @@ private:
     VECTOR2I          m_grid_origin;
 
     std::unique_ptr<NL_PL_EDITOR_PLUGIN> m_spaceMouse;
-
-    wxString m_originChoiceList[5] =
-        {
-            _("Left Top paper corner"),
-            _("Right Bottom page corner"),
-            _("Left Bottom page corner"),
-            _("Right Top page corner"),
-            _("Left Top page corner")
-        };
 };
 
 #endif /* _PL_EDITOR_FRAME_H */

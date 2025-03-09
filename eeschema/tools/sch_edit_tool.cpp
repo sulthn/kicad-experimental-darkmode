@@ -1808,16 +1808,20 @@ void SCH_EDIT_TOOL::editFieldText( SCH_FIELD* aField )
     if( aField->GetEditFlags() == 0 )    // i.e. not edited, or moved
         commit.Modify( aField, m_frame->GetScreen() );
 
-    if( parentType == SCH_SYMBOL_T && aField->GetId() == FIELD_T::REFERENCE )
+    if( parentType == SCH_SYMBOL_T && aField->GetId() == REFERENCE_FIELD )
         static_cast<SCH_ITEM*>( aField->GetParent() )->SetConnectivityDirty();
 
     wxString caption;
 
     // Use title caps for mandatory fields.  "Edit Sheet name Field" looks dorky.
-    if( aField->IsMandatory() )
+    if( parentType == SCH_SYMBOL_T && aField->IsMandatory() )
     {
         wxString fieldName = GetDefaultFieldName( aField->GetId(), DO_TRANSLATE );
         caption.Printf( _( "Edit %s Field" ), TitleCaps( fieldName ) );
+    }
+    else if( parentType == SCH_SHEET_T && aField->IsMandatory() )
+    {
+        caption.Printf( _( "Edit %s Field" ), TitleCaps( aField->GetName() ) );
     }
     else
     {
@@ -1862,9 +1866,9 @@ int SCH_EDIT_TOOL::EditField( const TOOL_EVENT& aEvent )
     {
         SCH_FIELD* field = static_cast<SCH_FIELD*>( item );
 
-        if( ( aEvent.IsAction( &EE_ACTIONS::editReference ) && field->GetId() != FIELD_T::REFERENCE )
-         || ( aEvent.IsAction( &EE_ACTIONS::editValue )     && field->GetId() != FIELD_T::VALUE     )
-         || ( aEvent.IsAction( &EE_ACTIONS::editFootprint ) && field->GetId() != FIELD_T::FOOTPRINT ) )
+        if( ( aEvent.IsAction( &EE_ACTIONS::editReference ) && field->GetId() != REFERENCE_FIELD )
+         || ( aEvent.IsAction( &EE_ACTIONS::editValue )     && field->GetId() != VALUE_FIELD     )
+         || ( aEvent.IsAction( &EE_ACTIONS::editFootprint ) && field->GetId() != FOOTPRINT_FIELD ) )
         {
             item = field->GetParentSymbol();
             m_selectionTool->ClearSelection( true );
@@ -1878,16 +1882,16 @@ int SCH_EDIT_TOOL::EditField( const TOOL_EVENT& aEvent )
 
         if( aEvent.IsAction( &EE_ACTIONS::editReference ) )
         {
-            editFieldText( symbol->GetField( FIELD_T::REFERENCE ) );
+            editFieldText( symbol->GetField( REFERENCE_FIELD ) );
         }
         else if( aEvent.IsAction( &EE_ACTIONS::editValue ) )
         {
-            editFieldText( symbol->GetField( FIELD_T::VALUE ) );
+            editFieldText( symbol->GetField( VALUE_FIELD ) );
         }
         else if( aEvent.IsAction( &EE_ACTIONS::editFootprint ) )
         {
             if( !symbol->IsPower() )
-                editFieldText( symbol->GetField( FIELD_T::FOOTPRINT ) );
+                editFieldText( symbol->GetField( FOOTPRINT_FIELD ) );
         }
     }
     else if( item->Type() == SCH_FIELD_T )
@@ -1907,16 +1911,16 @@ int SCH_EDIT_TOOL::EditField( const TOOL_EVENT& aEvent )
         {
             if( aEvent.IsAction( &EE_ACTIONS::editReference ) )
             {
-                editFieldText( symbol->GetField( FIELD_T::REFERENCE ) );
+                editFieldText( symbol->GetField( REFERENCE_FIELD ) );
             }
             else if( aEvent.IsAction( &EE_ACTIONS::editValue ) )
             {
-                editFieldText( symbol->GetField( FIELD_T::VALUE ) );
+                editFieldText( symbol->GetField( VALUE_FIELD ) );
             }
             else if( aEvent.IsAction( &EE_ACTIONS::editFootprint ) )
             {
                 if( !symbol->IsPower() )
-                    editFieldText( symbol->GetField( FIELD_T::FOOTPRINT ) );
+                    editFieldText( symbol->GetField( FOOTPRINT_FIELD ) );
             }
         }
     }
@@ -2294,7 +2298,7 @@ int SCH_EDIT_TOOL::Properties( const TOOL_EVENT& aEvent )
     case SCH_HIER_LABEL_T:
     case SCH_DIRECTIVE_LABEL_T:
     {
-        DIALOG_LABEL_PROPERTIES dlg( m_frame, static_cast<SCH_LABEL_BASE*>( curr_item ), false );
+        DIALOG_LABEL_PROPERTIES dlg( m_frame, static_cast<SCH_LABEL_BASE*>( curr_item ) );
 
         // QuasiModal for syntax help and Scintilla auto-complete
         dlg.ShowQuasiModal();
@@ -2643,7 +2647,7 @@ int SCH_EDIT_TOOL::ChangeTextType( const TOOL_EVENT& aEvent )
                 // or not.
                 if( !dynamic_cast<SCH_LABEL_BASE*>( item ) )
                 {
-                    SCH_FIELD netclass( position, FIELD_T::USER, new_label, wxT( "Netclass" ) );
+                    SCH_FIELD netclass( position, 0, new_label, wxT( "Netclass" ) );
                     netclass.SetText( txt );
                     netclass.SetVisible( true );
                     new_label->GetFields().push_back( netclass );
@@ -2746,14 +2750,18 @@ int SCH_EDIT_TOOL::ChangeTextType( const TOOL_EVENT& aEvent )
             {
                 new_label->AddFields( label->GetFields() );
 
-                // A SCH_GLOBALLABEL has a specific field for intersheet references that has
-                // no meaning for other labels
-                alg::delete_if( new_label->GetFields(),
-                                [&]( SCH_FIELD& field )
-                                {
-                                    return field.GetId() == FIELD_T::INTERSHEET_REFS
-                                            && new_label->Type() != SCH_GLOBAL_LABEL_T;
-                                } );
+                // A SCH_GLOBALLABEL has a specific field, that has no meaning for
+                // other labels, and expected to be the first field in list.
+                // It is the first field in list for this kind of label
+                // So remove field named "Intersheetrefs" if exists for other labels
+                int min_idx = new_label->Type() == SCH_GLOBAL_LABEL_T ? 1 : 0;
+                std::vector<SCH_FIELD>& fields = new_label->GetFields();
+
+                for( int ii = fields.size()-1; ii >= min_idx; ii-- )
+                {
+                    if( fields[ii].GetCanonicalName() == wxT( "Intersheetrefs" ) )
+                        fields.erase( fields.begin() + ii );
+                }
             }
 
             if( selected )

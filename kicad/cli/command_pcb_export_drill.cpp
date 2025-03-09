@@ -38,7 +38,6 @@
 #define ARG_GERBER_PRECISION "--gerber-precision"
 #define ARG_EXCELLON_UNITS "--excellon-units"
 #define ARG_GENERATE_MAP "--generate-map"
-#define ARG_GENERATE_TENTING "--generate-tenting"
 #define ARG_MAP_FORMAT "--map-format"
 #define ARG_DRILL_ORIGIN "--drill-origin"
 
@@ -88,10 +87,6 @@ CLI::PCB_EXPORT_DRILL_COMMAND::PCB_EXPORT_DRILL_COMMAND() : PCB_EXPORT_BASE_COMM
 
     m_argParser.add_argument( ARG_GENERATE_MAP )
             .help( UTF8STDSTR( _( "Generate map / summary of drill hits" ) ) )
-            .flag();
-
-    m_argParser.add_argument( ARG_GENERATE_TENTING )
-            .help( UTF8STDSTR( _( "Generate a file specifically for tenting" ) ) )
             .flag();
 
     m_argParser.add_argument( ARG_MAP_FORMAT )
@@ -144,11 +139,11 @@ int CLI::PCB_EXPORT_DRILL_COMMAND::doPerform( KIWAY& aKiway )
 
     if( units == wxS( "mm" ) )
     {
-        drillJob->m_drillUnits = JOB_EXPORT_PCB_DRILL::DRILL_UNITS::MM;
+        drillJob->m_drillUnits = JOB_EXPORT_PCB_DRILL::DRILL_UNITS::MILLIMETERS;
     }
     else if( units == wxS( "in" ) )
     {
-        drillJob->m_drillUnits = JOB_EXPORT_PCB_DRILL::DRILL_UNITS::INCH;
+        drillJob->m_drillUnits = JOB_EXPORT_PCB_DRILL::DRILL_UNITS::INCHES;
     }
     else
     {
@@ -245,7 +240,6 @@ int CLI::PCB_EXPORT_DRILL_COMMAND::doPerform( KIWAY& aKiway )
     drillJob->m_excellonMinimalHeader = m_argParser.get<bool>( ARG_EXCELLON_MINIMALHEAD );
     drillJob->m_excellonCombinePTHNPTH = !m_argParser.get<bool>( ARG_EXCELLON_SEPARATE_TH );
     drillJob->m_generateMap = m_argParser.get<bool>( ARG_GENERATE_MAP );
-    drillJob->m_generateTenting = m_argParser.get<bool>( ARG_GENERATE_TENTING );
     drillJob->m_gerberPrecision = m_argParser.get<int>( ARG_GERBER_PRECISION );
 
     if( drillJob->m_gerberPrecision != 5 && drillJob->m_gerberPrecision != 6 )

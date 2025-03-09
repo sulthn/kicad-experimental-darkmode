@@ -47,11 +47,6 @@ std::string FormatPath( const std::vector<std::string>& aVectorPath )
 }
 
 
-ALTIUM_COMPOUND_FILE::ALTIUM_COMPOUND_FILE()
-{
-}
-
-
 ALTIUM_COMPOUND_FILE::ALTIUM_COMPOUND_FILE( const wxString& aFilePath )
 {
     // Open file
@@ -97,12 +92,6 @@ ALTIUM_COMPOUND_FILE::ALTIUM_COMPOUND_FILE( const wxString& aFilePath )
 
 ALTIUM_COMPOUND_FILE::ALTIUM_COMPOUND_FILE( const void* aBuffer, size_t aLen )
 {
-    InitFromBuffer( aBuffer, aLen );
-}
-
-
-void ALTIUM_COMPOUND_FILE::InitFromBuffer( const void* aBuffer, size_t aLen )
-{
     m_buffer.resize( aLen );
     memcpy( m_buffer.data(), aBuffer, aLen );
 
@@ -117,11 +106,10 @@ void ALTIUM_COMPOUND_FILE::InitFromBuffer( const void* aBuffer, size_t aLen )
 }
 
 
-bool ALTIUM_COMPOUND_FILE::DecodeIntLibStream( const CFB::COMPOUND_FILE_ENTRY& cfe,
-                                               ALTIUM_COMPOUND_FILE* aOutput )
+std::unique_ptr<ALTIUM_COMPOUND_FILE>
+ALTIUM_COMPOUND_FILE::DecodeIntLibStream( const CFB::COMPOUND_FILE_ENTRY& cfe )
 {
-    wxCHECK( aOutput, false );
-    wxCHECK( cfe.size >= 1, false );
+    wxCHECK( cfe.size >= 1, nullptr );
 
     size_t         streamSize = cfe.size;
     wxMemoryBuffer buffer( streamSize );
@@ -142,13 +130,14 @@ bool ALTIUM_COMPOUND_FILE::DecodeIntLibStream( const CFB::COMPOUND_FILE_ENTRY& c
         decodedPcbLibStream << zlibInputStream;
 
         wxStreamBuffer* outStream = decodedPcbLibStream.GetOutputStreamBuffer();
-        aOutput->InitFromBuffer( outStream->GetBufferStart(), outStream->GetIntPosition() );
-        return true;
+
+        return std::make_unique<ALTIUM_COMPOUND_FILE>( outStream->GetBufferStart(),
+                                                       outStream->GetIntPosition() );
     }
     else if( buffer[0] == 0x00 )
     {
-        aOutput->InitFromBuffer( static_cast<uint8_t*>( buffer.GetData() ) + 1, streamSize - 1 );
-        return true;
+        return std::make_unique<ALTIUM_COMPOUND_FILE>(
+                reinterpret_cast<uint8_t*>( buffer.GetData() ) + 1, streamSize - 1 );
     }
     else
     {
@@ -156,7 +145,7 @@ bool ALTIUM_COMPOUND_FILE::DecodeIntLibStream( const CFB::COMPOUND_FILE_ENTRY& c
                                       buffer[0], buffer[1], buffer[2], buffer[3], buffer[4] ) );
     }
 
-    return false;
+    return nullptr;
 }
 
 

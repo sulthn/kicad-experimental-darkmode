@@ -152,6 +152,9 @@ public:
     wxString GetAlt() const { return m_alt; }
     void SetAlt( const wxString& aAlt ) { m_alt = aAlt; }
 
+    void Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed ) override;
+
     /**
      * Return the pin real orientation (PIN_UP, PIN_DOWN, PIN_RIGHT, PIN_LEFT),
      * according to its orientation and the matrix transform (rot, mirror) \a aTransform.
@@ -192,18 +195,6 @@ public:
      * and of type POWER_IN, or is a legacy invisible global power pin on a symbol.
      */
     bool IsGlobalPower() const;
-
-    /**
-     * Local power pin is the same except that it is sheet-local and it does not support the legacy
-     * hidden pin mode
-     */
-    bool IsLocalPower() const;
-
-    /**
-     * Check if the pin is _either_ a global or local power pin.
-     * @see IsGlobalPower() and IsLocalPower()
-     */
-    bool IsPower() const;
 
     int GetPenWidth() const override { return 0; }
 
@@ -326,6 +317,32 @@ protected:
     void validateExtentsCache( KIFONT::FONT* aFont, int aSize, const wxString& aText,
                                EXTENTS_CACHE* aCache ) const;
 
+    /**
+     * Print the pin symbol without text.
+     *
+     * If \a aColor != 0, draw with \a aColor, else with the normal pin color.
+     */
+    void printPinSymbol( const SCH_RENDER_SETTINGS *aSettings, const VECTOR2I &aPos,
+                         PIN_ORIENTATION aOrientation, bool aDimmed );
+
+    /**
+     * Put the pin number and pin text info, given the pin line coordinates.
+     *
+     * The line must be vertical or horizontal.
+     * If aDrawPinName == false the pin name is not printed.
+     * If aDrawPinNum = false the pin number is not printed.
+     * If aTextInside then the text is been put inside,otherwise all is drawn outside.
+     * Pin Name:    substring between '~' is negated
+     */
+    void printPinTexts( const RENDER_SETTINGS* aSettings, const VECTOR2I& aPinPos,
+                        PIN_ORIENTATION aPinOrient, int aTextInside, bool aDrawPinNum,
+                        bool aDrawPinName, bool aDimmed );
+
+    /**
+     * Draw the electrical type text of the pin (only for the footprint editor).
+     */
+    void printPinElectricalTypeName( const RENDER_SETTINGS* aSettings, const VECTOR2I& aPosition,
+                                     PIN_ORIENTATION aOrientation, bool aDimmed );
     std::ostream& operator<<( std::ostream& aStream );
 
 private:

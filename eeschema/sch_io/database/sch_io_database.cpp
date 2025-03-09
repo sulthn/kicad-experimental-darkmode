@@ -632,7 +632,7 @@ std::unique_ptr<LIB_SYMBOL>  SCH_IO_DATABASE::loadSymbolFromRow( const wxString&
         }
         else
         {
-            field = new SCH_FIELD( nullptr, FIELD_T::USER );
+            field = new SCH_FIELD( nullptr, symbol->GetNextAvailableFieldId() );
             field->SetName( mapping.name_wx );
             isNew = true;
             fieldsMap[mapping.name_wx] = field;

@@ -92,7 +92,6 @@
 #include <font/font.h>
 #include <macros.h>
 #include <trigo.h>
-#include <fmt/format.h>
 
 #include <cstdint>
 #include <wx/mstream.h>
@@ -220,25 +219,25 @@ void SVG_PLOTTER::setFillMode( FILL_T fill )
 void SVG_PLOTTER::setSVGPlotStyle( int aLineWidth, bool aIsGroup, const std::string& aExtraStyle )
 {
     if( aIsGroup )
-        fmt::print( m_outputFile, "</g>\n<g " );
+        fputs( "</g>\n<g ", m_outputFile );
 
-    fmt::print( m_outputFile, "style=\"" );
+    fputs( "style=\"", m_outputFile );
 
     if( m_fillMode == FILL_T::NO_FILL )
     {
-        fmt::print( m_outputFile, "fill:none; " );
+        fputs( "fill:none; ", m_outputFile );
     }
     else
     {
         // output the background fill color
-        fmt::print( m_outputFile, "fill:#{:06X}; ", m_brush_rgb_color );
+        fprintf( m_outputFile, "fill:#%6.6lX; ", m_brush_rgb_color );
 
         switch( m_fillMode )
         {
         case FILL_T::FILLED_SHAPE:
         case FILL_T::FILLED_WITH_BG_BODYCOLOR:
         case FILL_T::FILLED_WITH_COLOR:
-            fmt::print( m_outputFile, "fill-opacity:{:.{}f}; ", m_brush_alpha, m_precision );
+            fprintf( m_outputFile, "fill-opacity:%.*f; ", m_precision, m_brush_alpha );
             break;
         default: break;
         }
@@ -248,7 +247,7 @@ void SVG_PLOTTER::setSVGPlotStyle( int aLineWidth, bool aIsGroup, const std::str
 
     if( pen_w <= 0 )
     {
-        fmt::print( m_outputFile, "stroke:none;" );
+        fputs( "stroke:none;", m_outputFile );
     }
     else
     {
@@ -257,36 +256,34 @@ void SVG_PLOTTER::setSVGPlotStyle( int aLineWidth, bool aIsGroup, const std::str
         // So we use only 4 digits in mantissa for stroke-width.
         // TODO: perhaps used only 3 or 4 digits in mantissa for all values in mm, because some
         // issues were previously reported reported when using nm as integer units
-        fmt::print( m_outputFile, "\nstroke:#{:06X}; stroke-width:{:.{}f}; stroke-opacity:1; \n",
-                    m_pen_rgb_color, pen_w, m_precision );
-        fmt::print( m_outputFile, "stroke-linecap:round; stroke-linejoin:round;" );
+        fprintf( m_outputFile, "\nstroke:#%6.6lX; stroke-width:%.*f; stroke-opacity:1; \n",
+                 m_pen_rgb_color, m_precision, pen_w );
+        fputs( "stroke-linecap:round; stroke-linejoin:round;", m_outputFile );
 
         //set any extra attributes for non-solid lines
         switch( m_dashed )
         {
         case LINE_STYLE::DASH:
-            fmt::print( m_outputFile, "stroke-dasharray:{:.{}f},{:.{}f};",
-                        GetDashMarkLenIU( aLineWidth ), m_precision,
-                        GetDashGapLenIU( aLineWidth ), m_precision );
+            fprintf( m_outputFile, "stroke-dasharray:%.*f,%.*f;", m_precision,
+                     GetDashMarkLenIU( aLineWidth ), m_precision, GetDashGapLenIU( aLineWidth ) );
             break;
 
         case LINE_STYLE::DOT:
-            fmt::print( m_outputFile, "stroke-dasharray:{:f},{:f};", GetDotMarkLenIU( aLineWidth ),
-                        GetDashGapLenIU( aLineWidth ) );
+            fprintf( m_outputFile, "stroke-dasharray:%f,%f;", GetDotMarkLenIU( aLineWidth ),
+                     GetDashGapLenIU( aLineWidth ) );
             break;
 
         case LINE_STYLE::DASHDOT:
-            fmt::print( m_outputFile, "stroke-dasharray:{:f},{:f},{:f},{:f};",
-                        GetDashMarkLenIU( aLineWidth ),
-                        GetDashGapLenIU( aLineWidth ), GetDotMarkLenIU( aLineWidth ),
-                        GetDashGapLenIU( aLineWidth ) );
+            fprintf( m_outputFile, "stroke-dasharray:%f,%f,%f,%f;", GetDashMarkLenIU( aLineWidth ),
+                     GetDashGapLenIU( aLineWidth ), GetDotMarkLenIU( aLineWidth ),
+                     GetDashGapLenIU( aLineWidth ) );
             break;
 
         case LINE_STYLE::DASHDOTDOT:
-            fmt::print( m_outputFile, "stroke-dasharray:{:f},{:f},{:f},{:f},{:f},{:f};",
-                        GetDashMarkLenIU( aLineWidth ), GetDashGapLenIU( aLineWidth ),
-                        GetDotMarkLenIU( aLineWidth ), GetDashGapLenIU( aLineWidth ),
-                        GetDotMarkLenIU( aLineWidth ), GetDashGapLenIU( aLineWidth ) );
+            fprintf( m_outputFile, "stroke-dasharray:%f,%f,%f,%f,%f,%f;",
+                     GetDashMarkLenIU( aLineWidth ), GetDashGapLenIU( aLineWidth ),
+                     GetDotMarkLenIU( aLineWidth ), GetDashGapLenIU( aLineWidth ),
+                     GetDotMarkLenIU( aLineWidth ), GetDashGapLenIU( aLineWidth ) );
             break;
 
         case LINE_STYLE::DEFAULT:
@@ -298,17 +295,17 @@ void SVG_PLOTTER::setSVGPlotStyle( int aLineWidth, bool aIsGroup, const std::str
     }
 
     if( aExtraStyle.length() )
-        fmt::print( m_outputFile, "{}", aExtraStyle );
+        fputs( aExtraStyle.c_str(), m_outputFile );
 
-    fmt::print( m_outputFile, "\"" );
+    fputs( "\"", m_outputFile );
 
     if( aIsGroup )
     {
-        fmt::print( m_outputFile, ">" );
+        fputs( ">", m_outputFile );
         m_graphics_changed = false;
     }
 
-    fmt::print( m_outputFile, "\n" );
+    fputs( "\n", m_outputFile );
 }
 
 
@@ -345,10 +342,10 @@ void SVG_PLOTTER::EndBlock( void* aData )
 
 void SVG_PLOTTER::emitSetRGBColor( double r, double g, double b, double a )
 {
-    uint32_t red = (uint32_t) ( 255.0 * r );
-    uint32_t green = (uint32_t) ( 255.0 * g );
-    uint32_t blue = (uint32_t) ( 255.0 * b );
-    uint32_t rgb_color = ( red << 16 ) | ( green << 8 ) | blue;
+    int red     = (int) ( 255.0 * r );
+    int green   = (int) ( 255.0 * g );
+    int blue    = (int) ( 255.0 * b );
+    long rgb_color = ( red << 16 ) | ( green << 8 ) | blue;
 
     if( m_pen_rgb_color != rgb_color || m_brush_alpha != a )
     {
@@ -397,22 +394,22 @@ void SVG_PLOTTER::Rect( const VECTOR2I& p1, const VECTOR2I& p2, FILL_T fill, int
     // so use a line when happens.
     if( rect_dev.GetSize().x == 0.0 || rect_dev.GetSize().y == 0.0 )    // Draw a line
     {
-        fmt::print( m_outputFile,
-                    "<line x1=\"{:.{}f}\" y1=\"{:.{}f}\" x2=\"{:.{}f}\" y2=\"{:.{}f}\" />\n",
-                    rect_dev.GetPosition().x, m_precision,
-                    rect_dev.GetPosition().y, m_precision,
-                    rect_dev.GetEnd().x, m_precision,
-                    rect_dev.GetEnd().y, m_precision );
+        fprintf( m_outputFile,
+                 "<line x1=\"%.*f\" y1=\"%.*f\" x2=\"%.*f\" y2=\"%.*f\" />\n",
+                 m_precision, rect_dev.GetPosition().x,
+                 m_precision, rect_dev.GetPosition().y,
+                 m_precision, rect_dev.GetEnd().x,
+                 m_precision, rect_dev.GetEnd().y );
     }
     else
     {
-        fmt::print( m_outputFile,
-                      "<rect x=\"{:f}\" y=\"{:f}\" width=\"{:f}\" height=\"{:f}\" rx=\"{:f}\" />\n",
-                      rect_dev.GetPosition().x,
-                      rect_dev.GetPosition().y,
-                      rect_dev.GetSize().x,
-                      rect_dev.GetSize().y,
-                      0.0 /* radius of rounded corners */ );
+        fprintf( m_outputFile,
+                 "<rect x=\"%f\" y=\"%f\" width=\"%f\" height=\"%f\" rx=\"%f\" />\n",
+                 rect_dev.GetPosition().x,
+                 rect_dev.GetPosition().y,
+                 rect_dev.GetSize().x,
+                 rect_dev.GetSize().y,
+                 0.0 /* radius of rounded corners */ );
     }
 }
 
@@ -437,11 +434,11 @@ void SVG_PLOTTER::Circle( const VECTOR2I& pos, int diametre, FILL_T fill, int wi
         radius = userToDeviceSize( ( diametre / 2.0 ) + ( width / 2.0 ) );
     }
 
-    fmt::print( m_outputFile,
-                  "<circle cx=\"{:.{}f}\" cy=\"{:.{}f}\" r=\"{:.{}f}\" /> \n",
-                  pos_dev.x, m_precision,
-                  pos_dev.y, m_precision,
-                  radius, m_precision );
+    fprintf( m_outputFile,
+             "<circle cx=\"%.*f\" cy=\"%.*f\" r=\"%.*f\" /> \n",
+             m_precision, pos_dev.x,
+             m_precision, pos_dev.y,
+             m_precision, radius );
 }
 
 
@@ -529,18 +526,18 @@ void SVG_PLOTTER::Arc( const VECTOR2D& aCenter, const EDA_ANGLE& aStartAngle,
         if( m_graphics_changed )
             setSVGPlotStyle( GetCurrentLineWidth() );
 
-        fmt::print( m_outputFile,
-                   "<path d=\"M{:.{}f} {:.{}f} A{:.{}f} {:.{}f} 0.0 {:d} {:d} {:.{}f} {:.{}f} L {:.{}f} {:.{}f} Z\" />\n",
-                    start.x, m_precision,
-                    start.y, m_precision,
-                    radius_device, m_precision,
-                    radius_device, m_precision,
-                    flg_arc,
-                    flg_sweep,
-                    end.x, m_precision,
-                    end.y, m_precision,
-                    centre_device.x, m_precision,
-                    centre_device.y, m_precision );
+        fprintf( m_outputFile,
+                 "<path d=\"M%.*f %.*f A%.*f %.*f 0.0 %d %d %.*f %.*f L %.*f %.*f Z\" />\n",
+                 m_precision, start.x,
+                 m_precision, start.y,
+                 m_precision, radius_device,
+                 m_precision, radius_device,
+                 flg_arc,
+                 flg_sweep,
+                 m_precision, end.x,
+                 m_precision, end.y,
+                 m_precision, centre_device.x,
+                 m_precision, centre_device.y  );
     }
 
     setFillMode( FILL_T::NO_FILL );
@@ -549,16 +546,16 @@ void SVG_PLOTTER::Arc( const VECTOR2D& aCenter, const EDA_ANGLE& aStartAngle,
     if( m_graphics_changed )
         setSVGPlotStyle( GetCurrentLineWidth() );
 
-    fmt::print( m_outputFile,
-                "<path d=\"M{:.{}f} {:.{}f} A{:.{}f} {:.{}f} 0.0 {:d} {:d} {:.{}f} {:.{}f}\" />\n",
-                start.x, m_precision,
-                start.y, m_precision,
-                radius_device, m_precision,
-                radius_device, m_precision,
-                flg_arc,
-                flg_sweep,
-                end.x, m_precision,
-                end.y, m_precision );
+    fprintf( m_outputFile,
+             "<path d=\"M%.*f %.*f A%.*f %.*f 0.0 %d %d %.*f %.*f\" />\n",
+             m_precision, start.x,
+             m_precision, start.y,
+             m_precision, radius_device,
+             m_precision, radius_device,
+             flg_arc,
+             flg_sweep,
+             m_precision, end.x,
+             m_precision, end.y  );
 }
 
 
@@ -579,16 +576,16 @@ void SVG_PLOTTER::BezierCurve( const VECTOR2I& aStart, const VECTOR2I& aControl1
     VECTOR2D end  = userToDeviceCoordinates( aEnd );
 
     // Generate a cubic curve: start point and 3 other control points.
-    fmt::print( m_outputFile,
-                "<path d=\"M{:.{}f},{:.{}f} C{:.{}f},{:.{}f} {:.{}f},{:.{}f} {:.{}f},{:.{}f}\" />\n",
-                start.x, m_precision,
-                start.y, m_precision,
-                ctrl1.x,m_precision,
-                ctrl1.y, m_precision,
-                ctrl2.x, m_precision,
-                ctrl2.y, m_precision,
-                end.x, m_precision,
-                end.y, m_precision  );
+    fprintf( m_outputFile,
+             "<path d=\"M%.*f,%.*f C%.*f,%.*f %.*f,%.*f %.*f,%.*f\" />\n",
+             m_precision, start.x,
+             m_precision, start.y,
+             m_precision, ctrl1.x,
+             m_precision, ctrl1.y,
+             m_precision, ctrl2.x,
+             m_precision, ctrl2.y,
+             m_precision, end.x,
+             m_precision, end.y  );
 #else
     PLOTTER::BezierCurve( aStart, aControl1, aControl2, aEnd, aTolerance, aLineThickness );
 #endif
@@ -603,14 +600,11 @@ void SVG_PLOTTER::PlotPoly( const std::vector<VECTOR2I>& aCornerList, FILL_T aFi
 
     setFillMode( aFill );
     SetCurrentLineWidth( aWidth );
-    fmt::print( m_outputFile, "<path " );
+    fprintf( m_outputFile, "<path ");
 
     switch( aFill )
     {
     case FILL_T::NO_FILL:
-    case FILL_T::HATCH:
-    case FILL_T::REVERSE_HATCH:
-    case FILL_T::CROSS_HATCH:
         setSVGPlotStyle( aWidth, false, "fill:none" );
         break;
 
@@ -622,26 +616,32 @@ void SVG_PLOTTER::PlotPoly( const std::vector<VECTOR2I>& aCornerList, FILL_T aFi
     }
 
     VECTOR2D pos = userToDeviceCoordinates( aCornerList[0] );
-    fmt::print( m_outputFile, "d=\"M {:.{}f},{:.{}f}\n", pos.x, m_precision, pos.y, m_precision );
+    fprintf( m_outputFile,
+             "d=\"M %.*f,%.*f\n",
+             m_precision, pos.x,
+             m_precision, pos.y );
 
     for( unsigned ii = 1; ii < aCornerList.size() - 1; ii++ )
     {
         pos = userToDeviceCoordinates( aCornerList[ii] );
-        fmt::print( m_outputFile, "{:.{}f},{:.{}f}\n", pos.x, m_precision, pos.y, m_precision );
+        fprintf( m_outputFile,
+                 "%.*f,%.*f\n",
+                 m_precision, pos.x,
+                 m_precision, pos.y );
     }
 
     // If the corner list ends where it begins, then close the poly
     if( aCornerList.front() == aCornerList.back() )
     {
-        fmt::print( m_outputFile, "Z\" /> \n" );
+        fprintf( m_outputFile, "Z\" /> \n" );
     }
     else
     {
         pos = userToDeviceCoordinates( aCornerList.back() );
-        fmt::print( m_outputFile,
-                    "{:.{}f},{:.{}f}\n\" /> \n",
-                    pos.x, m_precision,
-                    pos.y, m_precision );
+        fprintf( m_outputFile,
+                 "%.*f,%.*f\n\" /> \n",
+                 m_precision, pos.x,
+                 m_precision, pos.y );
     }
 }
 
@@ -683,23 +683,25 @@ void SVG_PLOTTER::PlotImage( const wxImage& aImage, const VECTOR2I& aPos, double
         img_stream.CopyTo( buffer.data(), buffer.size() );
         base64::encode( buffer, encoded );
 
-        fmt::print( m_outputFile,
-                    "<image x=\"{:f}\" y=\"{:f}\" xlink:href=\"data:image/png;base64,",
-                    userToDeviceSize( start.x ),
-                    userToDeviceSize( start.y ) );
+        fprintf( m_outputFile,
+                 "<image x=\"%f\" y=\"%f\" xlink:href=\"data:image/png;base64,",
+                 userToDeviceSize( start.x ),
+                 userToDeviceSize( start.y ) );
 
         for( size_t i = 0; i < encoded.size(); i++ )
         {
-            fmt::print( m_outputFile, "{}", static_cast<char>( encoded[i] ) );
+            fprintf( m_outputFile, "%c", static_cast<char>( encoded[i] ) );
 
             if( ( i % 64 )  == 63 )
-                fmt::print( m_outputFile, "\n" );
+                fprintf( m_outputFile, "\n" );
         }
 
-        fmt::print( m_outputFile,
-                    "\"\npreserveAspectRatio=\"none\" width=\"{:.{}f}\" height=\"{:.{}f}\" />",
-                    userToDeviceSize( drawsize.x ), m_precision,
-                    userToDeviceSize( drawsize.y ), m_precision );
+        fprintf( m_outputFile,
+                 "\"\npreserveAspectRatio=\"none\" width=\"%.*f\" height=\"%.*f\" />",
+                 m_precision,
+                 userToDeviceSize( drawsize.x ),
+                 m_precision,
+                 userToDeviceSize( drawsize.y ) );
     }
 }
 
@@ -710,7 +712,7 @@ void SVG_PLOTTER::PenTo( const VECTOR2I& pos, char plume )
     {
         if( m_penState != 'Z' )
         {
-            fmt::print( m_outputFile, "\" />\n" );
+            fputs( "\" />\n", m_outputFile );
             m_penState        = 'Z';
             m_penLastpos.x    = -1;
             m_penLastpos.y    = -1;
@@ -731,9 +733,9 @@ void SVG_PLOTTER::PenTo( const VECTOR2I& pos, char plume )
         if( m_graphics_changed )
             setSVGPlotStyle( GetCurrentLineWidth() );
 
-        fmt::print( m_outputFile, "<path d=\"M{:.{}f} {:.{}f}\n",
-                    pos_dev.x, m_precision,
-                    pos_dev.y, m_precision );
+        fprintf( m_outputFile, "<path d=\"M%.*f %.*f\n",
+                 m_precision, pos_dev.x,
+                 m_precision, pos_dev.y );
     }
     else if( m_penState != plume || pos != m_penLastpos )
     {
@@ -742,9 +744,9 @@ void SVG_PLOTTER::PenTo( const VECTOR2I& pos, char plume )
 
         VECTOR2D pos_dev = userToDeviceCoordinates( pos );
 
-        fmt::print( m_outputFile, "L{:.{}f} {:.{}f}\n",
-                    pos_dev.x, m_precision,
-                    pos_dev.y, m_precision );
+        fprintf( m_outputFile, "L%.*f %.*f\n",
+                 m_precision, pos_dev.x,
+                 m_precision, pos_dev.y );
     }
 
     m_penState    = plume;
@@ -756,61 +758,71 @@ bool SVG_PLOTTER::StartPlot( const wxString& aPageNumber )
 {
     wxASSERT( m_outputFile );
 
-    std::string header = "<?xml version=\"1.0\" standalone=\"no\"?>\n"
-                " <!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \n"
-                " \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\"> \n"
-                "<svg\n"
-                "  xmlns:svg=\"http://www.w3.org/2000/svg\"\n"
-                "  xmlns=\"http://www.w3.org/2000/svg\"\n"
-                "  xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n"
-                "  version=\"1.1\"\n";
+    static const char*  header[] =
+    {
+        "<?xml version=\"1.0\" standalone=\"no\"?>\n",
+        " <!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\" \n",
+        " \"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\"> \n",
+        "<svg\n"
+        "  xmlns:svg=\"http://www.w3.org/2000/svg\"\n"
+        "  xmlns=\"http://www.w3.org/2000/svg\"\n",
+        "  xmlns:xlink=\"http://www.w3.org/1999/xlink\"\n",
+        "  version=\"1.1\"\n",
+        nullptr
+    };
 
     // Write header.
-    fmt::print( m_outputFile, "{}", header );
+    for( int ii = 0; header[ii] != nullptr; ii++ )
+    {
+        fputs( header[ii], m_outputFile );
+    }
 
     // Write viewport pos and size
     VECTOR2D origin;    // TODO set to actual value
-    fmt::print( m_outputFile,
-                "  width=\"{:.{}f}mm\" height=\"{:.{}f}mm\" viewBox=\"{:.{}f} {:.{}f} {:.{}f} {:.{}f}\">\n",
-                (double) m_paperSize.x / m_IUsPerDecimil * 2.54 / 1000, m_precision,
-                (double) m_paperSize.y / m_IUsPerDecimil * 2.54 / 1000, m_precision,
-                origin.x, m_precision, origin.y, m_precision,
-                m_paperSize.x * m_iuPerDeviceUnit, m_precision,
-                m_paperSize.y * m_iuPerDeviceUnit, m_precision );
+    fprintf( m_outputFile,
+             "  width=\"%.*fmm\" height=\"%.*fmm\" viewBox=\"%.*f %.*f %.*f %.*f\">\n",
+             m_precision, (double) m_paperSize.x / m_IUsPerDecimil * 2.54 / 1000,
+             m_precision, (double) m_paperSize.y / m_IUsPerDecimil * 2.54 / 1000,
+             m_precision, origin.x, m_precision, origin.y,
+             m_precision, m_paperSize.x * m_iuPerDeviceUnit,
+             m_precision, m_paperSize.y * m_iuPerDeviceUnit);
 
     // Write title
-    wxString date = GetISO8601CurrentDateTime();
+    char    date_buf[250];
+    time_t  ltime = time( nullptr );
+    strftime( date_buf, 250, "%Y/%m/%d %H:%M:%S", localtime( &ltime ) );
 
-    fmt::print( m_outputFile,
-                "<title>SVG Image created as {} date {} </title>\n",
-                TO_UTF8( XmlEsc( wxFileName( m_filename ).GetFullName() ) ),
-                TO_UTF8( date ) );
+    fprintf( m_outputFile,
+             "<title>SVG Image created as %s date %s </title>\n",
+             TO_UTF8( XmlEsc( wxFileName( m_filename ).GetFullName() ) ),
+             date_buf );
 
     // End of header
-    fmt::print( m_outputFile, "  <desc>Image generated by {} </desc>\n",
-                TO_UTF8( XmlEsc( m_creator ) ) );
+    fprintf( m_outputFile,
+             "  <desc>Image generated by %s </desc>\n",
+             TO_UTF8( XmlEsc( m_creator ) ) );
 
     // output the pen and brush color (RVB values in hex) and opacity
     double opacity = 1.0;      // 0.0 (transparent to 1.0 (solid)
-    fmt::print( m_outputFile,
-                  "<g style=\"fill:#{:06X}; fill-opacity:{:.{}f};stroke:#{:06X}; stroke-opacity:{:.{}f};\n",
-                  m_brush_rgb_color,
-                  m_brush_alpha,
-                  m_precision,
-                  m_pen_rgb_color,
-                  opacity,
-                  m_precision );
+    fprintf( m_outputFile,
+             "<g style=\"fill:#%6.6lX; fill-opacity:%.*f;stroke:#%6.6lX; stroke-opacity:%.*f;\n",
+             m_brush_rgb_color,
+             m_precision,
+             m_brush_alpha,
+             m_pen_rgb_color,
+             m_precision,
+             opacity );
 
     // output the pen cap and line joint
-    fmt::print( m_outputFile, "stroke-linecap:round; stroke-linejoin:round;\"\n" );
-    fmt::print( m_outputFile, " transform=\"translate(0 0) scale(1 1)\">\n" );
+    fputs( "stroke-linecap:round; stroke-linejoin:round;\"\n", m_outputFile );
+    fputs( " transform=\"translate(0 0) scale(1 1)\">\n", m_outputFile );
     return true;
 }
 
 
 bool SVG_PLOTTER::EndPlot()
 {
-    fmt::print( m_outputFile, "</g> \n</svg>\n" );
+    fputs( "</g> \n</svg>\n", m_outputFile );
     fclose( m_outputFile );
     m_outputFile = nullptr;
 
@@ -880,52 +892,53 @@ void SVG_PLOTTER::Text( const VECTOR2I&        aPos,
     {
         if( !aOrient.IsZero() )
         {
-            fmt::print( m_outputFile,
-                         "<g transform=\"rotate({:f} {:.{}f} {:.{}f})\">\n",
-                         m_plotMirror ? aOrient.AsDegrees() : -aOrient.AsDegrees(),
-                         anchor_pos_dev.x,
-                         m_precision,
-                         anchor_pos_dev.y,
-                         m_precision );
+            fprintf( m_outputFile,
+                     "<g transform=\"rotate(%f %.*f %.*f)\">\n",
+                     m_plotMirror ? aOrient.AsDegrees() : -aOrient.AsDegrees(),
+                     m_precision,
+                     anchor_pos_dev.x,
+                     m_precision,
+                     anchor_pos_dev.y );
         }
 
-        fmt::print( m_outputFile,
-                    "<text x=\"{:.{}f}\" y=\"{:.{}f}\"\n",
-                    text_pos_dev.x, m_precision,
-                    text_pos_dev.y, m_precision );
+        fprintf( m_outputFile,
+                 "<text x=\"%.*f\" y=\"%.*f\"\n",
+                 m_precision,
+                 text_pos_dev.x, m_precision,
+                 text_pos_dev.y );
 
         /// If the text is mirrored, we should also mirror the hidden text to match
         if( m_plotMirror != ( aSize.x < 0 ) )
         {
-            fmt::print( m_outputFile, "transform=\"scale(-1 1) translate({:f} 0)\"\n",
-                        -2 * text_pos_dev.x );
+            fprintf( m_outputFile, "transform=\"scale(-1 1) translate(%f 0)\"\n",
+                     -2 * text_pos_dev.x );
         }
 
-        fmt::print( m_outputFile,
-                    "textLength=\"{:.{}f}\" font-size=\"{:.{}f}\" lengthAdjust=\"spacingAndGlyphs\"\n"
-                    "text-anchor=\"{}\" opacity=\"0\" stroke-opacity=\"0\">{}</text>\n",
-                    sz_dev.x,
-                    m_precision,
-                    sz_dev.y,
-                    m_precision,
-                    hjust,
-                    TO_UTF8( XmlEsc( aText ) ) );
+        fprintf( m_outputFile,
+                 "textLength=\"%.*f\" font-size=\"%.*f\" lengthAdjust=\"spacingAndGlyphs\"\n"
+                 "text-anchor=\"%s\" opacity=\"0\" stroke-opacity=\"0\">%s</text>\n",
+                 m_precision,
+                 sz_dev.x,
+                 m_precision,
+                 sz_dev.y,
+                 hjust,
+                 TO_UTF8( XmlEsc( aText ) ) );
 
         if( !aOrient.IsZero() )
-            fmt::print( m_outputFile, "</g>\n" );
+            fputs( "</g>\n", m_outputFile );
     }
 
     // Output the text again as graphics with a <desc> tag (for non-WYSIWYG search and for
     // screen readers)
     {
-        fmt::print( m_outputFile,
-                    "<g class=\"stroked-text\"><desc>{}</desc>\n",
-                    TO_UTF8( XmlEsc( aText ) ) );
+        fprintf( m_outputFile,
+                 "<g class=\"stroked-text\"><desc>%s</desc>\n",
+                 TO_UTF8( XmlEsc( aText ) ) );
 
         PLOTTER::Text( aPos, aColor, aText, aOrient, aSize, aH_justify, aV_justify, aWidth,
                        aItalic, aBold, aMultilineAllowed, aFont, aFontMetrics );
 
-        fmt::print( m_outputFile, "</g>" );
+        fputs( "</g>", m_outputFile );
     }
 }
 

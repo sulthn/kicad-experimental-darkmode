@@ -58,8 +58,8 @@ public:
      * @param aPcb is the board to extract a netlist from
      * @param aParent will be used as the parent for any warning dialogs
      */
-    IPC356D_WRITER( BOARD* aPcb ) :
-            m_pcb( aPcb )
+    IPC356D_WRITER( BOARD* aPcb, wxWindow* aParent = nullptr ) :
+            m_pcb( aPcb ), m_parent( aParent )
     {}
 
     virtual ~IPC356D_WRITER() {}
@@ -67,12 +67,12 @@ public:
     /**
      * Generates and writes the netlist to a given path
      * @param aFilename is the full path and name of the output file
-     * @return true on success
      */
-    bool Write( const wxString& aFilename );
+    void Write( const wxString& aFilename );
 
 private:
-    BOARD* m_pcb;
+    BOARD*    m_pcb;
+    wxWindow* m_parent;
 
     /// Writes a list of records to the given output stream
     void write_D356_records( std::vector<D356_RECORD> &aRecords, FILE* aFile );

@@ -284,12 +284,6 @@ wxString FILEEXT::KiCadSchematicFileWildcard()
 }
 
 
-wxString FILEEXT::AltiumProjectFilesWildcard()
-{
-    return _( "Altium Project files" ) + AddFileExtListToFilter( { "PrjPcb" } );
-}
-
-
 wxString FILEEXT::CadstarArchiveFilesWildcard()
 {
     return _( "CADSTAR Archive files" ) + AddFileExtListToFilter( { "csa", "cpa" } );

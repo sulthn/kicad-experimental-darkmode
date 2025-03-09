@@ -197,13 +197,14 @@ void PCB_IO_ALTIUM_DESIGNER::loadAltiumLibrary( const wxString& aLibraryPath )
 
             std::map<wxString, const CFB::COMPOUND_FILE_ENTRY*> pcbLibFiles =
                     intCom->EnumDir( L"PCBLib" );
-
             for( const auto& [pcbLibName, pcbCfe] : pcbLibFiles )
             {
-                auto decodedStream = std::make_unique<ALTIUM_PCB_COMPOUND_FILE>();
-
-                if( intCom->DecodeIntLibStream( *pcbCfe, decodedStream.get() ) )
-                    m_fplibFiles[aLibraryPath].emplace_back( std::move( decodedStream ) );
+                auto decodedStream = intCom->DecodeIntLibStream( *pcbCfe );
+                m_fplibFiles[aLibraryPath].push_back(
+                    std::unique_ptr<ALTIUM_PCB_COMPOUND_FILE>(
+                        static_cast<ALTIUM_PCB_COMPOUND_FILE*>(decodedStream.release())
+                    )
+                );
             }
         }
     }
@@ -340,15 +341,4 @@ FOOTPRINT* PCB_IO_ALTIUM_DESIGNER::FootprintLoad( const wxString& aLibraryPath,
     THROW_IO_ERROR( wxString::Format( _( "Footprint '%s' not found in '%s'." ),
                                       aFootprintName,
                                       aLibraryPath ) );
-}
-
-
-std::vector<FOOTPRINT*> PCB_IO_ALTIUM_DESIGNER::GetImportedCachedLibraryFootprints()
-{
-    std::vector<FOOTPRINT*> footprints;
-
-    for( FOOTPRINT* fp : m_board->Footprints() )
-        footprints.push_back( fp );
-
-    return footprints;
 }

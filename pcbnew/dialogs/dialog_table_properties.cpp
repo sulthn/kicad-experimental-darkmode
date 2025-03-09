@@ -250,32 +250,6 @@ bool DIALOG_TABLE_PROPERTIES::TransferDataToWindow()
     return true;
 }
 
-void DIALOG_TABLE_PROPERTIES::onHeaderChecked( wxCommandEvent& aEvent )
-{
-    BOARD_DESIGN_SETTINGS& bds = m_frame->GetDesignSettings();
-    PCB_LAYER_ID           currentLayer = ToLAYER_ID( m_LayerSelectionCtrl->GetLayerSelection() );
-    int                    defaultLineThickness = bds.GetLineThickness( currentLayer );
-
-    bool border = m_borderCheckbox->GetValue();
-    bool header = m_headerBorder->GetValue();
-
-    if( ( border || header ) && m_borderWidth.GetValue() < 0 )
-        m_borderWidth.SetValue( defaultLineThickness );
-
-    m_borderWidth.Enable( border || header );
-    m_borderStyleLabel->Enable( border || header );
-    m_borderStyleCombo->Enable( border || header );
-
-    bool row = m_rowSeparators->GetValue();
-    bool col = m_colSeparators->GetValue();
-
-    if( ( row || col ) && m_separatorsWidth.GetValue() < 0 )
-        m_separatorsWidth.SetValue( defaultLineThickness );
-
-    m_separatorsWidth.Enable( row || col );
-    m_separatorsStyleLabel->Enable( row || col );
-    m_separatorsStyleCombo->Enable( row || col );
-}
 
 void DIALOG_TABLE_PROPERTIES::onBorderChecked( wxCommandEvent& aEvent )
 {
@@ -284,14 +258,13 @@ void DIALOG_TABLE_PROPERTIES::onBorderChecked( wxCommandEvent& aEvent )
     int                    defaultLineThickness = bds.GetLineThickness( currentLayer );
 
     bool border = m_borderCheckbox->GetValue();
-    bool header = m_headerBorder->GetValue();
 
-    if( ( border || header ) && m_borderWidth.GetValue() < 0 )
+    if( border && m_borderWidth.GetValue() < 0 )
         m_borderWidth.SetValue( defaultLineThickness );
 
-    m_borderWidth.Enable( border || header );
-    m_borderStyleLabel->Enable( border || header );
-    m_borderStyleCombo->Enable( border || header );
+    m_borderWidth.Enable( border );
+    m_borderStyleLabel->Enable( border );
+    m_borderStyleCombo->Enable( border );
 
     bool row = m_rowSeparators->GetValue();
     bool col = m_colSeparators->GetValue();
@@ -364,7 +337,7 @@ bool DIALOG_TABLE_PROPERTIES::TransferDataFromWindow()
     {
         STROKE_PARAMS stroke = m_table->GetBorderStroke();
 
-        if( m_borderCheckbox->GetValue() || m_headerBorder->GetValue() )
+        if( m_borderCheckbox->GetValue() )
             stroke.SetWidth( std::max( 0, m_borderWidth.GetIntValue() ) );
         else
             stroke.SetWidth( -1 );

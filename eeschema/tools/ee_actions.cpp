@@ -268,13 +268,6 @@ TOOL_ACTION EE_ACTIONS::importSymbol( TOOL_ACTION_ARGS()
         .Tooltip( _( "Import a symbol to the current library" ) )
         .Icon( BITMAPS::import_part ) );
 
-TOOL_ACTION EE_ACTIONS::exportSymbol( TOOL_ACTION_ARGS()
-        .Name( "eeschema.SymbolLibraryControl.exportSymbol" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Export..." ) )
-        .Tooltip( _( "Export a symbol to a new library file" ) )
-        .Icon( BITMAPS::export_part ) );
-
 TOOL_ACTION EE_ACTIONS::updateSymbolFields( TOOL_ACTION_ARGS()
         .Name( "eeschema.SymbolLibraryControl.updateSymbolFields" )
         .Scope( AS_GLOBAL )
@@ -300,7 +293,6 @@ TOOL_ACTION EE_ACTIONS::showElectricalTypes( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Pin Electrical Types" ) )
         .Tooltip( _( "Annotate pins with their electrical types" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::pin_show_etype ) );
 
 TOOL_ACTION EE_ACTIONS::showPinNumbers( TOOL_ACTION_ARGS()
@@ -308,7 +300,6 @@ TOOL_ACTION EE_ACTIONS::showPinNumbers( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Pin Numbers" ) )
         .Tooltip( _( "Annotate pins with their numbers" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::pin ) );
 
 TOOL_ACTION EE_ACTIONS::exportSymbolView( TOOL_ACTION_ARGS()
@@ -332,21 +323,18 @@ TOOL_ACTION EE_ACTIONS::toggleSyncedPinsMode( TOOL_ACTION_ARGS()
         .Tooltip( _( "Synchronized Pins Mode\n"
                      "When enabled propagates all changes (except pin numbers) to other units.\n"
                      "Enabled by default for multiunit parts with interchangeable units." ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::pin2pin ) );
 
 TOOL_ACTION EE_ACTIONS::showHiddenPins( TOOL_ACTION_ARGS()
         .Name( "eeschema.SymbolLibraryControl.showHiddenPins" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Hidden Pins" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::hidden_pin ) );
 
 TOOL_ACTION EE_ACTIONS::showHiddenFields( TOOL_ACTION_ARGS()
         .Name( "eeschema.SymbolLibraryControl.showHiddenFields" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Hidden Fields" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::text_sketch ) );
 
 
@@ -358,7 +346,6 @@ TOOL_ACTION EE_ACTIONS::placeSymbolPin( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'P' )
         .LegacyHotkeyName( "Create Pin" )
         .FriendlyName( _( "Draw Pins" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::pin )
         .Flags( AF_ACTIVATE )
         .Parameter( SCH_PIN_T ) );
@@ -367,7 +354,6 @@ TOOL_ACTION EE_ACTIONS::placeSymbolText( TOOL_ACTION_ARGS()
         .Name( "eeschema.SymbolDrawing.placeSymbolText" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Text" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::text )
         .Flags( AF_ACTIVATE )
         .Parameter( SCH_TEXT_T ) );
@@ -376,7 +362,6 @@ TOOL_ACTION EE_ACTIONS::drawSymbolTextBox( TOOL_ACTION_ARGS()
         .Name( "eeschema.SymbolDrawing.drawSymbolTextBox" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Text Boxes" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_textbox )
         .Flags( AF_ACTIVATE ) );
 
@@ -385,7 +370,6 @@ TOOL_ACTION EE_ACTIONS::drawSymbolLines( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Lines" ) )
         .Tooltip( _( "Draw connected graphic lines" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_graphical_segments )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::POLY ) );
@@ -394,7 +378,6 @@ TOOL_ACTION EE_ACTIONS::drawSymbolPolygon( TOOL_ACTION_ARGS()
         .Name( "eeschema.SymbolDrawing.drawSymbolPolygon" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Polygons" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_graphical_polygon )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::POLY ) );
@@ -403,7 +386,6 @@ TOOL_ACTION EE_ACTIONS::placeSymbolAnchor( TOOL_ACTION_ARGS()
         .Name( "eeschema.SymbolDrawing.placeSymbolAnchor" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Move Symbol Anchor" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::anchor  )
         .Flags( AF_ACTIVATE ) );
 
@@ -439,7 +421,6 @@ TOOL_ACTION EE_ACTIONS::placeSymbol( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'A' )
         .LegacyHotkeyName( "Add Symbol" )
         .FriendlyName( _( "Place Symbols" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_component )
         .Flags( AF_ACTIVATE )
         .Parameter<EE_ACTIONS::PLACE_SYMBOL_PARAMS>( {} ) );
@@ -459,7 +440,6 @@ TOOL_ACTION EE_ACTIONS::placePower( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'P' )
         .LegacyHotkeyName( "Add Power" )
         .FriendlyName( _( "Place Power Symbols" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_power )
         .Flags( AF_ACTIVATE )
         .Parameter<EE_ACTIONS::PLACE_SYMBOL_PARAMS>( {} ) );
@@ -481,7 +461,6 @@ TOOL_ACTION EE_ACTIONS::placeNoConnect( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'Q' )
         .LegacyHotkeyName( "Add No Connect Flag" )
         .FriendlyName( _( "Place No Connect Flags" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::noconn )
         .Flags( AF_ACTIVATE )
         .Parameter( SCH_NO_CONNECT_T ) );
@@ -492,7 +471,6 @@ TOOL_ACTION EE_ACTIONS::placeJunction( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'J' )
         .LegacyHotkeyName( "Add Junction" )
         .FriendlyName( _( "Place Junctions" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_junction )
         .Flags( AF_ACTIVATE )
         .Parameter( SCH_JUNCTION_T ) );
@@ -503,7 +481,6 @@ TOOL_ACTION EE_ACTIONS::placeBusWireEntry( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'Z' )
         .LegacyHotkeyName( "Add Wire Entry" )
         .FriendlyName( _( "Place Wire to Bus Entries" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_line2bus )
         .Flags( AF_ACTIVATE )
         .Parameter( SCH_BUS_WIRE_ENTRY_T ) );
@@ -514,17 +491,16 @@ TOOL_ACTION EE_ACTIONS::placeLabel( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'L' )
         .LegacyHotkeyName( "Add Label" )
         .FriendlyName( _( "Place Net Labels" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_label )
         .Flags( AF_ACTIVATE ) );
 
-TOOL_ACTION EE_ACTIONS::placeClassLabel( TOOL_ACTION_ARGS()
-        .Name( "eeschema.InteractiveDrawing.placeClassLabel" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Place Directive Labels" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
-        .Icon( BITMAPS::add_class_flag )
-        .Flags( AF_ACTIVATE ) );
+TOOL_ACTION
+        EE_ACTIONS::placeClassLabel( TOOL_ACTION_ARGS()
+                                             .Name( "eeschema.InteractiveDrawing.placeClassLabel" )
+                                             .Scope( AS_GLOBAL )
+                                             .FriendlyName( _( "Place Directive Labels" ) )
+                                             .Icon( BITMAPS::add_class_flag )
+                                             .Flags( AF_ACTIVATE ) );
 
 TOOL_ACTION EE_ACTIONS::placeHierLabel( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.placeHierarchicalLabel" )
@@ -532,7 +508,6 @@ TOOL_ACTION EE_ACTIONS::placeHierLabel( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'H' )
         .LegacyHotkeyName( "Add Hierarchical Label" )
         .FriendlyName( _( "Place Hierarchical Labels" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_hierarchical_label )
         .Flags( AF_ACTIVATE ) );
 
@@ -542,7 +517,6 @@ TOOL_ACTION EE_ACTIONS::drawSheet( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'S' )
         .LegacyHotkeyName( "Add Sheet" )
         .FriendlyName( _( "Draw Hierarchical Sheets" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_hierarchical_subsheet )
         .Flags( AF_ACTIVATE )
         .Parameter( SCH_SHEET_T ) );
@@ -569,20 +543,13 @@ TOOL_ACTION EE_ACTIONS::placeSheetPin( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.placeSheetPin" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Place Sheet Pins" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_hierar_pin )
         .Flags( AF_ACTIVATE ) );
-
-TOOL_ACTION EE_ACTIONS::autoplaceAllSheetPins( TOOL_ACTION_ARGS()
-        .Name( "eeschema.InteractiveDrawing.autoplaceAllSheetPins" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Autoplace All Sheet Pins" ) )
-        .Tooltip( _( "Imports and auto places all sheet pins" ) ) );
 
 TOOL_ACTION EE_ACTIONS::syncSheetPins( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.syncSheetPins" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Sync Sheet Pins..." ) )
+        .FriendlyName( _( "Sync Sheet Pins" ) )
         .Tooltip( _( "Synchronize sheet pins and hierarchical labels" ) )
         .Icon( BITMAPS::import_hierarchical_label )
         .Flags( AF_ACTIVATE ) );
@@ -590,7 +557,7 @@ TOOL_ACTION EE_ACTIONS::syncSheetPins( TOOL_ACTION_ARGS()
 TOOL_ACTION EE_ACTIONS::syncAllSheetsPins( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.syncAllSheetsPins" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Sync Sheet Pins..." ) )
+        .FriendlyName( _( "Sync Sheet Pins" ) )
         .Tooltip( _( "Synchronize sheet pins and hierarchical labels" ) )
         .Icon( BITMAPS::import_hierarchical_label )
         .Flags( AF_ACTIVATE ) );
@@ -598,7 +565,7 @@ TOOL_ACTION EE_ACTIONS::syncAllSheetsPins( TOOL_ACTION_ARGS()
 TOOL_ACTION EE_ACTIONS::importSheet( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.importSheet" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Import Sheet..." ) )
+        .FriendlyName( _( "Import Sheet" ) )
         .Tooltip( _( "Import sheet into project" ) )
         .Icon( BITMAPS::add_hierarchical_subsheet )
         .Flags( AF_ACTIVATE )
@@ -610,7 +577,6 @@ TOOL_ACTION EE_ACTIONS::placeGlobalLabel( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + 'L' )
         .LegacyHotkeyName( "Add Global Label" )
         .FriendlyName( _( "Place Global Labels" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_glabel )
         .Flags( AF_ACTIVATE ) );
 
@@ -620,7 +586,6 @@ TOOL_ACTION EE_ACTIONS::placeSchematicText( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'T' )
         .LegacyHotkeyName( "Add Graphic Text" )
         .FriendlyName( _( "Draw Text" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::text )
         .Flags( AF_ACTIVATE ) );
 
@@ -628,7 +593,6 @@ TOOL_ACTION EE_ACTIONS::drawTextBox( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.drawTextBox" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Text Boxes" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_textbox )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::RECTANGLE ) );
@@ -637,7 +601,6 @@ TOOL_ACTION EE_ACTIONS::drawTable( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.drawTable" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Tables" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::table )
         .Flags( AF_ACTIVATE ) );
 
@@ -645,7 +608,6 @@ TOOL_ACTION EE_ACTIONS::drawRectangle( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.drawRectangle" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Rectangles" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_rectangle )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::RECTANGLE ) );
@@ -654,7 +616,6 @@ TOOL_ACTION EE_ACTIONS::drawCircle( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.drawCircle" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Circles" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_circle )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::CIRCLE ) );
@@ -663,7 +624,6 @@ TOOL_ACTION EE_ACTIONS::drawArc( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.drawArc" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Arcs" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_arc )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::ARC ) );
@@ -672,7 +632,6 @@ TOOL_ACTION EE_ACTIONS::drawBezier( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.drawBezier" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Bezier Curve" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_bezier )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::BEZIER ) );
@@ -681,7 +640,6 @@ TOOL_ACTION EE_ACTIONS::placeImage( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.placeImage" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Place Images" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::image )
         .Flags( AF_ACTIVATE )
         .Parameter<SCH_BITMAP*>( nullptr ) );
@@ -690,7 +648,6 @@ TOOL_ACTION EE_ACTIONS::drawRuleArea( TOOL_ACTION_ARGS()
         .Name( "eeschema.InteractiveDrawing.drawRuleArea" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Rule Areas" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_keepout_area )
         .Flags( AF_ACTIVATE )
         .Parameter( SHAPE_T::RECTANGLE ) );
@@ -852,7 +809,6 @@ TOOL_ACTION EE_ACTIONS::showDeMorganStandard( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "De Morgan Standard" ) )
         .Tooltip( _( "Switch to standard De Morgan representation" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::morgan1 ) );
 
 TOOL_ACTION EE_ACTIONS::showDeMorganAlternate( TOOL_ACTION_ARGS()
@@ -860,7 +816,6 @@ TOOL_ACTION EE_ACTIONS::showDeMorganAlternate( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "De Morgan Alternate" ) )
         .Tooltip( _( "Switch to alternate De Morgan representation" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::morgan2 ) );
 
 TOOL_ACTION EE_ACTIONS::toLabel( TOOL_ACTION_ARGS()
@@ -987,7 +942,6 @@ TOOL_ACTION EE_ACTIONS::highlightNetTool( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Highlight Nets" ) )
         .Tooltip( _( "Highlight wires and pins of a net" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::net_highlight_schematic )
         .Flags( AF_ACTIVATE ) );
 
@@ -1108,20 +1062,6 @@ TOOL_ACTION EE_ACTIONS::remapSymbols( TOOL_ACTION_ARGS()
         .Tooltip( _( "Remap library symbol references in legacy schematics to the symbol library table" ) )
         .Icon( BITMAPS::rescue ) );
 
-TOOL_ACTION EE_ACTIONS::nextNetItem( TOOL_ACTION_ARGS()
-        .Name( "eeschema.EditorControl.nextNetItem" )
-        .Scope( AS_GLOBAL )
-        .DefaultHotkey( WXK_TAB )
-        .FriendlyName( _( "Next Net Item" ) )
-        .Tooltip( _( "Select next item on the current net" ) ) );
-
-TOOL_ACTION EE_ACTIONS::previousNetItem( TOOL_ACTION_ARGS()
-        .Name( "eeschema.EditorControl.previousNetItem" )
-        .Scope( AS_GLOBAL )
-        .DefaultHotkey( MD_SHIFT + static_cast<int>( WXK_TAB ) )
-        .FriendlyName( _( "Previous Net Item" ) )
-        .Tooltip( _( "Select previous item on the current net" ) ) );
-
 TOOL_ACTION EE_ACTIONS::drawSheetOnClipboard( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.drawSheetOnClipboard" )
         .Scope( AS_GLOBAL )
@@ -1202,76 +1142,65 @@ TOOL_ACTION EE_ACTIONS::toggleHiddenPins( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showHiddenPins" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Hidden Pins" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::hidden_pin ) );
 
 TOOL_ACTION EE_ACTIONS::toggleHiddenFields( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showHiddenFields" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Show Hidden Fields" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .FriendlyName( _( "Show Hidden Fields" ) ) );
 
 TOOL_ACTION EE_ACTIONS::toggleDirectiveLabels( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showDirectiveLabels" )
         .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Show Directive Labels" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .FriendlyName( _( "Show Directive Labels" ) ) );
 
 TOOL_ACTION EE_ACTIONS::toggleERCWarnings( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showERCWarnings" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show ERC Warnings" ) )
-        .Tooltip( _( "Show markers for electrical rules checker warnings" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Tooltip( _( "Show markers for electrical rules checker warnings" ) ) );
 
 TOOL_ACTION EE_ACTIONS::toggleERCErrors( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showERCErrors" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show ERC Errors" ) )
-        .Tooltip( _( "Show markers for electrical rules checker errors" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Tooltip( _( "Show markers for electrical rules checker errors" ) ) );
 
 TOOL_ACTION EE_ACTIONS::toggleERCExclusions( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showERCExclusions" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show ERC Exclusions" ) )
-        .Tooltip( _( "Show markers for excluded electrical rules checker violations" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Tooltip( _( "Show markers for excluded electrical rules checker violations" ) ) );
 
 TOOL_ACTION EE_ACTIONS::markSimExclusions( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.markSimExclusions" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Mark items excluded from simulation" ) )
-        .Tooltip( _( "Draw 'X's over items which have been excluded from simulation" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Tooltip( _( "Draw 'X's over items which have been excluded from simulation" ) ) );
 
 TOOL_ACTION EE_ACTIONS::toggleOPVoltages( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showOperatingPointVoltages" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show OP Voltages" ) )
-        .Tooltip( _( "Show operating point voltage data from simulation" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ));
+        .Tooltip( _( "Show operating point voltage data from simulation" ) ) );
 
 TOOL_ACTION EE_ACTIONS::toggleOPCurrents( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.showOperatingPointCurrents" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show OP Currents" ) )
-        .Tooltip( _( "Show operating point current data from simulation" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Tooltip( _( "Show operating point current data from simulation" ) ) );
 
 TOOL_ACTION EE_ACTIONS::togglePinAltIcons( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.togglePinAltIcons" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Pin Alternate Icons" ) )
-        .Tooltip( _( "Show indicator icons for pins with alternate modes" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Tooltip( _( "Show indicator icons for pins with alternate modes" ) ) );
 
 TOOL_ACTION EE_ACTIONS::lineModeFree( TOOL_ACTION_ARGS()
         .Name( "eeschema.EditorControl.lineModeFree" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Line Mode for Wires and Buses" ) )
         .Tooltip( _( "Draw and drag at any angle" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::lines_any )
         .Flags( AF_NONE )
         .Parameter( LINE_MODE::LINE_MODE_FREE ) );
@@ -1281,7 +1210,6 @@ TOOL_ACTION EE_ACTIONS::lineMode90( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Line Mode for Wires and Buses" ) )
         .Tooltip( _( "Constrain drawing and dragging to horizontal or vertical motions" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::lines90 )
         .Flags( AF_NONE )
         .Parameter( LINE_MODE::LINE_MODE_90) );
@@ -1291,7 +1219,6 @@ TOOL_ACTION EE_ACTIONS::lineMode45( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Line Mode for Wires and Buses" ) )
         .Tooltip( _( "Constrain drawing and dragging to horizontal, vertical, or 45-degree angle motions" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::hv45mode )
         .Flags( AF_NONE )
         .Parameter( LINE_MODE::LINE_MODE_45 ) );
@@ -1308,7 +1235,6 @@ TOOL_ACTION EE_ACTIONS::toggleAnnotateAuto( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Annotate Automatically" ) )
         .Tooltip( _( "Toggle automatic annotation of new symbols" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::annotate ) );
 
 TOOL_ACTION EE_ACTIONS::repairSchematic( TOOL_ACTION_ARGS()
@@ -1403,7 +1329,6 @@ TOOL_ACTION EE_ACTIONS::showHierarchy( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + 'H' )
         .FriendlyName( _( "Hierarchy Navigator" ) )
         .Tooltip( _( "Show/hide the schematic sheet hierarchy navigator" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::hierarchy_nav ) );
 
 
@@ -1416,7 +1341,6 @@ TOOL_ACTION EE_ACTIONS::drawWire( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'W' )
         .LegacyHotkeyName( "Begin Wire" )
         .FriendlyName( _( "Draw Wires" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_line )
         .Flags( AF_ACTIVATE )
         .Parameter( &drawWireActionParam ) );
@@ -1428,7 +1352,6 @@ TOOL_ACTION EE_ACTIONS::drawBus( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'B' )
         .LegacyHotkeyName( "Begin Bus" )
         .FriendlyName( _( "Draw Buses" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_bus )
         .Flags( AF_ACTIVATE )
         .Parameter( &drawBusActionParam ) );
@@ -1451,7 +1374,6 @@ TOOL_ACTION EE_ACTIONS::drawLines( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'I' )
         .LegacyHotkeyName( "Add Graphic PolyLine" )
         .FriendlyName( _( "Draw Lines" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_graphical_segments )
         .Flags( AF_ACTIVATE )
         .Parameter( &drawLinesActionParam ) );
@@ -1616,7 +1538,7 @@ TOOL_ACTION EE_ACTIONS::stopSimulation( TOOL_ACTION_ARGS()
 TOOL_ACTION EE_ACTIONS::simProbe( TOOL_ACTION_ARGS()
         .Name( "eeschema.Simulation.probe" )
         .Scope( AS_GLOBAL )
-        .DefaultHotkey( MD_SHIFT + 'P' )
+        .DefaultHotkey( 'P' )
         .FriendlyName( _( "Probe Schematic..." ) )
         .Tooltip( _( "Add a simulator probe" ) )
         .Icon( BITMAPS::sim_probe ) );
@@ -1624,7 +1546,7 @@ TOOL_ACTION EE_ACTIONS::simProbe( TOOL_ACTION_ARGS()
 TOOL_ACTION EE_ACTIONS::simTune( TOOL_ACTION_ARGS()
         .Name( "eeschema.Simulation.tune" )
         .Scope( AS_GLOBAL )
-        .DefaultHotkey( MD_SHIFT + 'T' )
+        .DefaultHotkey( 'T' )
         .FriendlyName( _( "Add Tuned Value..." ) )
         .Tooltip( _( "Select a value to be tuned" ) )
         .Icon( BITMAPS::sim_tune ) );

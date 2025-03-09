@@ -678,7 +678,7 @@ SCH_EASYEDAPRO_PARSER::ParseSymbol( const std::vector<nlohmann::json>&  aLines,
     if( symInfo.head.symbolType == EASYEDAPRO::SYMBOL_TYPE::POWER_PORT
         || symInfo.head.symbolType == EASYEDAPRO::SYMBOL_TYPE::NETPORT )
     {
-        ksymbol->SetGlobalPower();
+        ksymbol->SetPower();
         ksymbol->GetReferenceField().SetText( wxS( "#PWR" ) );
         ksymbol->GetReferenceField().SetVisible( false );
         ksymbol->SetKeyWords( wxS( "power-flag" ) );
@@ -720,11 +720,11 @@ SCH_EASYEDAPRO_PARSER::ParseSymbol( const std::vector<nlohmann::json>&  aLines,
                 if( valOpt->empty() )
                     continue;
 
-                SCH_FIELD* fd = ksymbol->FindFieldCaseInsensitive( attrName );
+                SCH_FIELD* fd = ksymbol->FindField( attrName, true );
 
                 if( !fd )
                 {
-                    fd = new SCH_FIELD( ksymbol, FIELD_T::USER, attrName );
+                    fd = new SCH_FIELD( ksymbol, ksymbol->GetNextAvailableFieldId(), attrName );
                     ksymbol->AddField( fd );
                 }
 
@@ -1182,7 +1182,7 @@ void SCH_EASYEDAPRO_PARSER::ParseSchematic( SCHEMATIC* aSchematic, SCH_SHEET* aR
                                                         &aSchematic->CurrentSheet(),
                                                         esymInfo.partUnits[unitName] );
 
-            schSym->SetFootprintFieldText( newLibSymbol.GetFootprint() );
+            schSym->SetFootprintFieldText( newLibSymbol.GetFootprintField().GetText() );
 
             for( double i = component->rotation; i > 0; i -= 90 )
                 schSym->Rotate( VECTOR2I(), true );
@@ -1196,20 +1196,20 @@ void SCH_EASYEDAPRO_PARSER::ParseSchematic( SCHEMATIC* aSchematic, SCH_SHEET* aR
             {
                 if( auto globalNetAttr = get_opt( attributes, "Global Net Name" ) )
                 {
-                    ApplyAttrToField( fontStyles, schSym->GetField( FIELD_T::VALUE ),
-                                      *globalNetAttr, false, true, compAttrs, schSym.get() );
+                    ApplyAttrToField( fontStyles, schSym->GetField( VALUE_FIELD ), *globalNetAttr,
+                                      false, true, compAttrs, schSym.get() );
 
                     for( SCH_PIN* pin : schSym->GetAllLibPins() )
                         pin->SetName( globalNetAttr->value );
                 }
                 else
                 {
-                    SCH_FIELD* valueField = schSym->GetField( FIELD_T::VALUE );
-                    valueField->SetText( newLibSymbol.GetValueField().GetText() );
+                    schSym->GetField( VALUE_FIELD )
+                            ->SetText( newLibSymbol.GetValueField().GetText() );
                 }
 
                 schSym->SetRef( &aSchematic->CurrentSheet(), wxS( "#PWR?" ) );
-                schSym->GetField( FIELD_T::REFERENCE )->SetVisible( false );
+                schSym->GetField( REFERENCE_FIELD )->SetVisible( false );
             }
             else if( esymInfo.head.symbolType == EASYEDAPRO::SYMBOL_TYPE::NETPORT )
             {
@@ -1291,12 +1291,13 @@ void SCH_EASYEDAPRO_PARSER::ParseSchematic( SCHEMATIC* aSchematic, SCH_SHEET* aR
                         if( valOpt->empty() )
                             continue;
 
-                        SCH_FIELD* text = schSym->FindFieldCaseInsensitive( attrKey );
+                        SCH_FIELD* text = schSym->FindField( attrKey, true );
 
                         if( !text )
                         {
-                            text = new SCH_FIELD( schSym.get(), FIELD_T::USER, attrKey );
-                            schSym->AddField( text );
+                            text = schSym->AddField( SCH_FIELD( schSym.get(),
+                                                                schSym->GetNextFieldId(),
+                                                                attrKey ) );
                         }
 
                         wxString value = *valOpt;
@@ -1330,19 +1331,19 @@ void SCH_EASYEDAPRO_PARSER::ParseSchematic( SCHEMATIC* aSchematic, SCH_SHEET* aR
 
                 if( targetValueAttr )
                 {
-                    ApplyAttrToField( fontStyles, schSym->GetField( FIELD_T::VALUE ),
-                                      *targetValueAttr, false, true, compAttrs, schSym.get() );
+                    ApplyAttrToField( fontStyles, schSym->GetField( VALUE_FIELD ), *targetValueAttr,
+                                      false, true, compAttrs, schSym.get() );
                 }
 
                 if( auto descrAttr = get_opt( attributes, "Description" ) )
                 {
-                    ApplyAttrToField( fontStyles, schSym->GetField( FIELD_T::DESCRIPTION ),
-                                      *descrAttr, false, true, compAttrs, schSym.get() );
+                    ApplyAttrToField( fontStyles, schSym->GetField( DESCRIPTION_FIELD ), *descrAttr,
+                                      false, true, compAttrs, schSym.get() );
                 }
 
                 if( auto designatorAttr = get_opt( attributes, "Designator" ) )
                 {
-                    ApplyAttrToField( fontStyles, schSym->GetField( FIELD_T::REFERENCE ),
+                    ApplyAttrToField( fontStyles, schSym->GetField( REFERENCE_FIELD ),
                                       *designatorAttr, false, true, compAttrs, schSym.get() );
 
                     schSym->SetRef( &aSchematic->CurrentSheet(), designatorAttr->value );
@@ -1362,12 +1363,12 @@ void SCH_EASYEDAPRO_PARSER::ParseSchematic( SCHEMATIC* aSchematic, SCH_SHEET* aR
                     if( attr.value.IsEmpty() )
                         continue;
 
-                    SCH_FIELD* text = schSym->FindFieldCaseInsensitive( attrKey );
+                    SCH_FIELD* text = schSym->FindField( attrKey, true );
 
                     if( !text )
                     {
-                        text = new SCH_FIELD( schSym.get(), FIELD_T::USER, attrKey );
-                        schSym->AddField( text );
+                        text = schSym->AddField( SCH_FIELD( schSym.get(), schSym->GetNextFieldId(),
+                                                            attrKey ) );
                     }
 
                     text->SetPosition( schSym->GetPosition() );

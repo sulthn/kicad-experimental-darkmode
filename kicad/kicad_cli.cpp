@@ -59,7 +59,6 @@
 #include "cli/command_pcb_export_gerbers.h"
 #include "cli/command_pcb_export_gencad.h"
 #include "cli/command_pcb_export_ipc2581.h"
-#include "cli/command_pcb_export_ipcd356.h"
 #include "cli/command_pcb_export_odb.h"
 #include "cli/command_pcb_export_pdf.h"
 #include "cli/command_pcb_export_pos.h"
@@ -131,7 +130,6 @@ static CLI::PCB_EXPORT_GERBER_COMMAND    exportPcbGerberCmd{};
 static CLI::PCB_EXPORT_GERBERS_COMMAND   exportPcbGerbersCmd{};
 static CLI::PCB_EXPORT_GENCAD_COMMAND    exportPcbGencadCmd{};
 static CLI::PCB_EXPORT_IPC2581_COMMAND   exportPcbIpc2581Cmd{};
-static CLI::PCB_EXPORT_IPCD356_COMMAND   exportPcbIpcD356Cmd{};
 static CLI::PCB_EXPORT_ODB_COMMAND       exportPcbOdbCmd{};
 static CLI::PCB_EXPORT_COMMAND           exportPcbCmd{};
 static CLI::SCH_EXPORT_COMMAND           exportSchCmd{};
@@ -156,7 +154,6 @@ static CLI::SYM_UPGRADE_COMMAND          symUpgradeCmd{};
 static CLI::VERSION_COMMAND              versionCmd{};
 
 
-// clang-format off
 static std::vector<COMMAND_ENTRY> commandStack = {
     {
         &jobsetCmd,
@@ -200,7 +197,6 @@ static std::vector<COMMAND_ENTRY> commandStack = {
                     &exportPcbGencadCmd,
                     &exportPcbGlbCmd,
                     &exportPcbIpc2581Cmd,
-                    &exportPcbIpcD356Cmd,
                     &exportPcbOdbCmd,
                     &exportPcbPdfCmd,
                     &exportPcbPosCmd,
@@ -253,7 +249,6 @@ static std::vector<COMMAND_ENTRY> commandStack = {
             &versionCmd,
     }
 };
-// clang-format on
 
 
 static void recurseArgParserBuild( argparse::ArgumentParser& aArgParser, COMMAND_ENTRY& aEntry )

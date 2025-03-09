@@ -650,22 +650,21 @@ void PCB_IO_EASYEDA_PARSER::ParseToBoardItemContainer(
 
                     if( euuid )
                     {
-                        PCB_FIELD* field = new PCB_FIELD( footprint, FIELD_T::USER,
-                                                          DIRECT_MODEL_UUID_KEY );
-                        field->SetLayer( Cmts_User );
-                        field->SetVisible( false );
-                        field->SetText( *euuid );
-                        footprint->Add( field );
+                        PCB_FIELD field( footprint, footprint->GetNextFieldId(),
+                                         DIRECT_MODEL_UUID_KEY );
+                        field.SetLayer( Cmts_User );
+                        field.SetVisible( false );
+                        field.SetText( *euuid );
+                        footprint->AddField( field );
                     }
 
                     /*if( etransform )
                     {
-                        PCB_FIELD* field = new PCB_FIELD( footprint, FIELD_T::USER,
-                                                          "3D Transform" );
-                        field->SetLayer( Cmts_User );
-                        field->SetVisible( false );
-                        field->SetText( *etransform );
-                        footprint->Add( field );
+                        PCB_FIELD field( footprint, footprint->GetNextFieldId(), "3D Transform" );
+                        field.SetLayer( Cmts_User );
+                        field.SetVisible( false );
+                        field.SetText( *etransform );
+                        footprint->AddField( field );
                     }*/
 
                     if( ec_width && ec_height )
@@ -677,13 +676,12 @@ void PCB_IO_EASYEDA_PARSER::ParseToBoardItemContainer(
                         fitXmm = KiROUND( fitXmm / rounding ) * rounding;
                         fitYmm = KiROUND( fitYmm / rounding ) * rounding;
 
-                        PCB_FIELD* field = new PCB_FIELD( footprint, FIELD_T::USER,
-                                                          MODEL_SIZE_KEY );
-                        field->SetLayer( Cmts_User );
-                        field->SetVisible( false );
-                        field->SetText( wxString::FromCDouble( fitXmm ) + wxS( " " )
+                        PCB_FIELD field( footprint, footprint->GetNextFieldId(), MODEL_SIZE_KEY );
+                        field.SetLayer( Cmts_User );
+                        field.SetVisible( false );
+                        field.SetText( wxString::FromCDouble( fitXmm ) + wxS( " " )
                                        + wxString::FromCDouble( fitYmm ) );
-                        footprint->Add( field );
+                        footprint->AddField( field );
                     }
 
                     if( ec_origin )
@@ -783,24 +781,20 @@ void PCB_IO_EASYEDA_PARSER::ParseToBoardItemContainer(
         {
             PCB_TEXT* text;
             wxString  textType = arr[1];
+            bool      add = false;
 
             if( footprint && textType == wxS( "P" ) )
             {
-                text = footprint->GetField( FIELD_T::REFERENCE );
+                text = footprint->GetField( REFERENCE_FIELD );
             }
             else if( footprint && textType == wxS( "N" ) )
             {
-                text = footprint->GetField( FIELD_T::VALUE );
-            }
-            else if( arr[12] == wxS( "none" ) )
-            {
-                text = new PCB_FIELD( aContainer, FIELD_T::USER );
-                static_cast<PCB_FIELD*>( text )->SetVisible( false );
+                text = footprint->GetField( VALUE_FIELD );
             }
             else
             {
                 text = new PCB_TEXT( aContainer );
-                aContainer->Add( text, ADD_MODE::APPEND );
+                add = true;
             }
 
             VECTOR2D start;
@@ -832,11 +826,16 @@ void PCB_IO_EASYEDA_PARSER::ParseToBoardItemContainer(
 
             //arr[11] // Geometry data
 
+            text->SetVisible( arr[12] != wxS( "none" ) );
+
             wxString font = arr[14];
             if( !font.IsEmpty() )
                 text->SetFont( KIFONT::FONT::GetFont( font ) );
 
             TransformTextToBaseline( text, wxEmptyString );
+
+            if( add )
+                aContainer->Add( text, ADD_MODE::APPEND );
         }
         else if( elType == wxS( "VIA" ) )
         {
@@ -974,7 +973,7 @@ void PCB_IO_EASYEDA_PARSER::ParseToBoardItemContainer(
             else if( klayer == B_Cu )
             {
                 pad->SetLayer( B_Cu );
-                pad->SetLayerSet( PAD::SMDMask().FlipStandardLayers() );
+                pad->SetLayerSet( PAD::SMDMask().Flip() );
                 pad->SetAttribute( PAD_ATTRIB::SMD );
             }
             else if( elayer == wxS( "11" ) )

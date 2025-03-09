@@ -27,7 +27,6 @@ column_widths
 comment
 company
 convert
-cross_hatch
 data
 date
 default
@@ -55,9 +54,7 @@ footprint
 free
 generator
 generator_version
-global
 global_label
-hatch
 header
 hide
 hierarchical_label
@@ -87,7 +84,6 @@ lib_name
 lib_symbols
 line
 line_spacing
-local
 margins
 members
 mid
@@ -132,7 +128,6 @@ rectangle
 reference
 required
 rev
-reverse_hatch
 right
 round
 rows

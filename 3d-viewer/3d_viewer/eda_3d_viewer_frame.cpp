@@ -58,7 +58,6 @@
 #include <widgets/wx_aui_utils.h>
 #include <wildcards_and_files_ext.h>
 #include <project_pcb.h>
-#include <toolbars_3d.h>
 
 #include <3d_navlib/nl_3d_viewer_plugin.h>
 
@@ -81,6 +80,7 @@ BEGIN_EVENT_TABLE( EDA_3D_VIEWER_FRAME, KIWAY_PLAYER )
                     EDA_3D_VIEWER_FRAME::Process_Special_Functions )
 
     EVT_MENU( wxID_CLOSE, EDA_3D_VIEWER_FRAME::Exit3DFrame )
+    EVT_MENU( ID_RENDER_CURRENT_VIEW, EDA_3D_VIEWER_FRAME::onRenderEngineSelection )
     EVT_MENU( ID_DISABLE_RAY_TRACING, EDA_3D_VIEWER_FRAME::onDisableRayTracing )
 
     EVT_CLOSE( EDA_3D_VIEWER_FRAME::OnCloseWindow )
@@ -91,6 +91,7 @@ EDA_3D_VIEWER_FRAME::EDA_3D_VIEWER_FRAME( KIWAY* aKiway, PCB_BASE_FRAME* aParent
                                           const wxString& aTitle, long style ) :
         KIWAY_PLAYER( aKiway, aParent, FRAME_PCB_DISPLAY3D, aTitle, wxDefaultPosition,
                       wxDefaultSize, style, QUALIFIED_VIEWER3D_FRAMENAME( aParent ), unityScale ),
+        m_mainToolBar( nullptr ),
         m_canvas( nullptr ),
         m_currentCamera( m_trackBallCamera ),
         m_trackBallCamera( 2 * RANGE_SCALE_3D )
@@ -148,16 +149,13 @@ EDA_3D_VIEWER_FRAME::EDA_3D_VIEWER_FRAME( KIWAY* aKiway, PCB_BASE_FRAME* aParent
     m_toolManager->InvokeTool( "3DViewer.Control" );
 
     ReCreateMenuBar();
-
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<EDA_3D_VIEWER_TOOLBAR_SETTINGS>( "3d_viewer-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
+    ReCreateMainToolbar();
 
     m_infoBar = new WX_INFOBAR( this, &m_auimgr );
 
     m_auimgr.SetManagedWindow( this );
 
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( wxS( "TopMainToolbar" ) )
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( wxS( "MainToolbar" ) )
                       .Top().Layer( 6 ) );
     m_auimgr.AddPane( m_infoBar, EDA_PANE().InfoBar().Name( wxS( "InfoBar" ) )
                       .Top().Layer( 1 ) );
@@ -274,7 +272,7 @@ void EDA_3D_VIEWER_FRAME::setupUIConditions()
                 return m_boardAdapter.m_Cfg->m_AuiPanels.show_layer_manager;
             };
 
-    mgr->SetConditions( EDA_3D_ACTIONS::toggleRaytacing, ACTION_CONDITIONS().Check( raytracing ) );
+    RegisterUIUpdateHandler( ID_RENDER_CURRENT_VIEW, ACTION_CONDITIONS().Check( raytracing ) );
 
     mgr->SetConditions( EDA_3D_ACTIONS::showTHT, ACTION_CONDITIONS().Check( showTH ) );
     mgr->SetConditions( EDA_3D_ACTIONS::showSMD, ACTION_CONDITIONS().Check( showSMD ) );
@@ -469,6 +467,16 @@ void EDA_3D_VIEWER_FRAME::Process_Special_Functions( wxCommandEvent &event )
 
     switch( id )
     {
+    case ID_RELOAD3D_BOARD:
+        NewDisplay( true );
+        break;
+
+    case ID_TOOL_SCREENCOPY_TOCLIBBOARD:
+    case ID_MENU_SCREENCOPY_PNG:
+    case ID_MENU_SCREENCOPY_JPEG:
+        takeScreenshot( event );
+        return;
+
     case ID_MENU3D_RESET_DEFAULTS:
     {
         SETTINGS_MANAGER&       mgr = Pgm().GetSettingsManager();
@@ -488,6 +496,24 @@ void EDA_3D_VIEWER_FRAME::Process_Special_Functions( wxCommandEvent &event )
         wxFAIL_MSG( wxT( "Invalid event in EDA_3D_VIEWER_FRAME::Process_Special_Functions()" ) );
         return;
     }
+}
+
+
+void EDA_3D_VIEWER_FRAME::onRenderEngineSelection( wxCommandEvent &event )
+{
+    RENDER_ENGINE& engine = m_boardAdapter.m_Cfg->m_Render.engine;
+    RENDER_ENGINE  old_engine = engine;
+
+    if( old_engine == RENDER_ENGINE::OPENGL )
+        engine = RENDER_ENGINE::RAYTRACING;
+    else
+        engine = RENDER_ENGINE::OPENGL;
+
+    wxLogTrace( m_logTrace, wxT( "EDA_3D_VIEWER_FRAME::OnRenderEngineSelection type %s " ),
+                engine == RENDER_ENGINE::RAYTRACING ? wxT( "raytracing" ) : wxT( "realtime" ) );
+
+    if( old_engine != engine )
+        RenderEngineChanged();
 }
 
 
@@ -615,6 +641,9 @@ void EDA_3D_VIEWER_FRAME::CommonSettingsChanged( int aFlags )
     // Regen menu bars, etc
     EDA_BASE_FRAME::CommonSettingsChanged( aFlags );
 
+    // There is no base class that handles toolbars for this frame
+    ReCreateMainToolbar();
+
     loadCommonSettings();
     applySettings(
             Pgm().GetSettingsManager().GetAppSettings<EDA_3D_VIEWER_SETTINGS>( "3d_viewer" ) );
@@ -630,7 +659,7 @@ void EDA_3D_VIEWER_FRAME::ShowChangedLanguage()
     EDA_BASE_FRAME::ShowChangedLanguage();
 
     SetTitle( _( "3D Viewer" ) );
-    RecreateToolbars();
+    ReCreateMainToolbar();
 
     if( m_appearancePanel )
     {
@@ -673,15 +702,15 @@ void EDA_3D_VIEWER_FRAME::OnDarkModeToggle()
 }
 
 
-void EDA_3D_VIEWER_FRAME::TakeScreenshot( EDA_3D_VIEWER_EXPORT_FORMAT aFormat )
+void EDA_3D_VIEWER_FRAME::takeScreenshot( wxCommandEvent& event )
 {
     wxString   fullFileName;
     bool       fmt_is_jpeg = false;
 
-    if( aFormat == EDA_3D_VIEWER_EXPORT_FORMAT::JPEG )
+    if( event.GetId() == ID_MENU_SCREENCOPY_JPEG )
         fmt_is_jpeg = true;
 
-    if( aFormat != EDA_3D_VIEWER_EXPORT_FORMAT::CLIPBOARD )
+    if( event.GetId() != ID_TOOL_SCREENCOPY_TOCLIBBOARD )
     {
         // Remember path between saves during this session only.
         const wxString wildcard =
@@ -745,7 +774,7 @@ void EDA_3D_VIEWER_FRAME::TakeScreenshot( EDA_3D_VIEWER_EXPORT_FORMAT aFormat )
 
     cfg.highlight_on_rollover = allow_highlight;
 
-    if( aFormat == EDA_3D_VIEWER_EXPORT_FORMAT::CLIPBOARD )
+    if( event.GetId() == ID_TOOL_SCREENCOPY_TOCLIBBOARD )
     {
         wxBitmap bitmap( screenshotImage );
 

@@ -23,7 +23,6 @@
 
 #include <dialog_update_symbol_fields_base.h>
 #include <set>
-#include <template_fieldnames.h>
 
 class LIB_ID;
 class LIB_SYMBOL;
@@ -57,15 +56,11 @@ protected:
 private:
     void updateFieldsList();
 
-private:
     SYMBOL_EDIT_FRAME* m_editFrame;
     LIB_SYMBOL*        m_symbol;
 
     /// Set of field names that should have values updated.
-    std::set<wxString>     m_updateFields;
-
-    /// Index in the list control for each MANDATORY_FIELD type
-    std::map<FIELD_T, int> m_mandatoryFieldListIndexes;
+    std::set<wxString> m_updateFields;
 };
 
 #endif // DIALOG_UPDATE_SYMBOL_FIELDS_H

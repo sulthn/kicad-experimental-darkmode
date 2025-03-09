@@ -81,7 +81,7 @@ BOARD::BOARD() :
         m_timeStamp( 1 ),
         m_paper( PAGE_INFO::A4 ),
         m_project( nullptr ),
-        m_userUnits( EDA_UNITS::MM ),
+        m_userUnits( EDA_UNITS::MILLIMETRES ),
         m_designSettings( new BOARD_DESIGN_SETTINGS( nullptr, "board.design_settings" ) ),
         m_NetInfo( this ),
         m_embedFonts( false )
@@ -1187,23 +1187,6 @@ void BOARD::FinalizeBulkRemove( std::vector<BOARD_ITEM*>& aRemovedItems )
 }
 
 
-void BOARD::BulkRemoveStaleTeardrops( BOARD_COMMIT& aCommit )
-{
-    for( int ii = (int) m_zones.size() - 1; ii > 0; --ii )
-    {
-        ZONE* zone = m_zones[ii];
-
-        if( zone->IsTeardropArea() && zone->HasFlag( STRUCT_DELETED ) )
-        {
-            m_itemByIdCache.erase( zone->m_Uuid );
-            m_zones.erase( m_zones.begin() + ii );
-            m_connectivity->Remove( zone );
-            aCommit.Removed( zone );
-        }
-    }
-}
-
-
 void BOARD::Remove( BOARD_ITEM* aBoardItem, REMOVE_MODE aRemoveMode )
 {
     // find these calls and fix them!  Don't send me no stinking' nullptr.
@@ -1472,19 +1455,6 @@ void BOARD::DeleteAllFootprints()
     {
         m_itemByIdCache.erase( footprint->m_Uuid );
         delete footprint;
-    }
-
-    m_footprints.clear();
-    IncrementTimeStamp();
-}
-
-
-void BOARD::DetachAllFootprints()
-{
-    for( FOOTPRINT* footprint : m_footprints )
-    {
-        m_itemByIdCache.erase( footprint->m_Uuid );
-        footprint->SetParent( nullptr );
     }
 
     m_footprints.clear();
@@ -2392,7 +2362,12 @@ std::tuple<int, double, double> BOARD::GetTrackLength( const PCB_TRACK& aTrack )
     BOARD_STACKUP&    stackup      = GetDesignSettings().GetStackupDescriptor();
     bool              useHeight    = GetDesignSettings().m_UseHeightForLengthCalcs;
 
-    for( BOARD_CONNECTED_ITEM* item : connectivity->GetConnectedItems( &aTrack, EXCLUDE_ZONES ) )
+    static const std::vector<KICAD_T> baseConnectedTypes = { PCB_TRACE_T,
+                                                             PCB_ARC_T,
+                                                             PCB_VIA_T,
+                                                             PCB_PAD_T };
+
+    for( BOARD_CONNECTED_ITEM* item : connectivity->GetConnectedItems( &aTrack, baseConnectedTypes ) )
     {
         count++;
 

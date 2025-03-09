@@ -175,6 +175,9 @@ public:
     void SaveSettings( APP_SETTINGS_BASE* aCfg ) override;
 
     void CreateScreens();
+    void ReCreateHToolbar() override;
+    void ReCreateVToolbar() override;
+    void ReCreateOptToolbar() override;
 
     void setupUIConditions() override;
 
@@ -241,7 +244,7 @@ public:
     /**
      * Update the hierarchy navigation tree and history
      */
-    void UpdateHierarchyNavigator( bool aRefreshNetNavigator = true, bool aClear = false );
+    void UpdateHierarchyNavigator( bool aRefreshNetNavigator = true );
 
     /**
      * Update the hierarchy navigation tree labels.
@@ -809,6 +812,11 @@ public:
 
     DESIGN_BLOCK_PANE* GetDesignBlockPane() const { return m_designBlocksPane; }
 
+    /**
+     * Plot or print the current sheet to the clipboard.
+     */
+    virtual void PrintPage( const RENDER_SETTINGS* aSettings ) override;
+
     void SetNetListerCommand( const wxString& aCommand ) { m_netListerCommand = aCommand; }
 
     /**
@@ -922,10 +930,6 @@ public:
      */
     static const wxString SearchPaneName() { return wxT( "Search" ); }
 
-    bool IsSearchPaneShown() { return m_auimgr.GetPane( SearchPaneName() ).IsShown(); }
-
-    void FocusSearch();
-
     /**
      * Add \a aListener to post #EDA_EVT_SCHEMATIC_CHANGED command events to.
      *
@@ -955,8 +959,6 @@ public:
 
     void SelectNetNavigatorItem( const NET_NAVIGATOR_ITEM_DATA* aSelection = nullptr );
 
-    const SCH_ITEM* SelectNextPrevNetNavigatorItem( bool aNext );
-
     void ToggleNetNavigator();
 
     PLUGIN_ACTION_SCOPE PluginActionScope() const override
@@ -973,8 +975,6 @@ protected:
      * @return true if the auto save was successful otherwise false.
      */
     bool doAutoSave() override;
-
-    void configureToolbars() override;
 
     void doReCreateMenuBar() override;
 

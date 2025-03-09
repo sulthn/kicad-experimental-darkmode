@@ -76,7 +76,7 @@ private:
     void              loadDocs();
     static SCH_SHAPE* loadArc( LINE_READER& aReader );
     static SCH_SHAPE* loadCircle( LINE_READER& aReader );
-    static SCH_ITEM*  loadText( LINE_READER& aReader, int aMajorVersion, int aMinorVersion );
+    static SCH_TEXT*  loadText( LINE_READER& aReader, int aMajorVersion, int aMinorVersion );
     static SCH_SHAPE* loadRect( LINE_READER& aReader );
     static SCH_PIN*   loadPin( std::unique_ptr<LIB_SYMBOL>& aSymbol, LINE_READER& aReader );
     static SCH_SHAPE* loadPolyLine( LINE_READER& aReader );
@@ -88,8 +88,7 @@ private:
     static void     saveArc( SCH_SHAPE* aArc, OUTPUTFORMATTER& aFormatter );
     static void     saveBezier( SCH_SHAPE* aBezier, OUTPUTFORMATTER& aFormatter );
     static void     saveCircle( SCH_SHAPE* aCircle, OUTPUTFORMATTER& aFormatter );
-    static void     saveField( const SCH_FIELD* aField, int aLegacyFieldIdx,
-                               OUTPUTFORMATTER& aFormatter );
+    static void     saveField( const SCH_FIELD* aField, OUTPUTFORMATTER& aFormatter );
     static void     savePin( const SCH_PIN* aPin, OUTPUTFORMATTER& aFormatter );
     static void     savePolyLine( SCH_SHAPE* aPolyLine, OUTPUTFORMATTER& aFormatter );
     static void     saveRectangle( SCH_SHAPE* aRectangle, OUTPUTFORMATTER& aFormatter );

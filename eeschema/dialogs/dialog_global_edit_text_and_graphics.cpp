@@ -284,6 +284,9 @@ void DIALOG_GLOBAL_EDIT_TEXT_AND_GRAPHICS::processItem( SCH_COMMIT* aCommit,
             eda_text->SetVertJustify( vAlign );
         }
 
+        if( m_visible->Get3StateValue() != wxCHK_UNDETERMINED )
+            eda_text->SetVisible( m_visible->GetValue() );
+
         if( m_italic->Get3StateValue() != wxCHK_UNDETERMINED )
             eda_text->SetItalic( m_italic->GetValue() );
 
@@ -317,9 +320,6 @@ void DIALOG_GLOBAL_EDIT_TEXT_AND_GRAPHICS::processItem( SCH_COMMIT* aCommit,
 
     if( SCH_FIELD* sch_field = dynamic_cast<SCH_FIELD*>( aItem ) )
     {
-        if( m_visible->Get3StateValue() != wxCHK_UNDETERMINED )
-            sch_field->SetVisible( m_visible->GetValue() );
-
         if( m_showFieldNames->Get3StateValue() != wxCHK_UNDETERMINED )
             sch_field->SetNameShown( m_showFieldNames->GetValue() );
     }
@@ -421,18 +421,16 @@ void DIALOG_GLOBAL_EDIT_TEXT_AND_GRAPHICS::visitItem( SCH_COMMIT* aCommit,
         SCH_SYMBOL* symbol = (SCH_SYMBOL*) aItem;
 
         if( m_references->GetValue() )
-            processItem( aCommit, aSheetPath, symbol->GetField( FIELD_T::REFERENCE ) );
+            processItem( aCommit, aSheetPath, symbol->GetField( REFERENCE_FIELD ) );
 
         if( m_values->GetValue() )
-            processItem( aCommit, aSheetPath, symbol->GetField( FIELD_T::VALUE ) );
+            processItem( aCommit, aSheetPath, symbol->GetField( VALUE_FIELD ) );
 
         if( m_otherFields->GetValue() )
         {
-            for( SCH_FIELD& field : symbol->GetFields() )
+            for( int i = 2; i < symbol->GetFieldCount(); ++i )
             {
-                if( field.GetId() == FIELD_T::REFERENCE || field.GetId() == FIELD_T::VALUE )
-                    continue;
-
+                SCH_FIELD&      field = symbol->GetFields()[i];
                 const wxString& fieldName = field.GetName();
 
                 if( !m_fieldnameFilterOpt->GetValue() || m_fieldnameFilter->GetValue().IsEmpty()
@@ -451,13 +449,13 @@ void DIALOG_GLOBAL_EDIT_TEXT_AND_GRAPHICS::visitItem( SCH_COMMIT* aCommit,
         SCH_SHEET* sheet = static_cast<SCH_SHEET*>( aItem );
 
         if( m_sheetTitles->GetValue() )
-            processItem( aCommit, aSheetPath, sheet->GetField( FIELD_T::SHEET_NAME ) );
+            processItem( aCommit, aSheetPath, &sheet->GetFields()[SHEETNAME] );
 
         if( m_sheetFields->GetValue() )
         {
             for( SCH_FIELD& field : sheet->GetFields() )
             {
-                if( field.GetId() == FIELD_T::SHEET_NAME )
+                if( field.GetId() == SHEETNAME )
                     continue;
 
                 const wxString& fieldName = field.GetName();

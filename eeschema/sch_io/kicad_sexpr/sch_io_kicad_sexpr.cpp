@@ -80,20 +80,20 @@ SCH_IO_KICAD_SEXPR::~SCH_IO_KICAD_SEXPR()
 }
 
 
-void SCH_IO_KICAD_SEXPR::init( SCHEMATIC* aSchematic,
-                               const std::map<std::string, UTF8>* aProperties )
+void SCH_IO_KICAD_SEXPR::init( SCHEMATIC* aSchematic, const std::map<std::string, UTF8>* aProperties )
 {
-    m_version   = 0;
-    m_appending = false;
-    m_rootSheet = nullptr;
-    m_schematic = aSchematic;
-    m_cache     = nullptr;
-    m_out       = nullptr;
+    m_version         = 0;
+    m_appending       = false;
+    m_rootSheet       = nullptr;
+    m_schematic       = aSchematic;
+    m_cache           = nullptr;
+    m_out             = nullptr;
+    m_nextFreeFieldId = 100; // number arbitrarily > MANDATORY_FIELD_COUNT or SHEET_MANDATORY_FIELD_COUNT
 }
 
 
 SCH_SHEET* SCH_IO_KICAD_SEXPR::LoadSchematicFile( const wxString& aFileName, SCHEMATIC* aSchematic,
-                                                  SCH_SHEET* aAppendToMe,
+                                                  SCH_SHEET*             aAppendToMe,
                                                   const std::map<std::string, UTF8>* aProperties )
 {
     wxASSERT( !aFileName || aSchematic != nullptr );
@@ -739,45 +739,54 @@ void SCH_IO_KICAD_SEXPR::saveSymbol( SCH_SYMBOL* aSymbol, const SCHEMATIC& aSche
 
     KICAD_FORMAT::FormatUuid( m_out, aSymbol->m_Uuid );
 
-    std::vector<SCH_FIELD*> orderedFields;
-    aSymbol->GetFields( orderedFields, false );
+    m_nextFreeFieldId = MANDATORY_FIELD_COUNT;
 
-    for( SCH_FIELD* field : orderedFields )
+    for( SCH_FIELD& field : aSymbol->GetFields() )
     {
-        FIELD_T  id = field->GetId();
-        wxString value = field->GetText();
+        int id = field.GetId();
+        wxString value = field.GetText();
 
         if( !aForClipboard && aSymbol->GetInstances().size() )
         {
             // The instance fields are always set to the default instance regardless of the
             // sheet instance to prevent file churn.
-            if( id == FIELD_T::REFERENCE )
-                field->SetText( ordinalInstance.m_Reference );
+            if( id == REFERENCE_FIELD )
+            {
+                field.SetText( ordinalInstance.m_Reference );
+            }
+            else if( id == VALUE_FIELD )
+            {
+                field.SetText( aSymbol->GetField( VALUE_FIELD )->GetText() );
+            }
+            else if( id == FOOTPRINT_FIELD )
+            {
+                field.SetText( aSymbol->GetField( FOOTPRINT_FIELD )->GetText() );
+            }
         }
         else if( aForClipboard && aSymbol->GetInstances().size() && aRelativePath
-               && ( id == FIELD_T::REFERENCE ) )
+               && ( id == REFERENCE_FIELD ) )
         {
             SCH_SYMBOL_INSTANCE instance;
 
             if( aSymbol->GetInstance( instance, aRelativePath->Path() ) )
-                field->SetText( instance.m_Reference );
+                field.SetText( instance.m_Reference );
         }
 
         try
         {
-            saveField( field );
+            saveField( &field );
         }
         catch( ... )
         {
             // Restore the changed field text on write error.
-            if( id == FIELD_T::REFERENCE )
-                field->SetText( value );
+            if( id == REFERENCE_FIELD || id == VALUE_FIELD || id == FOOTPRINT_FIELD )
+                field.SetText( value );
 
             throw;
         }
 
-        if( id == FIELD_T::REFERENCE )
-            field->SetText( value );
+        if( id == REFERENCE_FIELD || id == VALUE_FIELD || id == FOOTPRINT_FIELD )
+            field.SetText( value );
     }
 
     for( const std::unique_ptr<SCH_PIN>& pin : aSymbol->GetRawPins() )
@@ -873,12 +882,24 @@ void SCH_IO_KICAD_SEXPR::saveField( SCH_FIELD* aField )
 {
     wxCHECK_RET( aField != nullptr && m_out != nullptr, "" );
 
-    wxString fieldName;
+    wxString fieldName = aField->GetCanonicalName();
+    // For some reason (bug in legacy parser?) the field ID for non-mandatory fields is -1 so
+    // check for this in order to correctly use the field name.
 
-    if( aField->IsMandatory() )
-        fieldName = aField->GetCanonicalName();
-    else
-        fieldName = aField->GetName();
+    if( aField->GetId() == -1 /* undefined ID */ )
+    {
+        // Replace the default name built by GetCanonicalName() by
+        // the field name if exists
+        if( !aField->GetName().IsEmpty() )
+            fieldName = aField->GetName();
+
+        aField->SetId( m_nextFreeFieldId );
+        m_nextFreeFieldId += 1;
+    }
+    else if( aField->GetId() >= m_nextFreeFieldId )
+    {
+        m_nextFreeFieldId = aField->GetId() + 1;
+    }
 
     m_out->Print( "(property %s %s %s (at %s %s %s)",
                   aField->IsPrivate() ? "private" : "",
@@ -889,9 +910,6 @@ void SCH_IO_KICAD_SEXPR::saveField( SCH_FIELD* aField )
                   EDA_UNIT_UTILS::FormatInternalUnits( schIUScale,
                                                        aField->GetPosition().y ).c_str(),
                   EDA_UNIT_UTILS::FormatAngle( aField->GetTextAngle() ).c_str() );
-
-    if( !aField->IsVisible() )
-        KICAD_FORMAT::FormatBool( m_out, "hide", true );
 
     if( aField->IsNameShown() )
         KICAD_FORMAT::FormatBool( m_out, "show_name", true );
@@ -983,6 +1001,8 @@ void SCH_IO_KICAD_SEXPR::saveSheet( SCH_SHEET* aSheet, const SCH_SHEET_LIST& aSh
                   aSheet->GetBackgroundColor().a );
 
     KICAD_FORMAT::FormatUuid( m_out, aSheet->m_Uuid );
+
+    m_nextFreeFieldId = SHEET_MANDATORY_FIELD_COUNT;
 
     for( SCH_FIELD& field : aSheet->GetFields() )
         saveField( &field );
@@ -1291,6 +1311,11 @@ void SCH_IO_KICAD_SEXPR::saveText( SCH_TEXT* aText )
 
     aText->EDA_TEXT::Format( m_out, 0 );
     KICAD_FORMAT::FormatUuid( m_out, aText->m_Uuid );
+
+    if( label && label->Type() == SCH_GLOBAL_LABEL_T )
+        m_nextFreeFieldId = GLOBALLABEL_MANDATORY_FIELD_COUNT;
+    else
+        m_nextFreeFieldId = 0;
 
     if( label )
     {
@@ -1672,24 +1697,14 @@ void SCH_IO_KICAD_SEXPR::SaveLibrary( const wxString& aLibraryPath,
     wxString oldFileName = m_cache->GetFileName();
 
     if( !m_cache->IsFile( aLibraryPath ) )
+    {
         m_cache->SetFileName( aLibraryPath );
+    }
 
     // This is a forced save.
     m_cache->SetModified();
     m_cache->Save();
     m_cache->SetFileName( oldFileName );
-}
-
-
-bool SCH_IO_KICAD_SEXPR::CanReadLibrary( const wxString& aLibraryPath ) const
-{
-    if( !SCH_IO::CanReadLibrary( aLibraryPath ) )
-        return false;
-
-    // Above just checks for proper extension; now check that it actually exists
-
-    wxFileName fn( aLibraryPath );
-    return fn.IsOk() && fn.FileExists();
 }
 
 
@@ -1770,6 +1785,7 @@ std::vector<LIB_SYMBOL*> SCH_IO_KICAD_SEXPR::ParseLibSymbols( std::string& aSymb
 
 void SCH_IO_KICAD_SEXPR::FormatLibSymbol( LIB_SYMBOL* symbol, OUTPUTFORMATTER & formatter )
 {
+
     LOCALE_IO toggle;     // toggles on, then off, the C locale.
     SCH_IO_KICAD_SEXPR_LIB_CACHE::SaveSymbol( symbol, formatter );
 }

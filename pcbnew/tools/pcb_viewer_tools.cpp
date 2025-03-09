@@ -30,6 +30,7 @@
 #include <gal/graphics_abstraction_layer.h>
 #include <kiplatform/ui.h>
 #include <pcb_base_frame.h>
+#include <pcbnew_settings.h>
 #include <preview_items/ruler_item.h>
 #include <pgm_base.h>
 #include <settings/settings_manager.h>
@@ -50,17 +51,14 @@ bool PCB_VIEWER_TOOLS::Init()
     CONDITIONAL_MENU& ctxMenu = m_menu->GetMenu();
 
     // "Cancel" goes at the top of the context menu when a tool is active
-    if( !m_isDefaultTool )
-    {
-        ctxMenu.AddItem( ACTIONS::cancelInteractive,     activeToolCondition, 1 );
-        ctxMenu.AddSeparator( 1 );
-    }
+    ctxMenu.AddItem( ACTIONS::cancelInteractive, activeToolCondition, 1 );
+    ctxMenu.AddSeparator( 1 );
 
-    ctxMenu.AddCheckItem( PCB_ACTIONS::toggleHV45Mode,   activeToolCondition, 2 );
-    ctxMenu.AddSeparator(                                activeToolCondition, 2 );
+    ctxMenu.AddCheckItem( PCB_ACTIONS::toggleHV45Mode, activeToolCondition, 2 );
+    ctxMenu.AddSeparator(                              activeToolCondition, 2 );
 
-    ctxMenu.AddItem( ACTIONS::copy,                      activeToolCondition, 3 );
-    ctxMenu.AddSeparator(                                activeToolCondition, 3 );
+    ctxMenu.AddItem( ACTIONS::copy,     activeToolCondition, 3 );
+    ctxMenu.AddSeparator(               activeToolCondition, 3 );
 
     frame()->AddStandardSubMenus( *m_menu.get() );
 
@@ -277,11 +275,6 @@ int PCB_VIEWER_TOOLS::MeasureTool( const TOOL_EVENT& aEvent )
             {
                 cleanup();
             }
-            else if( m_isDefaultTool )
-            {
-                view.SetVisible( &ruler, false );
-                view.Remove( &ruler );
-            }
             else
             {
                 frame()->PopTool( aEvent );
@@ -404,18 +397,6 @@ int PCB_VIEWER_TOOLS::MeasureTool( const TOOL_EVENT& aEvent )
 }
 
 
-int PCB_VIEWER_TOOLS::FootprintAutoZoom( const TOOL_EVENT& aEvent )
-{
-    PCB_VIEWERS_SETTINGS_BASE* cfg = dynamic_cast<PCB_VIEWERS_SETTINGS_BASE*>( frame()->config() );
-
-    // Toggle the setting
-    if( cfg )
-        cfg->m_FootprintViewerAutoZoomOnSelect = !cfg->m_FootprintViewerAutoZoomOnSelect;
-
-    return 0;
-}
-
-
 void PCB_VIEWER_TOOLS::setTransitions()
 {
     // clang-format off
@@ -426,8 +407,6 @@ void PCB_VIEWER_TOOLS::setTransitions()
     Go( &PCB_VIEWER_TOOLS::PadDisplayMode,    PCB_ACTIONS::padDisplayMode.MakeEvent() );
     Go( &PCB_VIEWER_TOOLS::GraphicOutlines,   PCB_ACTIONS::graphicsOutlines.MakeEvent() );
     Go( &PCB_VIEWER_TOOLS::TextOutlines,      PCB_ACTIONS::textOutlines.MakeEvent() );
-
-    Go( &PCB_VIEWER_TOOLS::FootprintAutoZoom,  PCB_ACTIONS::fpAutoZoom.MakeEvent() );
 
     Go( &PCB_VIEWER_TOOLS::MeasureTool,       ACTIONS::measureTool.MakeEvent() );
     // clang-format on

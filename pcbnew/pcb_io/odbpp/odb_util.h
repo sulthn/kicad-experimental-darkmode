@@ -69,15 +69,6 @@ enum class ODB_FID_TYPE
     HOLE
 };
 
-enum class ODB_AUX_LAYER_TYPE
-{
-    COVERING,
-    PLUGGING,
-    TENTING,
-    FILLING,
-    CAPPING,
-};
-
 
 namespace ODB
 {

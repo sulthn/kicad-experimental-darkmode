@@ -64,8 +64,6 @@
 #include "kiface_base.h"
 #include "pcbnew_settings.h"
 
-#include <pcb_group.h>
-
 using KIGFX::PCB_PAINTER;
 using KIGFX::PCB_RENDER_SETTINGS;
 
@@ -203,8 +201,6 @@ void PAD::ClearZoneLayerOverrides()
 
 const ZONE_LAYER_OVERRIDE& PAD::GetZoneLayerOverride( PCB_LAYER_ID aLayer ) const
 {
-    std::unique_lock<std::mutex> cacheLock( m_zoneLayerOverridesMutex );
-
     static const ZONE_LAYER_OVERRIDE defaultOverride = ZLO_NONE;
     auto it = m_zoneLayerOverrides.find( aLayer );
     return it != m_zoneLayerOverrides.end() ? it->second : defaultOverride;
@@ -397,7 +393,12 @@ bool PAD::FlashLayer( int aLayer, bool aOnlyCheckIfPermitted ) const
 
         if( const BOARD* board = GetBoard() )
         {
-            if( GetZoneLayerOverride( layer ) == ZLO_FORCE_FLASHED )
+            // Must be static to keep from raising its ugly head in performance profiles
+            static std::initializer_list<KICAD_T> types = { PCB_TRACE_T, PCB_ARC_T, PCB_VIA_T,
+                                                            PCB_PAD_T };
+
+            if( auto it = m_zoneLayerOverrides.find( static_cast<PCB_LAYER_ID>( aLayer ) );
+                it != m_zoneLayerOverrides.end() && it->second == ZLO_FORCE_FLASHED )
             {
                 return true;
             }
@@ -407,11 +408,7 @@ bool PAD::FlashLayer( int aLayer, bool aOnlyCheckIfPermitted ) const
             }
             else
             {
-                // Must be static to keep from raising its ugly head in performance profiles
-                static std::initializer_list<KICAD_T> nonZoneTypes = { PCB_TRACE_T, PCB_ARC_T,
-                                                                       PCB_VIA_T, PCB_PAD_T };
-
-                return board->GetConnectivity()->IsConnectedOnLayer( this, aLayer, nonZoneTypes );
+                return board->GetConnectivity()->IsConnectedOnLayer( this, aLayer, types );
             }
         }
     }
@@ -599,28 +596,18 @@ void PAD::BuildEffectiveShapes() const
     m_effectiveBoundingBox = BOX2I();
 
     Padstack().ForEachUniqueLayer(
-            [&]( PCB_LAYER_ID aLayer )
-            {
-                const SHAPE_COMPOUND& layerShape = buildEffectiveShape( aLayer );
-                m_effectiveBoundingBox.Merge( layerShape.BBox() );
-            } );
+        [&]( PCB_LAYER_ID aLayer )
+        {
+            const SHAPE_COMPOUND& layerShape = buildEffectiveShape( aLayer );
+            m_effectiveBoundingBox.Merge( layerShape.BBox() );
+        } );
 
     // Hole shape
     m_effectiveHoleShape = nullptr;
 
     VECTOR2I half_size = m_padStack.Drill().size / 2;
-    int      half_width;
-    VECTOR2I half_len;
-
-    if( m_padStack.Drill().shape == PAD_DRILL_SHAPE::CIRCLE )
-    {
-        half_width = half_size.x;
-    }
-    else
-    {
-        half_width = std::min( half_size.x, half_size.y );
-        half_len = VECTOR2I( half_size.x - half_width, half_size.y - half_width );
-    }
+    int      half_width = std::min( half_size.x, half_size.y );
+    VECTOR2I half_len( half_size.x - half_width, half_size.y - half_width );
 
     RotatePoint( half_len, GetOrientation() );
 
@@ -998,12 +985,8 @@ void PAD::Flip( const VECTOR2I& aCentre, FLIP_DIRECTION aFlipDirection )
     m_padStack.FlipLayers( copperLayerCount );
 
     // Flip pads layers after padstack geometry
-    LSET flipped;
-
-    for( PCB_LAYER_ID layer : m_padStack.LayerSet() )
-        flipped.set( GetBoard()->FlipLayer( layer ) );
-
-    SetLayerSet( flipped );
+    LSET layerSet = m_padStack.LayerSet();
+    SetLayerSet( layerSet.Flip( copperLayerCount ) );
 
     // Flip the basic shapes, in custom pads
     FlipPrimitives( aFlipDirection );
@@ -1556,11 +1539,13 @@ wxString PAD::ShowPadAttr() const
 
 wxString PAD::GetItemDescription( UNITS_PROVIDER* aUnitsProvider, bool aFull ) const
 {
-    FOOTPRINT* parentFP = GetParentFootprint();
+    FOOTPRINT* parentFP = nullptr;
 
-    // Don't report parent footprint info from footprint editor, viewer, etc.
-    if( GetBoard() && GetBoard()->GetBoardUse() == BOARD_USE::FPHOLDER )
-        parentFP = nullptr;
+    if( EDA_DRAW_FRAME* frame = dynamic_cast<EDA_DRAW_FRAME*>( aUnitsProvider ) )
+    {
+        if( frame->GetName() == PCB_EDIT_FRAME_NAME )
+            parentFP = GetParentFootprint();
+    }
 
     if( GetAttribute() == PAD_ATTRIB::NPTH )
     {
@@ -1783,12 +1768,8 @@ double PAD::ViewGetLOD( int aLayer, const KIGFX::VIEW* aView ) const
         // Netnames will be shown only if zoom is appropriate
         const int minSize = std::min( GetBoundingBox().GetWidth(), GetBoundingBox().GetHeight() );
 
-        return lodScaleForThreshold( aView, minSize, pcbIUScale.mmToIU( 0.5 ) );
+        return lodScaleForThreshold( minSize, pcbIUScale.mmToIU( 0.5 ) );
     }
-
-    // Hole walls always need a repaint when zoom changes
-    if( aLayer == LAYER_PAD_HOLEWALLS )
-        aView->Update( this, KIGFX::REPAINT );
 
     VECTOR2L padSize = GetShape( pcbLayer ) != PAD_SHAPE::CUSTOM
                        ? VECTOR2L( GetSize( pcbLayer ) ) : GetBoundingBox().GetSize();
@@ -1796,7 +1777,7 @@ double PAD::ViewGetLOD( int aLayer, const KIGFX::VIEW* aView ) const
     int64_t minSide = std::min( padSize.x, padSize.y );
 
     if( minSide > 0 )
-        return std::min( lodScaleForThreshold( aView, minSide, pcbIUScale.mmToIU( 0.2 ) ), 3.5 );
+        return std::min( (double) pcbIUScale.mmToIU( 0.2 ) / minSide, 3.5 );
 
     return LOD_SHOW;
 }
@@ -2150,20 +2131,9 @@ std::vector<PCB_SHAPE*> PAD::Recombine( bool aIsDryRun, int maxError )
 
         if( !aIsDryRun )
         {
-            // If the editor was inside a group when the pad was exploded, the added exploded shapes
-            // will be part of the group.  Remove them here before duplicating; we don't want the
-            // primitives to wind up in a group.
-            if( PCB_GROUP* group = fpShape->GetParentGroup(); group )
-                group->RemoveItem( fpShape );
-
             PCB_SHAPE* primitive = static_cast<PCB_SHAPE*>( fpShape->Duplicate() );
 
             primitive->SetParent( nullptr );
-
-            // Convert any hatched fills to solid
-            if( primitive->IsAnyFill() )
-                primitive->SetFillMode( FILL_T::FILLED_SHAPE );
-
             primitive->Move( - ShapePos( layer ) );
             primitive->Rotate( VECTOR2I( 0, 0 ), - GetOrientation() );
 

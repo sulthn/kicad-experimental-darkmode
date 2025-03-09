@@ -96,7 +96,7 @@ private:
     void OnChoice( wxCommandEvent& event ) override;
     void OnCheckBox( wxCommandEvent& event ) override;
 
-    bool checkFootprintName( const wxString& aFootprintName, LIB_ID* doOverwrite );
+    bool checkFootprintName( const wxString& aFootprintName );
 
     void adjustGridColumns();
 

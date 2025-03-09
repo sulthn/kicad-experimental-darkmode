@@ -151,7 +151,6 @@ bool SYMBOL_EDITOR_CONTROL::Init()
 
         ctxMenu.AddSeparator( 100 );
         ctxMenu.AddItem( EE_ACTIONS::importSymbol,        libInferredCondition, 100 );
-        ctxMenu.AddItem( EE_ACTIONS::exportSymbol,        symbolSelectedCondition );
 
         if( ADVANCED_CFG::GetCfg().m_EnableLibWithText )
         {
@@ -485,15 +484,13 @@ int SYMBOL_EDITOR_CONTROL::RenameSymbol( const TOOL_EVENT& aEvent )
                 }
 
                 // If no change, accept it without prompting
-                if( newName != oldName && libMgr.SymbolNameInUse( newName, libName ) )
+                if( newName != oldName && libMgr.SymbolExists( newName, libName ) )
                 {
-                    msg.Printf( _( "Symbol '%s' already exists in library '%s'." ),
-                                UnescapeString( newName ),
-                                libName );
+                    msg = wxString::Format( _( "Symbol '%s' already exists in library '%s'." ),
+                                            newName, libName );
 
                     KIDIALOG errorDlg( m_frame, msg, _( "Confirmation" ),
                                        wxOK | wxCANCEL | wxICON_WARNING );
-
                     errorDlg.SetOKLabel( _( "Overwrite" ) );
 
                     return errorDlg.ShowModal() == wxID_OK;
@@ -527,8 +524,8 @@ int SYMBOL_EDITOR_CONTROL::RenameSymbol( const TOOL_EVENT& aEvent )
 
     libSymbol->SetName( newName );
 
-    if( libSymbol->GetValueField().GetText() == oldName )
-        libSymbol->GetValueField().SetText( newName );
+    if( libSymbol->GetFieldById( VALUE_FIELD )->GetText() == oldName )
+        libSymbol->GetFieldById( VALUE_FIELD )->SetText( newName );
 
     libMgr.UpdateSymbolAfterRename( libSymbol, newName, libName );
     libMgr.SetSymbolModified( newName, libName );
@@ -546,8 +543,8 @@ int SYMBOL_EDITOR_CONTROL::RenameSymbol( const TOOL_EVENT& aEvent )
 
         libSymbol->SetName( newName );
 
-        if( libSymbol->GetValueField().GetText() == oldName )
-            libSymbol->GetValueField().SetText( newName );
+        if( libSymbol->GetFieldById( VALUE_FIELD )->GetText() == oldName )
+            libSymbol->GetFieldById( VALUE_FIELD )->SetText( newName );
 
         editFrame->RebuildView();
         editFrame->OnModify();
@@ -727,15 +724,6 @@ int SYMBOL_EDITOR_CONTROL::ExportView( const TOOL_EVENT& aEvent )
 }
 
 
-int SYMBOL_EDITOR_CONTROL::ExportSymbol( const TOOL_EVENT& aEvent )
-{
-    if( m_frame->IsType( FRAME_SCH_SYMBOL_EDITOR ) )
-        static_cast<SYMBOL_EDIT_FRAME*>( m_frame )->ExportSymbol();
-
-    return 0;
-}
-
-
 int SYMBOL_EDITOR_CONTROL::ExportSymbolAsSVG( const TOOL_EVENT& aEvent )
 {
     if( !m_isSymbolEditor )
@@ -899,7 +887,6 @@ void SYMBOL_EDITOR_CONTROL::setTransitions()
     Go( &SYMBOL_EDITOR_CONTROL::CutCopyDelete,         EE_ACTIONS::cutSymbol.MakeEvent() );
     Go( &SYMBOL_EDITOR_CONTROL::CutCopyDelete,         EE_ACTIONS::copySymbol.MakeEvent() );
     Go( &SYMBOL_EDITOR_CONTROL::DuplicateSymbol,       EE_ACTIONS::pasteSymbol.MakeEvent() );
-    Go( &SYMBOL_EDITOR_CONTROL::ExportSymbol,          EE_ACTIONS::exportSymbol.MakeEvent() );
 
     Go( &SYMBOL_EDITOR_CONTROL::OpenWithTextEditor,    ACTIONS::openWithTextEditor.MakeEvent() );
     Go( &SYMBOL_EDITOR_CONTROL::OpenDirectory,         ACTIONS::openDirectory.MakeEvent() );

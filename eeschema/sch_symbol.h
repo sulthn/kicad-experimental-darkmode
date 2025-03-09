@@ -411,28 +411,46 @@ public:
     //-----<Fields>-----------------------------------------------------------
 
     /**
-     * Return a mandatory field in this symbol.  The const version will return nullptr if the
-     * field is not found; non-const version will create the field.
+     * Return a mandatory field in this symbol.
+     *
+     * @note If you need to fetch a user field, use GetFieldById.
+     *
+     * @param aFieldType is one of the mandatory field types (REFERENCE_FIELD, VALUE_FIELD, etc.).
+     * @return is the field at \a aFieldType or NULL if the field does not exist.
      */
-    SCH_FIELD* GetField( FIELD_T aFieldType );
-    const SCH_FIELD* GetField( FIELD_T aFieldNdx ) const;
+    SCH_FIELD* GetField( MANDATORY_FIELD_T aFieldType );
+    const SCH_FIELD* GetField( MANDATORY_FIELD_T aFieldNdx ) const;
 
     /**
-     * Return a field in this symbol.  Both versions return nullptr if the field is not found.
+     * Return a field in this symbol.
+     *
+     * @param aFieldId is the id of the field requested.  Note that this id ONLY SOMETIMES equates
+     *                 to the field's position in the vector.
+     * @return is the field at \a aFieldType or NULL if the field does not exist.
      */
-    SCH_FIELD* GetField( const wxString& aFieldName );
-    const SCH_FIELD* GetField( const wxString& aFieldName ) const;
+    SCH_FIELD* GetFieldById( int aFieldId );
 
     /**
-     * Populate a std::vector with SCH_FIELDs, sorted in ordinal order.
+     * Return a field in this symbol.
+     *
+     * @param aFieldName is the name of the field
+     *
+     * @return is the field with \a aFieldName or NULL if the field does not exist.
+     */
+    SCH_FIELD* GetFieldByName( const wxString& aFieldName );
+
+    const SCH_FIELD* GetFieldByName( const wxString& aFieldName ) const;
+
+    /**
+     * Populate a std::vector with SCH_FIELDs.
      *
      * @param aVector is the vector to populate.
      * @param aVisibleOnly is used to add only the fields that are visible and contain text.
      */
-    void GetFields( std::vector<SCH_FIELD*>& aVector, bool aVisibleOnly ) const override;
+    void GetFields( std::vector<SCH_FIELD*>& aVector, bool aVisibleOnly ) override;
 
     /**
-     * Return a reference to the vector holding the symbol's fields
+     * Return a vector of fields from the symbol
      */
     std::vector<SCH_FIELD>& GetFields() { return m_fields; }
     const std::vector<SCH_FIELD>& GetFields() const { return m_fields; }
@@ -448,8 +466,8 @@ public:
 
     /**
      * Remove a user field from the symbol.
-     *
-     * @param aFieldName is the user fieldName to remove.
+     * @param aFieldName is the user fieldName to remove.  Attempts to remove a mandatory
+     *                   field or a non-existant field are silently ignored.
      */
     void RemoveField( const wxString& aFieldName );
 
@@ -459,10 +477,13 @@ public:
      * Search for a #SCH_FIELD with \a aFieldName
      *
      * @param aFieldName is the name of the field to find.
+     * @param aIncludeDefaultFields searches the library symbol default fields if true.
+     * @param aCaseInsensitive ignore the filed name case if true.
      *
      * @return the field if found or NULL if the field was not found.
      */
-    SCH_FIELD* FindFieldCaseInsensitive( const wxString& aFieldName );
+    SCH_FIELD* FindField( const wxString& aFieldName, bool aIncludeDefaultFields = true,
+                          bool aCaseInsensitive = false );
 
     /**
      * @return the reference for the instance on the given sheet.
@@ -501,37 +522,21 @@ public:
         SetValueFieldText( aRef );
     }
 
-    wxString GetUnitProp() const
+    int GetUnitProp() const
     {
-        int unit = GetUnitSelection( &Schematic()->CurrentSheet() );
-
-        if( HasUnitDisplayName( unit ) )
-            return GetUnitDisplayName( unit );
-        else
-            return SubReference( unit, false );
+        return GetUnitSelection( &Schematic()->CurrentSheet() );
     }
 
-    void SetUnitProp( const wxString& aUnit )
+    void SetUnitProp( int aUnit )
     {
-        for( int unit = 1; unit <= GetUnitCount(); unit++ )
-        {
-            if( HasUnitDisplayName( unit ) && GetUnitDisplayName( unit ) == aUnit )
-            {
-                SetUnitSelection( &Schematic()->CurrentSheet(), unit );
-                SetUnit( unit );
-                return;
-            }
-        }
+        if( aUnit < 1 )
+            return;
 
-        for( int unit = 1; unit <= GetUnitCount(); unit++ )
-        {
-            if( SubReference( unit, false ) == aUnit )
-            {
-                SetUnitSelection( &Schematic()->CurrentSheet(), unit );
-                SetUnit( unit );
-                return;
-            }
-        }
+        if( aUnit > GetUnitCount() )
+            aUnit = GetUnitCount();
+
+        SetUnitSelection( &Schematic()->CurrentSheet(), aUnit );
+        SetUnit( aUnit );
     }
 
     int GetBodyStyleProp() const
@@ -570,9 +575,11 @@ public:
                          PROPERTY_BASE* aProperty );
 
     /**
-     * Return the next ordinal for a user field for this symbol
+     * Return the number of fields in this symbol.
      */
-    int GetNextFieldOrdinal() const;
+    int GetFieldCount() const { return (int )m_fields.size(); }
+
+    int GetNextFieldId() const { return (int) m_fields.size(); }
 
     /**
      * Automatically orient all the fields in the symbol.
@@ -784,6 +791,26 @@ public:
     bool HitTest( const VECTOR2I& aPosition, int aAccuracy = 0 ) const override;
     bool HitTest( const BOX2I& aRect, bool aContained, int aAccuracy = 0 ) const override;
 
+    /**
+     * Print a symbol.
+     *
+     * @param aSettings Render settings controlling output
+     * @param aOffset is the drawing offset (usually VECTOR2I(0,0), but can be different when
+     *                moving an object)
+     */
+    void Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed ) override;
+
+    /**
+     * Print only the background parts of a symbol (if any)
+     *
+     * @param aSettings Render settings controlling output
+     * @param aOffset is the drawing offset (usually VECTOR2I(0,0), but can be different when
+     *                moving an object)
+     */
+    void PrintBackground( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                          const VECTOR2I& aOffset, bool aDimmed ) override;
+
     void Plot( PLOTTER* aPlotter, bool aBackground, const SCH_PLOT_OPTS& aPlotOpts,
                int aUnit, int aBodyStyle, const VECTOR2I& aOffset, bool aDimmed ) override;
 
@@ -822,10 +849,7 @@ public:
      * It has only one pin type Power input
      */
     bool IsSymbolLikePowerGlobalLabel() const;
-    bool IsSymbolLikePowerLocalLabel() const;
 
-    bool IsGlobalPower() const override;
-    bool IsLocalPower() const override;
     bool IsPower() const override;
     bool IsNormal() const override;
 

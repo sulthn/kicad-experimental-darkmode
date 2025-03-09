@@ -174,7 +174,7 @@ protected:
 
         switch( aField.GetId() )
         {
-        case FIELD_T::DATASHEET:
+        case DATASHEET_FIELD:
             text = m_symbol->GetDatasheetField().GetShownText( false );
 
             if( text.IsEmpty() || text == wxT( "~" ) )
@@ -196,11 +196,11 @@ protected:
 
             break;
 
-        case FIELD_T::VALUE:
+        case VALUE_FIELD:
             // showing the value just repeats the name, so that's not much use...
             return wxEmptyString;
 
-        case FIELD_T::REFERENCE:
+        case REFERENCE_FIELD:
             text = aField.GetFullText( m_unit > 0 ? m_unit : 1 );
             fieldhtml.Replace( wxS( "__VALUE__" ), EscapeHTML( text ) );
             break;
@@ -224,11 +224,11 @@ protected:
         for( const SCH_FIELD* field: fields )
             fieldtable += GetHtmlFieldRow( *field );
 
-        if( m_symbol->IsDerived() )
+        if( m_symbol->IsAlias() )
         {
             std::shared_ptr<LIB_SYMBOL> parent = m_symbol->GetParent().lock();
 
-            // Append all of the unique parent fields if this is a derived symbol.
+            // Append all of the unique parent fields if this is an alias.
             if( parent )
             {
                 std::vector<SCH_FIELD*> parentFields;
@@ -237,7 +237,7 @@ protected:
 
                 for( const SCH_FIELD* parentField : parentFields )
                 {
-                    if( m_symbol->GetField( parentField->GetCanonicalName() ) )
+                    if( m_symbol->FindField( parentField->GetCanonicalName() ) )
                         continue;
 
                     fieldtable += GetHtmlFieldRow( *parentField );

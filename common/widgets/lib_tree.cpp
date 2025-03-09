@@ -305,12 +305,6 @@ LIB_ID LIB_TREE::GetSelectedLibId( int* aUnit ) const
     if( !sel )
         return LIB_ID();
 
-    if( m_adapter->GetTreeNodeFor( sel )->m_IsAlreadyPlacedGroup
-            || m_adapter->GetTreeNodeFor( sel )->m_IsRecentlyUsedGroup )
-    {
-        return LIB_ID();
-    }
-
     if( aUnit )
         *aUnit = m_adapter->GetUnitFor( sel );
 
@@ -343,19 +337,6 @@ LIB_TREE_NODE* LIB_TREE::GetCurrentTreeNode() const
         return nullptr;
 
     return m_adapter->GetTreeNodeFor( sel );
-}
-
-int LIB_TREE::GetSelectedTreeNodes( std::vector<LIB_TREE_NODE*>& aSelection ) const
-{
-    wxDataViewItemArray selection;
-    int                 count = m_tree_ctrl->GetSelections( selection );
-
-    for( const wxDataViewItem& item : selection )
-    {
-        aSelection.push_back( m_adapter->GetTreeNodeFor( item ) );
-    }
-
-    return count;
 }
 
 

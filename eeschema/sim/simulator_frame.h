@@ -139,16 +139,14 @@ public:
      */
     SIM_TAB* GetCurrentSimTab() const;
 
-    void ToggleConsole();
-
-    void ToggleSimulationSidePanel();
-
     /**
      * Toggle dark-mode of the plot tabs.
      */
     void ToggleDarkModePlots();
 
     void ShowChangedLanguage() override;
+
+    void ReCreateHToolbar();
 
     /**
      * Load plot, signal, cursor, measurement, etc. settings from a file.

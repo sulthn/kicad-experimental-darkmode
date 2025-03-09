@@ -40,6 +40,18 @@ class EDA_DRAW_FRAME;
 #define MIN_SHEET_HEIGHT 150    // Units are mils.
 
 
+enum  SHEET_FIELD_TYPE
+{
+    SHEETNAME = 0,
+    SHEETFILENAME,
+
+    /// The first 2 are mandatory, and must be instantiated in SCH_SHEET
+    SHEET_MANDATORY_FIELD_COUNT
+};
+
+#define SHEET_MANDATORY_FIELDS { SHEETNAME, SHEETFILENAME }
+
+
 /**
  * Sheet symbol placed in a schematic, and is the entry point for a sub schematic.
  */
@@ -81,23 +93,8 @@ public:
      */
     bool IsMovableFromAnchorPoint() const override { return false; }
 
-    /**
-     * Return a reference to the vector holding the sheet's fields
-     */
     std::vector<SCH_FIELD>& GetFields() { return m_fields; }
     const std::vector<SCH_FIELD>& GetFields() const { return m_fields; }
-
-    /**
-     * Return a mandatory field in this sheet.  The const version will return nullptr if the
-     * field does not exist; the non-const version will create it.
-     */
-    SCH_FIELD* GetField( FIELD_T aFieldType );
-    const SCH_FIELD* GetField( FIELD_T aFieldNdx ) const;
-
-    /**
-     * Return the next ordinal for a user field for this sheet
-     */
-    int GetNextFieldOrdinal() const;
 
     /**
      * Set multiple schematic fields.
@@ -108,10 +105,10 @@ public:
 
     wxString GetShownName( bool aAllowExtraText ) const
     {
-        return GetField( FIELD_T::SHEET_NAME )->GetShownText( aAllowExtraText );
+        return m_fields[SHEETNAME].GetShownText( aAllowExtraText );
     }
-    wxString GetName() const { return GetField( FIELD_T::SHEET_NAME )->GetText(); }
-    void SetName( const wxString& aName ) { GetField( FIELD_T::SHEET_NAME )->SetText( aName ); }
+    wxString GetName() const { return m_fields[ SHEETNAME ].GetText(); }
+    void SetName( const wxString& aName ) { m_fields[ SHEETNAME ].SetText( aName ); }
 
     SCH_SCREEN* GetScreen() const { return m_screen; }
 
@@ -306,21 +303,13 @@ public:
     int CountSheets() const;
 
     /**
-     * Count the number of sheets that refer to a specific file
-     * including all of the subsheets.
-     * @param aFileName The filename to search for.
-     * @return the full count of sheets+subsheets that refer to aFileName
-     */
-    int CountSheets( const wxString& aFileName ) const;
-
-    /**
      * Return the filename corresponding to this sheet.
      *
      * @return a wxString containing the filename
      */
     wxString GetFileName() const
     {
-        return GetField( FIELD_T::SHEET_FILENAME )->GetText();
+        return m_fields[ SHEETFILENAME ].GetText();
     }
 
     // Set a new filename without changing anything else
@@ -329,7 +318,7 @@ public:
         // Filenames are stored using unix notation
         wxString tmp = aFilename;
         tmp.Replace( wxT( "\\" ), wxT( "/" ) );
-        GetField( FIELD_T::SHEET_FILENAME )->SetText( tmp );
+        m_fields[ SHEETFILENAME ].SetText( tmp );
     }
 
     // Geometric transforms (used in block operations):
@@ -418,6 +407,12 @@ public:
     bool HitTest( const VECTOR2I& aPosition, int aAccuracy ) const override;
     bool HitTest( const BOX2I& aRect, bool aContained, int aAccuracy = 0 ) const override;
 
+    void Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed ) override;
+
+    void PrintBackground( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                          const VECTOR2I& aOffset, bool aDimmed ) override {}
+
     void Plot( PLOTTER* aPlotter, bool aBackground, const SCH_PLOT_OPTS& aPlotOpts,
                int aUnit, int aBodyStyle, const VECTOR2I& aOffset, bool aDimmed ) override;
 
@@ -475,6 +470,8 @@ public:
 #if defined(DEBUG)
     void Show( int nestLevel, std::ostream& os ) const override;
 #endif
+
+    static const wxString GetDefaultFieldName( int aFieldNdx, bool aTranslated );
 
 protected:
     friend SCH_SHEET_PATH;

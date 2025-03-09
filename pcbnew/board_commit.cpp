@@ -23,14 +23,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
-#include "thread_pool.h"
 #include <macros.h>
 #include <board.h>
 #include <footprint.h>
 #include <lset.h>
 #include <pcb_group.h>
 #include <pcb_track.h>
-#include <pcb_shape.h>
 #include <tool/tool_manager.h>
 #include <tools/pcb_selection_tool.h>
 #include <tools/zone_filler_tool.h>
@@ -127,96 +125,38 @@ COMMIT& BOARD_COMMIT::Stage( const PICKED_ITEMS_LIST& aItems, UNDO_REDO aModFlag
 }
 
 
-void BOARD_COMMIT::propagateDamage( BOARD_ITEM* aChangedItem, std::vector<ZONE*>* aStaleZones,
-                                    std::vector<PCB_SHAPE*>* aStaleHatchedShapes )
+void BOARD_COMMIT::dirtyIntersectingZones( BOARD_ITEM* item, int aChangeType )
 {
-    wxCHECK( aChangedItem, /* void */ );
+    wxCHECK( item, /* void */ );
 
-    if( aStaleZones && aChangedItem->Type() == PCB_ZONE_T )
-        aStaleZones->push_back( static_cast<ZONE*>( aChangedItem ) );
+    ZONE_FILLER_TOOL* zoneFillerTool = m_toolMgr->GetTool<ZONE_FILLER_TOOL>();
 
-    aChangedItem->RunOnChildren( std::bind( &BOARD_COMMIT::propagateDamage, this, _1, aStaleZones,
-                                            aStaleHatchedShapes ) );
+    if( item->Type() == PCB_ZONE_T )
+        zoneFillerTool->DirtyZone( static_cast<ZONE*>( item ) );
+
+    item->RunOnChildren( std::bind( &BOARD_COMMIT::dirtyIntersectingZones, this, _1, aChangeType ) );
 
     BOARD* board = static_cast<BOARD*>( m_toolMgr->GetModel() );
-    BOX2I  damageBBox = aChangedItem->GetBoundingBox();
-    LSET   damageLayers = aChangedItem->GetLayerSet();
+    BOX2I  bbox = item->GetBoundingBox();
+    LSET   layers = item->GetLayerSet();
 
-    if( aStaleZones )
+    if( layers.test( Edge_Cuts ) || layers.test( Margin ) )
+        layers = LSET::PhysicalLayersMask();
+    else
+        layers &= LSET::AllCuMask();
+
+    if( layers.any() )
     {
-        if( damageLayers.test( Edge_Cuts ) || damageLayers.test( Margin ) )
-            damageLayers = LSET::PhysicalLayersMask();
-        else
-            damageLayers &= LSET::AllCuMask();
-
-        if( damageLayers.any() )
+        for( ZONE* zone : board->Zones() )
         {
-            for( ZONE* zone : board->Zones() )
-            {
-                if( zone->GetIsRuleArea() )
-                    continue;
+            if( zone->GetIsRuleArea() )
+                continue;
 
-                if( ( zone->GetLayerSet() & damageLayers ).any()
-                        && zone->GetBoundingBox().Intersects( damageBBox ) )
-                {
-                    aStaleZones->push_back( zone );
-                }
+            if( ( zone->GetLayerSet() & layers ).any()
+                    && zone->GetBoundingBox().Intersects( bbox ) )
+            {
+                zoneFillerTool->DirtyZone( zone );
             }
-        }
-    }
-
-    auto checkItem =
-            [&]( BOARD_ITEM* item )
-            {
-                if( item->Type() != PCB_SHAPE_T )
-                    return;
-
-                PCB_SHAPE* shape = static_cast<PCB_SHAPE*>( item );
-
-                if( !shape->IsHatchedFill() )
-                   return;
-
-                if( ( shape->GetLayerSet() & damageLayers ).any()
-                        && shape->GetBoundingBox().Intersects( damageBBox ) )
-                {
-                    aStaleHatchedShapes->push_back( shape );
-                }
-            };
-
-    if( aStaleHatchedShapes && (    aChangedItem->Type() == PCB_FIELD_T
-                                 || aChangedItem->Type() == PCB_TEXT_T
-                                 || aChangedItem->Type() == PCB_TEXTBOX_T
-                                 || aChangedItem->Type() == PCB_SHAPE_T ) )
-    {
-        if( aChangedItem->IsOnLayer( F_CrtYd ) )
-        {
-            damageBBox = aChangedItem->GetParentFootprint()->GetBoundingBox();
-            damageLayers |= LSET::FrontMask();
-        }
-        else if( aChangedItem->IsOnLayer( B_CrtYd ) )
-        {
-            damageBBox = aChangedItem->GetParentFootprint()->GetBoundingBox();
-            damageLayers |= LSET::BackMask();
-        }
-
-        for( FOOTPRINT* footprint : board->Footprints() )
-        {
-            footprint->RunOnDescendants(
-                    [&]( BOARD_ITEM* child )
-                    {
-                        checkItem( child );
-                    } );
-        }
-
-        for( BOARD_ITEM* item : board->Drawings() )
-        {
-            item->RunOnDescendants(
-                    [&]( BOARD_ITEM* child )
-                    {
-                        checkItem( child );
-                    } );
-
-            checkItem( item );
         }
     }
 }
@@ -240,9 +180,6 @@ void BOARD_COMMIT::Push( const wxString& aMessage, int aCommitFlags )
     std::vector<BOARD_ITEM*> staleTeardropPadsAndVias;
     std::set<PCB_TRACK*>     staleTeardropTracks;
     PCB_GROUP*               addedGroup = nullptr;
-    std::vector<ZONE*>       staleZonesStorage;
-    std::vector<ZONE*>*      staleZones = nullptr;
-    std::vector<PCB_SHAPE*>  staleHatchedShapes;
 
     if( Empty() )
         return;
@@ -263,7 +200,6 @@ void BOARD_COMMIT::Push( const wxString& aMessage, int aCommitFlags )
             && ( frame && frame->GetPcbNewSettings()->m_AutoRefillZones ) )
     {
         autofillZones = true;
-        staleZones = &staleZonesStorage;
 
         for( ZONE* zone : board->Zones() )
             zone->CacheBoundingBox();
@@ -367,8 +303,8 @@ void BOARD_COMMIT::Push( const wxString& aMessage, int aCommitFlags )
             if( boardItem->Type() == PCB_GROUP_T || boardItem->Type() == PCB_GENERATOR_T )
                 addedGroup = static_cast<PCB_GROUP*>( boardItem );
 
-            if( boardItem->Type() != PCB_MARKER_T )
-                propagateDamage( boardItem, staleZones, &staleHatchedShapes );
+            if( m_isBoardEditor && autofillZones && boardItem->Type() != PCB_MARKER_T )
+                dirtyIntersectingZones( boardItem, changeType );
 
             if( view && boardItem->Type() != PCB_NETINFO_T )
                 view->Add( boardItem );
@@ -397,8 +333,8 @@ void BOARD_COMMIT::Push( const wxString& aMessage, int aCommitFlags )
             if( parentFP && !( parentFP->GetFlags() & STRUCT_DELETED ) )
                 ent.m_parent = parentFP->m_Uuid;
 
-            if( boardItem->Type() != PCB_MARKER_T )
-                propagateDamage( boardItem, staleZones, &staleHatchedShapes );
+            if( m_isBoardEditor && autofillZones && boardItem->Type() != PCB_MARKER_T )
+                dirtyIntersectingZones( boardItem, changeType );
 
             switch( boardItem->Type() )
             {
@@ -510,10 +446,10 @@ void BOARD_COMMIT::Push( const wxString& aMessage, int aCommitFlags )
                 connectivity->Update( boardItem );
             }
 
-            if( boardItem->Type() != PCB_MARKER_T )
+            if( m_isBoardEditor && autofillZones && boardItem->Type() != PCB_MARKER_T )
             {
-                propagateDamage( boardItemCopy, staleZones, &staleHatchedShapes );   // before
-                propagateDamage( boardItem, staleZones, &staleHatchedShapes );       // after
+                dirtyIntersectingZones( boardItemCopy, changeType );   // before
+                dirtyIntersectingZones( boardItem, changeType );       // after
             }
 
             if( view )
@@ -634,22 +570,7 @@ void BOARD_COMMIT::Push( const wxString& aMessage, int aCommitFlags )
         m_toolMgr->PostEvent( EVENTS::UnselectedEvent );
 
     if( autofillZones )
-    {
-        ZONE_FILLER_TOOL* zoneFillerTool = m_toolMgr->GetTool<ZONE_FILLER_TOOL>();
-
-        for( ZONE* zone : *staleZones )
-            zoneFillerTool->DirtyZone( zone );
-
         m_toolMgr->PostAction( PCB_ACTIONS::zoneFillDirty );
-    }
-
-    for( PCB_SHAPE* shape : staleHatchedShapes )
-    {
-        shape->SetHatchingDirty();
-
-        if( view )
-            view->Update( shape );
-    }
 
     if( selectedModified )
         m_toolMgr->ProcessEvent( EVENTS::SelectedItemsModified );
@@ -713,14 +634,16 @@ void BOARD_COMMIT::Revert()
     std::vector<BOARD_ITEM*> bulkRemovedItems;
     std::vector<BOARD_ITEM*> itemsChanged;
 
-    for( COMMIT_LINE& entry : m_changes )
+    for( auto it = m_changes.rbegin(); it != m_changes.rend(); ++it )
     {
-        if( !entry.m_item || !entry.m_item->IsBOARD_ITEM() )
+        COMMIT_LINE& ent = *it;
+
+        if( !ent.m_item || !ent.m_item->IsBOARD_ITEM() )
             continue;
 
-        BOARD_ITEM*  boardItem = static_cast<BOARD_ITEM*>( entry.m_item );
-        int          changeType = entry.m_type & CHT_TYPE;
-        int          changeFlags = entry.m_type & CHT_FLAGS;
+        BOARD_ITEM*  boardItem = static_cast<BOARD_ITEM*>( ent.m_item );
+        int          changeType = ent.m_type & CHT_TYPE;
+        int          changeFlags = ent.m_type & CHT_FLAGS;
 
         switch( changeType )
         {
@@ -759,9 +682,9 @@ void BOARD_COMMIT::Revert()
             view->Add( boardItem );
             connectivity->Add( boardItem );
 
-            // Note: parent can be nullptr, because entry.m_parent is only set for children
-            // of footprints.
-            BOARD_ITEM* parent = board->GetItem( entry.m_parent );
+            // Note: parent can be nullptr, because ent.m_parent is not
+            // initialized for every ent.m_item, only for some.
+            BOARD_ITEM* parent = board->GetItem( ent.m_parent );
 
             if( parent && parent->Type() == PCB_FOOTPRINT_T )
             {
@@ -781,8 +704,8 @@ void BOARD_COMMIT::Revert()
             view->Remove( boardItem );
             connectivity->Remove( boardItem );
 
-            wxASSERT( entry.m_copy && entry.m_copy->IsBOARD_ITEM() );
-            BOARD_ITEM* boardItemCopy = static_cast<BOARD_ITEM*>( entry.m_copy );
+            wxASSERT( ent.m_copy && ent.m_copy->IsBOARD_ITEM() );
+            BOARD_ITEM* boardItemCopy = static_cast<BOARD_ITEM*>( ent.m_copy );
             boardItem->SwapItemData( boardItemCopy );
 
             if( PCB_GROUP* group = dynamic_cast<PCB_GROUP*>( boardItem ) )
@@ -798,7 +721,7 @@ void BOARD_COMMIT::Revert()
             connectivity->Add( boardItem );
             itemsChanged.push_back( boardItem );
 
-            delete entry.m_copy;
+            delete ent.m_copy;
             break;
         }
 

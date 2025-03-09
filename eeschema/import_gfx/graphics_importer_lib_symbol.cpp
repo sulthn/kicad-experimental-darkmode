@@ -64,10 +64,10 @@ int GRAPHICS_IMPORTER_LIB_SYMBOL::MapLineWidth( double aLineWidth )
 
 STROKE_PARAMS GRAPHICS_IMPORTER_LIB_SYMBOL::MapStrokeParams( const IMPORTED_STROKE& aStroke )
 {
-    // Historicaly -1 meant no-stroke in Eeschema.
-    int width = ( aStroke.GetWidth() == -1 ) ? -1 : MapLineWidth( aStroke.GetWidth() );
+    double width = aStroke.GetWidth();
 
-    return STROKE_PARAMS( width, aStroke.GetPlotStyle(), aStroke.GetColor() );
+    return STROKE_PARAMS( width != -1 ? MapLineWidth( width ) : -1, aStroke.GetPlotStyle(),
+                          aStroke.GetColor() );
 }
 
 

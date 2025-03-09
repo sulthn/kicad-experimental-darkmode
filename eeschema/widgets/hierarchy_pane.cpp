@@ -132,7 +132,7 @@ void HIERARCHY_PANE::buildHierarchyTree( SCH_SHEET_PATH* aList, const wxTreeItem
         SCH_SHEET* sheet = static_cast<SCH_SHEET*>( aItem );
         aList->push_back( sheet );
 
-        wxString     sheetNameBase = sheet->GetField( FIELD_T::SHEET_NAME )->GetShownText( false );
+        wxString     sheetNameBase = sheet->GetFields()[SHEETNAME].GetShownText( false );
         wxString     sheetName = formatPageString( sheetNameBase, aList->GetPageNumber() );
         wxString     sheetNumber = aList->GetPageNumber();
         wxTreeItemId child = m_tree->AppendItem( aParent, sheetName, 0, 1 );
@@ -209,7 +209,7 @@ void HIERARCHY_PANE::UpdateHierarchySelection()
 }
 
 
-void HIERARCHY_PANE::UpdateHierarchyTree( bool aClear )
+void HIERARCHY_PANE::UpdateHierarchyTree()
 {
     Freeze();
 
@@ -248,9 +248,7 @@ void HIERARCHY_PANE::UpdateHierarchyTree( bool aClear )
                 }
             };
 
-    // If we are clearing the tree, don't try to get expanded nodes as they
-    // might be deleted
-    if( !aClear && !m_tree->IsEmpty() )
+    if( !m_tree->IsEmpty() )
         getExpandedNodes( m_tree->GetRootItem() );
 
     m_list.clear();
@@ -336,14 +334,14 @@ void HIERARCHY_PANE::UpdateLabelsHierarchyTree()
     std::function<void( const wxTreeItemId& )> updateLabel =
             [&]( const wxTreeItemId& id )
             {
-                auto*      itemData = static_cast<TREE_ITEM_DATA*>( m_tree->GetItemData( id ) );
-                SCH_SHEET* sheet = itemData->m_SheetPath.Last();
-                wxString   sheetNameBase = sheet->GetField( FIELD_T::SHEET_NAME )->GetShownText( false );
-                wxString   sheetName = formatPageString( sheetNameBase,
-                                                         itemData->m_SheetPath.GetPageNumber() );
+                TREE_ITEM_DATA* itemData = static_cast<TREE_ITEM_DATA*>( m_tree->GetItemData( id ) );
+                SCH_SHEET*      sheet = itemData->m_SheetPath.Last();
+                wxString        sheetNameLabel =
+                        formatPageString( sheet->GetFields()[SHEETNAME].GetShownText( false ),
+                                          itemData->m_SheetPath.GetPageNumber() );
 
-                if( m_tree->GetItemText( id ) != sheetName )
-                    m_tree->SetItemText( id, sheetName );
+                if( m_tree->GetItemText( id ) != sheetNameLabel )
+                    m_tree->SetItemText( id, sheetNameLabel );
             };
 
     wxTreeItemId rootId  = m_tree->GetRootItem();
@@ -473,7 +471,7 @@ void HIERARCHY_PANE::onTreeEditFinished( wxTreeEvent& event )
             if( parentSheet )
             {
                 SCH_COMMIT commit( m_frame );
-                commit.Modify( data->m_SheetPath.Last()->GetField( FIELD_T::SHEET_NAME ),
+                commit.Modify( &data->m_SheetPath.Last()->GetFields()[SHEETNAME],
                                parentSheet->GetScreen() );
 
                 data->m_SheetPath.Last()->SetName( newName );
@@ -589,7 +587,7 @@ void HIERARCHY_PANE::renameIdenticalSheets( const SCH_SHEET_PATH& renamedSheet,
         if( parentSheet && data->m_SheetPath.Cmp( renamedSheet ) != 0
             && data->m_SheetPath.Last() == renamedSheet.Last() )
         {
-            commit->Modify( data->m_SheetPath.Last()->GetField( FIELD_T::SHEET_NAME ),
+            commit->Modify( &data->m_SheetPath.Last()->GetFields()[SHEETNAME],
                             parentSheet->GetScreen() );
 
             data->m_SheetPath.Last()->SetName( newName );

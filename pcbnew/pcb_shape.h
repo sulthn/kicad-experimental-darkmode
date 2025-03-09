@@ -161,9 +161,6 @@ public:
                                   int aError, ERROR_LOC aErrorLoc,
                                   bool ignoreLineWidth = false ) const override;
 
-    void TransformShapeToPolySet( SHAPE_POLY_SET& aBuffer, PCB_LAYER_ID aLayer, int aClearance,
-                                  int aError, ERROR_LOC aErrorLoc ) const override;
-
     wxString GetItemDescription( UNITS_PROVIDER* aUnitsProvider, bool aFull ) const override;
 
     BITMAPS GetMenuImage() const override;
@@ -197,14 +194,11 @@ public:
 protected:
     void swapData( BOARD_ITEM* aImage ) override;
 
-    void updateHatching() const override;
-
     struct cmp_drawings
     {
         bool operator()( const BOARD_ITEM* aFirst, const BOARD_ITEM* aSecond ) const;
     };
 
-protected:
     bool               m_hasSolderMask;
     std::optional<int> m_solderMaskMargin;
 };

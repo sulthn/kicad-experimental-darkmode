@@ -28,7 +28,6 @@
 
 #include <mutex>
 #include <vector>
-#include <map>
 #include <gr_basic.h>
 #include <board_item.h>
 #include <board_connected_item.h>
@@ -139,24 +138,6 @@ public:
      * and new layer sets.
      */
     void SetLayerSetAndRemoveUnusedFills( const LSET& aLayerSet );
-
-    ZONE_LAYER_PROPERTIES& LayerProperties( PCB_LAYER_ID aLayer )
-    {
-        return m_layerProperties[aLayer];
-    }
-
-    const ZONE_LAYER_PROPERTIES& LayerProperties( PCB_LAYER_ID aLayer ) const;
-
-    std::map<PCB_LAYER_ID, ZONE_LAYER_PROPERTIES>& LayerProperties() { return m_layerProperties; }
-
-    const std::map<PCB_LAYER_ID, ZONE_LAYER_PROPERTIES>& LayerProperties() const
-    {
-        return m_layerProperties;
-    }
-
-    void SetLayerProperties( const std::map<PCB_LAYER_ID, ZONE_LAYER_PROPERTIES>& aOther );
-
-    const std::optional<VECTOR2I>& HatchingOffset( PCB_LAYER_ID aLayer ) const;
 
     const wxString& GetZoneName() const { return m_zoneName; }
     void SetZoneName( const wxString& aName ) { m_zoneName = aName; }
@@ -867,8 +848,6 @@ protected:
     wxString              m_zoneName;
 
     LSET                  m_layerSet;
-
-    std::map<PCB_LAYER_ID, ZONE_LAYER_PROPERTIES> m_layerProperties;
 
     /* Priority: when a zone outline is inside and other zone, if its priority is higher
      * the other zone priority, it will be created inside.

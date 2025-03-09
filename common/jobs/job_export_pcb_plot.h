@@ -63,12 +63,12 @@ public:
     bool m_plotFootprintValues;
     bool m_plotRefDes;
     bool m_plotDrawingSheet;
-    bool m_subtractSolderMaskFromSilk;
     bool m_plotPadNumbers;
+    bool m_plotInvisibleText;
 
-    LSEQ m_plotLayerSequence;
+    LSEQ m_printMaskLayer;
     ///< Layers to include on all individual layer prints
-    LSEQ m_plotOnAllLayersSequence;
+    LSEQ m_printMaskLayersToIncludeOnAllLayers;
 
     enum class DRILL_MARKS
     {

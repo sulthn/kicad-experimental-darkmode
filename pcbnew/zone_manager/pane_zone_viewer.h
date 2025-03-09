@@ -31,14 +31,11 @@
 #include <wx/window.h>
 #include <wx/panel.h>
 #include <wx/notebook.h>
-
 class wxDataViewCtrl;
 class PANEL_ZONE_GAL;
 class PCB_BASE_FRAME;
 class PANEL_ZONE_GAL_CONTAINER;
 class ROW_ICON_PROVIDER;
-
-
 class PANE_ZONE_VIEWER : public wxNotebook, public ZONE_SELECTION_CHANGE_NOTIFIER
 {
 public:
@@ -50,6 +47,7 @@ public:
     void OnNotebook( wxNotebookEvent& aEvent );
 
     PANEL_ZONE_GAL* GetZoneGAL() const { return m_zoneGAL; }
+
 
 private:
     PCB_BASE_FRAME*                                    m_pcbFrame;

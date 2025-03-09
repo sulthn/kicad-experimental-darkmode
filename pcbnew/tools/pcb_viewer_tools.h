@@ -61,9 +61,6 @@ public:
     int GraphicOutlines( const TOOL_EVENT& aEvent );
     int TextOutlines( const TOOL_EVENT& aEvent );
 
-    /// Automatically zoom to fit on footprints
-    int FootprintAutoZoom( const TOOL_EVENT& aEvent );
-
     /// Show the 3D viewer
     int Show3DViewer( const TOOL_EVENT& aEvent );
 
@@ -81,11 +78,6 @@ public:
     void SetFootprintFrame( bool aIsFrame )
     {
         m_footprintFrame = aIsFrame;
-    }
-
-    void SetIsDefaultTool( bool aIsDefaultTool )
-    {
-        m_isDefaultTool = aIsDefaultTool;
     }
 
     bool IsFootprintFrame() const
@@ -124,9 +116,7 @@ protected:
         return board()->GetFirstFootprint();
     }
 
-protected:
     bool m_footprintFrame;  ///< Is this tool associated with a footprint frame
-    bool m_isDefaultTool;   ///< Indicates no selection tool is present in the current toolset
 };
 
 #endif

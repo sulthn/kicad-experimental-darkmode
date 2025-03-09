@@ -23,10 +23,8 @@
 #include <wx/filename.h>
 #include <core/typeinfo.h>
 #include <core/utf8.h>
-#include <frame_type.h>
 
 #include <map>
-#include <set>
 
 class KICAD_MANAGER_FRAME;
 
@@ -71,13 +69,7 @@ private:
     void OutputCopyError( const wxFileName& aSrc, const wxFileName& aFileCopy );
     void ImportIndividualFile( KICAD_T aKicad_T, int aImportedFileType );
 
-    void doImport( const wxString& aFile, FRAME_T aFrameType, int aImportedFileType );
-
-    void addLocalLibraries( const std::set<wxString>& aLibName, FRAME_T aFrameType );
-
     void EasyEDAProProjectHandler();
-
-    void AltiumProjectHandler();
 };
 
 #endif

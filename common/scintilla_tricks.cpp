@@ -414,14 +414,7 @@ void SCINTILLA_TRICKS::onCharHook( wxKeyEvent& aEvent )
     else if( aEvent.GetKeyCode() == WXK_DELETE )
     {
         if( m_te->GetSelectionEnd() == m_te->GetSelectionStart() )
-        {
-#ifndef __WXMAC__
-            if( aEvent.GetModifiers() == wxMOD_CONTROL )
-                m_te->WordRightExtend();
-            else
-#endif
-                m_te->CharRightExtend();
-        }
+            m_te->CharRightExtend();
 
         if( m_te->GetSelectionEnd() > m_te->GetSelectionStart() )
             m_te->DeleteBack();

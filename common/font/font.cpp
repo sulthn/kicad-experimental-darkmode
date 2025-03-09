@@ -68,16 +68,18 @@ public:
         std::unique_ptr<MARKUP::NODE> root;
     };
 
+    typedef std::pair<wxString, ENTRY> CACHE_ENTRY;
+
     MARKUP_CACHE( size_t aMaxSize ) :
             m_maxSize( aMaxSize )
     {
     }
 
-    ENTRY& Put( const wxString& aQuery, ENTRY&& aResult )
+    ENTRY& Put( const CACHE_ENTRY::first_type& aQuery, ENTRY&& aResult )
     {
         auto it = m_cache.find( aQuery );
 
-        m_cacheMru.emplace_front( std::make_pair( aQuery, std::move( aResult ) ) );
+        m_cacheMru.emplace_front( CACHE_ENTRY( aQuery, std::move( aResult ) ) );
 
         if( it != m_cache.end() )
         {
@@ -98,7 +100,7 @@ public:
         return m_cacheMru.begin()->second;
     }
 
-    ENTRY* Get( const wxString& aQuery )
+    ENTRY* Get( const CACHE_ENTRY::first_type& aQuery )
     {
         auto it = m_cache.find( aQuery );
 
@@ -117,9 +119,9 @@ public:
     }
 
 private:
-    size_t                                                                        m_maxSize;
-    std::list<std::pair<wxString, ENTRY>>                                         m_cacheMru;
-    std::unordered_map<wxString, std::list<std::pair<wxString, ENTRY>>::iterator> m_cache;
+    size_t                                                         m_maxSize;
+    std::list<CACHE_ENTRY>                                         m_cacheMru;
+    std::unordered_map<wxString, std::list<CACHE_ENTRY>::iterator> m_cache;
 };
 
 

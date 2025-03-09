@@ -54,7 +54,6 @@
 #include <tools/pcb_editor_conditions.h>  // Shared conditions with other Pcbnew frames
 #include <tools/pcb_viewer_tools.h>       // shared tools with other Pcbnew frames
 #include <tools/cvpcb_fpviewer_selection_tool.h>
-#include <toolbars_display_footprints.h>
 #include <wx/choice.h>
 #include <wx/debug.h>
 #include <cvpcb_id.h>
@@ -116,19 +115,19 @@ DISPLAY_FOOTPRINTS_FRAME::DISPLAY_FOOTPRINTS_FRAME( KIWAY* aKiway, wxWindow* aPa
 
     setupUIConditions();
 
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<DISPLAY_FOOTPRINTS_TOOLBAR_SETTINGS>( "display_footprints-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
-
     // Run the control tool, it is supposed to be always active
     m_toolManager->InvokeTool( "cvpcb.FootprintViewerInteractiveSelection" );
+
+    ReCreateHToolbar();
+    ReCreateVToolbar();
+    ReCreateOptToolbar();
 
     m_auimgr.SetManagedWindow( this );
 
     CreateInfoBar();
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( wxS( "TopMainToolbar" ) )
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( wxS( "MainToolbar" ) )
                       .Top().Layer( 6 ) );
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().VToolbar().Name( wxS( "LeftToolbar" ) )
+    m_auimgr.AddPane( m_optionsToolBar, EDA_PANE().VToolbar().Name( wxS( "OptToolbar" ) )
                       .Left().Layer( 3 ) );
     m_auimgr.AddPane( GetCanvas(), EDA_PANE().Canvas().Name( wxS( "DrawFrame" ) )
                       .Center() );
@@ -148,7 +147,16 @@ DISPLAY_FOOTPRINTS_FRAME::DISPLAY_FOOTPRINTS_FRAME( KIWAY* aKiway, wxWindow* aPa
     CVPCB_SETTINGS* cfg = dynamic_cast<CVPCB_SETTINGS*>( config() );
 
     if( cfg )
+    {
         GetCanvas()->GetView()->SetScale( cfg->m_FootprintViewerZoom );
+
+        wxAuiToolBarItem* toolOpt = m_mainToolBar->FindTool( ID_CVPCB_FPVIEWER_AUTOZOOM_TOOL );
+
+        if( cfg->m_FootprintViewerAutoZoomOnSelect )
+            toolOpt->SetState( wxAUI_BUTTON_STATE_CHECKED );
+        else
+            toolOpt->SetState( 0 );
+    }
 
     updateView();
 
@@ -200,19 +208,134 @@ void DISPLAY_FOOTPRINTS_FRAME::setupUIConditions()
     mgr->SetConditions( ACTIONS::measureTool,
                         CHECK( cond.CurrentTool( ACTIONS::measureTool ) ) );
 
-    mgr->SetConditions( ACTIONS::toggleGrid,           CHECK( cond.GridVisible() ) );
-    mgr->SetConditions( ACTIONS::toggleCursorStyle,    CHECK( cond.FullscreenCursor() ) );
+    mgr->SetConditions( ACTIONS::toggleGrid,        CHECK( cond.GridVisible() ) );
+    mgr->SetConditions( ACTIONS::toggleCursorStyle, CHECK( cond.FullscreenCursor() ) );
 
-    mgr->SetConditions( ACTIONS::millimetersUnits,     CHECK( cond.Units( EDA_UNITS::MM ) ) );
-    mgr->SetConditions( ACTIONS::inchesUnits,          CHECK( cond.Units( EDA_UNITS::INCH ) ) );
-    mgr->SetConditions( ACTIONS::milsUnits,            CHECK( cond.Units( EDA_UNITS::MILS ) ) );
+    mgr->SetConditions( ACTIONS::millimetersUnits,  CHECK( cond.Units( EDA_UNITS::MILLIMETRES ) ) );
+    mgr->SetConditions( ACTIONS::inchesUnits,       CHECK( cond.Units( EDA_UNITS::INCHES ) ) );
+    mgr->SetConditions( ACTIONS::milsUnits,         CHECK( cond.Units( EDA_UNITS::MILS ) ) );
 
     mgr->SetConditions( PCB_ACTIONS::showPadNumbers,   CHECK( cond.PadNumbersDisplay() ) );
     mgr->SetConditions( PCB_ACTIONS::padDisplayMode,   CHECK( !cond.PadFillDisplay() ) );
     mgr->SetConditions( PCB_ACTIONS::textOutlines,     CHECK( !cond.TextFillDisplay() ) );
     mgr->SetConditions( PCB_ACTIONS::graphicsOutlines, CHECK( !cond.GraphicsFillDisplay() ) );
-    mgr->SetConditions( PCB_ACTIONS::fpAutoZoom,       CHECK( cond.FootprintViewerAutoZoom() ) );
+
 #undef CHECK
+}
+
+
+void DISPLAY_FOOTPRINTS_FRAME::ReCreateVToolbar()
+{
+    // Currently, no vertical right toolbar.
+}
+
+
+void DISPLAY_FOOTPRINTS_FRAME::ReCreateOptToolbar()
+{
+    if( m_optionsToolBar )
+    {
+        m_optionsToolBar->ClearToolbar();
+    }
+    else
+    {
+        m_optionsToolBar = new ACTION_TOOLBAR( this, ID_OPT_TOOLBAR, wxDefaultPosition,
+                                               wxDefaultSize,
+                                               KICAD_AUI_TB_STYLE | wxAUI_TB_VERTICAL );
+        m_optionsToolBar->SetAuiManager( &m_auimgr );
+    }
+
+    m_optionsToolBar->Add( ACTIONS::selectionTool,          ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::measureTool,            ACTION_TOOLBAR::TOGGLE );
+
+    m_optionsToolBar->AddScaledSeparator( this );
+    m_optionsToolBar->Add( ACTIONS::toggleGrid,             ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::togglePolarCoords,      ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::inchesUnits,            ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::milsUnits,              ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::millimetersUnits,       ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::toggleCursorStyle,      ACTION_TOOLBAR::TOGGLE );
+
+    m_optionsToolBar->AddScaledSeparator( this );
+    m_optionsToolBar->Add( PCB_ACTIONS::showPadNumbers,     ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( PCB_ACTIONS::padDisplayMode,     ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( PCB_ACTIONS::textOutlines,       ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( PCB_ACTIONS::graphicsOutlines,   ACTION_TOOLBAR::TOGGLE );
+
+    m_optionsToolBar->Realize();
+}
+
+
+void DISPLAY_FOOTPRINTS_FRAME::ReCreateHToolbar()
+{
+    // Note:
+    // To rebuild the aui toolbar, the more easy way is to clear ( calling m_mainToolBar.Clear() )
+    // all wxAuiToolBarItems.
+    // However the wxAuiToolBarItems are not the owners of controls managed by
+    // them ( m_zoomSelectBox and m_gridSelectBox ), and therefore do not delete them
+    // So we do not recreate them after clearing the tools.
+
+    if( m_mainToolBar )
+    {
+        m_mainToolBar->ClearToolbar();
+    }
+    else
+    {
+        m_mainToolBar = new ACTION_TOOLBAR( this, ID_H_TOOLBAR, wxDefaultPosition, wxDefaultSize,
+                                            KICAD_AUI_TB_STYLE | wxAUI_TB_HORZ_LAYOUT );
+        m_mainToolBar->SetAuiManager( &m_auimgr );
+    }
+
+    m_mainToolBar->Add( ACTIONS::zoomRedraw );
+    m_mainToolBar->Add( ACTIONS::zoomInCenter );
+    m_mainToolBar->Add( ACTIONS::zoomOutCenter );
+    m_mainToolBar->Add( ACTIONS::zoomFitScreen );
+    m_mainToolBar->Add( ACTIONS::zoomTool, ACTION_TOOLBAR::TOGGLE, ACTION_TOOLBAR::CANCEL );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( ACTIONS::show3DViewer );
+
+    m_mainToolBar->AddScaledSeparator( this );
+
+    // Grid selection choice box.
+    if( !m_gridSelectBox )
+        m_gridSelectBox = new wxChoice( m_mainToolBar, ID_ON_GRID_SELECT );
+
+    UpdateGridSelectBox();
+    m_mainToolBar->AddControl( m_gridSelectBox );
+
+    m_mainToolBar->AddScaledSeparator( this );
+
+    // Zoom selection choice box.
+    if( !m_zoomSelectBox )
+        m_zoomSelectBox = new wxChoice( m_mainToolBar, ID_ON_ZOOM_SELECT );
+
+    UpdateZoomSelectBox();
+    m_mainToolBar->AddControl( m_zoomSelectBox );
+
+    // Option to run Zoom automatique on footprint selection change
+    m_mainToolBar->AddTool( ID_CVPCB_FPVIEWER_AUTOZOOM_TOOL, wxEmptyString,
+                            KiScaledBitmap( BITMAPS::zoom_auto_fit_in_page, this ),
+                            _( "Automatic Zoom on footprint change" ),
+                            wxITEM_CHECK );
+
+    m_mainToolBar->AddScaledSeparator( this );
+
+    m_mainToolBar->UpdateControlWidth( ID_ON_GRID_SELECT );
+    m_mainToolBar->UpdateControlWidth( ID_ON_ZOOM_SELECT );
+
+    // after adding the buttons to the toolbar, must call Realize() to reflect the changes
+    m_mainToolBar->Realize();
+}
+
+
+void DISPLAY_FOOTPRINTS_FRAME::UpdateToolbarControlSizes()
+{
+    if( m_mainToolBar )
+    {
+        // Update the item widths
+        m_mainToolBar->UpdateControlWidth( ID_ON_GRID_SELECT );
+        m_mainToolBar->UpdateControlWidth( ID_ON_ZOOM_SELECT );
+    }
 }
 
 
@@ -238,7 +361,11 @@ void DISPLAY_FOOTPRINTS_FRAME::SaveSettings( APP_SETTINGS_BASE* aCfg )
     PCB_BASE_FRAME::SaveSettings( cfg );
 
     cfg->m_FootprintViewerDisplayOptions = GetDisplayOptions();
+
     cfg->m_FootprintViewerZoom = GetCanvas()->GetView()->GetScale();
+
+    wxAuiToolBarItem* toolOpt = m_mainToolBar->FindTool( ID_CVPCB_FPVIEWER_AUTOZOOM_TOOL );
+    cfg->m_FootprintViewerAutoZoomOnSelect = ( toolOpt->GetState() & wxAUI_BUTTON_STATE_CHECKED );
 }
 
 
@@ -429,10 +556,9 @@ void DISPLAY_FOOTPRINTS_FRAME::updateView()
 
     m_toolManager->ResetTools( TOOL_BASE::MODEL_RELOAD );
 
-    CVPCB_SETTINGS* cfg = dynamic_cast<CVPCB_SETTINGS*>( config() );
-    wxCHECK( cfg, /* void */ );
+    wxAuiToolBarItem* toolOpt = m_mainToolBar->FindTool( ID_CVPCB_FPVIEWER_AUTOZOOM_TOOL );
 
-    if( cfg->m_FootprintViewerAutoZoomOnSelect )
+    if( toolOpt->GetState() & wxAUI_BUTTON_STATE_CHECKED )
         m_toolManager->RunAction( ACTIONS::zoomFitScreen );
     else
         m_toolManager->RunAction( ACTIONS::centerContents );

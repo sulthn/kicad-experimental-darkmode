@@ -296,13 +296,6 @@ float SCH_PAINTER::getShadowWidth( bool aForHighlight ) const
 COLOR4D SCH_PAINTER::getRenderColor( const SCH_ITEM* aItem, int aLayer, bool aDrawingShadows,
                                      bool aDimmed ) const
 {
-    auto isBackgroundLayer =
-            []( int layer )
-            {
-                return layer == LAYER_DEVICE_BACKGROUND || layer == LAYER_NOTES_BACKGROUND
-                    || layer == LAYER_SHAPES_BACKGROUND || layer == LAYER_SHEET_BACKGROUND;
-            };
-
     COLOR4D color = m_schSettings.GetLayerColor( aLayer );
 
     // Graphic items of a SYMBOL frequently use the LAYER_DEVICE layer color
@@ -327,7 +320,7 @@ COLOR4D SCH_PAINTER::getRenderColor( const SCH_ITEM* aItem, int aLayer, bool aDr
         {
             const SCH_SHEET* sheet = static_cast<const SCH_SHEET*>( aItem );
 
-            if( isBackgroundLayer( aLayer ) )
+            if( aLayer == LAYER_SHEET_BACKGROUND )
                 color = sheet->GetBackgroundColor();
             else
                 color = sheet->GetBorderColor();
@@ -336,30 +329,39 @@ COLOR4D SCH_PAINTER::getRenderColor( const SCH_ITEM* aItem, int aLayer, bool aDr
         {
             const SCH_SHAPE* shape = static_cast<const SCH_SHAPE*>( aItem );
 
-            if( isBackgroundLayer( aLayer ) )
+            if( aLayer == LAYER_DEVICE_BACKGROUND || aLayer == LAYER_NOTES_BACKGROUND
+                || aLayer == LAYER_SHAPES_BACKGROUND )
             {
-                if( shape->GetFillMode() == FILL_T::FILLED_SHAPE )
-                    color = shape->GetStroke().GetColor();
-                else if( shape->GetFillMode() == FILL_T::FILLED_WITH_COLOR )
+                if( !isSymbolChild || shape->GetFillColor() != COLOR4D::UNSPECIFIED )
                     color = shape->GetFillColor();
-                else if( shape->GetFillMode() == FILL_T::FILLED_WITH_BG_BODYCOLOR )
-                    color = m_schSettings.GetLayerColor( LAYER_DEVICE_BACKGROUND );
 
-                // A filled shape means filled; if they didn't specify a fill colour then use
-                // the border colour.
-                if( shape->GetFillMode() != FILL_T::NO_FILL && color == COLOR4D::UNSPECIFIED )
+                if( isSymbolChild )
                 {
-                    if( aItem->Type() == SCH_RULE_AREA_T )
-                        color = m_schSettings.GetLayerColor( LAYER_RULE_AREAS );
-                    else if( isSymbolChild )
-                        color = m_schSettings.GetLayerColor( LAYER_DEVICE );
-                    else
-                        color = m_schSettings.GetLayerColor( LAYER_NOTES );
+                    if( shape->GetFillMode() == FILL_T::FILLED_SHAPE )
+                        color = shape->GetStroke().GetColor();
+                    else if( shape->GetFillMode() == FILL_T::FILLED_WITH_BG_BODYCOLOR )
+                        color = m_schSettings.GetLayerColor( LAYER_DEVICE_BACKGROUND );
                 }
             }
             else
             {
-                color = shape->GetStroke().GetColor();
+                if( !isSymbolChild || shape->GetStroke().GetColor() != COLOR4D::UNSPECIFIED )
+                    color = shape->GetStroke().GetColor();
+            }
+
+            // A filled shape means filled; if they didn't specify a fill colour then use the
+            // border colour.
+            if( color == COLOR4D::UNSPECIFIED )
+            {
+                if( aItem->Type() == SCH_RULE_AREA_T )
+                {
+                    color = m_schSettings.GetLayerColor( LAYER_RULE_AREAS );
+                }
+                else
+                {
+                    color = m_schSettings.GetLayerColor( isSymbolChild ? LAYER_DEVICE
+                                                                       : LAYER_NOTES );
+                }
             }
         }
         else if( aItem->IsType( { SCH_LABEL_LOCATE_ANY_T } ) )
@@ -374,7 +376,8 @@ COLOR4D SCH_PAINTER::getRenderColor( const SCH_ITEM* aItem, int aLayer, bool aDr
         {
             const SCH_TEXTBOX* textBox = dynamic_cast<const SCH_TEXTBOX*>( aItem );
 
-            if( isBackgroundLayer( aLayer ) )
+            if( aLayer == LAYER_DEVICE_BACKGROUND || aLayer == LAYER_NOTES_BACKGROUND
+                || aLayer == LAYER_SHAPES_BACKGROUND )
                 color = textBox->GetFillColor();
             else if( !isSymbolChild || textBox->GetTextColor() != COLOR4D::UNSPECIFIED )
                 color = textBox->GetTextColor();
@@ -383,28 +386,6 @@ COLOR4D SCH_PAINTER::getRenderColor( const SCH_ITEM* aItem, int aLayer, bool aDr
         {
             if( !isSymbolChild || otherTextItem->GetTextColor() != COLOR4D::UNSPECIFIED )
                 color = otherTextItem->GetTextColor();
-        }
-    }
-    else  /* overrideItemColors */
-    {
-        // If we ARE overriding the item colors, what do we do with non-item-color fills?
-        // There are two theories: we should leave them untouched, or we should drop them entirely.
-        // We currently implment the first.
-        if( isBackgroundLayer( aLayer) )
-        {
-            if( aItem->Type() == SCH_SHAPE_T || aItem->Type() == SCH_RULE_AREA_T )
-            {
-                const SCH_SHAPE* shape = static_cast<const SCH_SHAPE*>( aItem );
-
-                if( shape->GetFillMode() == FILL_T::FILLED_WITH_COLOR )
-                    color = shape->GetFillColor();
-            }
-            else if( aItem->Type() == SCH_SHEET_T )
-            {
-                const SCH_SHEET* sheet = static_cast<const SCH_SHEET*>( aItem );
-
-                color = sheet->GetBackgroundColor();
-            }
         }
     }
 
@@ -422,7 +403,8 @@ COLOR4D SCH_PAINTER::getRenderColor( const SCH_ITEM* aItem, int aLayer, bool aDr
             else
                 color = color.WithAlpha( 0.15 );
         }
-        else if( isBackgroundLayer( aLayer ) )
+        else if( aLayer == LAYER_DEVICE_BACKGROUND || aLayer == LAYER_SHEET_BACKGROUND
+                 || aLayer == LAYER_SHAPES_BACKGROUND )
         {
             color = color.WithAlpha( 0.2 );
         }
@@ -431,7 +413,9 @@ COLOR4D SCH_PAINTER::getRenderColor( const SCH_ITEM* aItem, int aLayer, bool aDr
     {
         color = m_schSettings.GetLayerColor( LAYER_SELECTION_SHADOWS );
     }
-    else if( aItem->IsSelected() && isBackgroundLayer( aLayer ) )
+    else if( aItem->IsSelected()
+             && ( aLayer == LAYER_DEVICE_BACKGROUND || aLayer == LAYER_SHEET_BACKGROUND
+                  || aLayer == LAYER_NOTES_BACKGROUND || aLayer == LAYER_SHAPES_BACKGROUND ) )
     {
         // Selected items will be painted over all other items, so make backgrounds translucent so
         // that non-selected overlapping objects are visible
@@ -699,7 +683,7 @@ void SCH_PAINTER::draw( const LIB_SYMBOL* aSymbol, int aLayer, bool aDrawFields,
     std::unique_ptr< LIB_SYMBOL > tmpSymbol;
     const LIB_SYMBOL* drawnSymbol = aSymbol;
 
-    if( aSymbol->IsDerived() )
+    if( aSymbol->IsAlias() )
     {
         tmpSymbol = aSymbol->Flatten();
         drawnSymbol = tmpSymbol.get();
@@ -773,55 +757,6 @@ void SCH_PAINTER::drawPinDanglingIndicator( const SCH_PIN& aPin, const COLOR4D& 
     m_gal->SetLineWidth( lineWidth );
     m_gal->DrawCircle( c.Center, c.Radius );
 }
-
-
-/**
- * Draw an local power pin indicator icon.
- */
-void SCH_PAINTER::drawLocalPowerIcon( const VECTOR2D& aPos, double aSize, bool aRotate,
-                                      const COLOR4D& aColor, bool aDrawingShadows, 
-                                      bool aBrightened )
-{
-    m_gal->Save();
-
-    m_gal->Translate( aPos );
-
-    if( aRotate )
-        m_gal->Rotate( ANGLE_270.AsRadians() );
-
-    double lineWidth = aSize / 10.0;
-
-    if( aDrawingShadows )
-        lineWidth += getShadowWidth( aBrightened );
-
-    m_gal->SetIsFill( false );
-    m_gal->SetIsStroke( true );
-    m_gal->SetLineWidth( lineWidth );
-    m_gal->SetStrokeColor( aColor );
-
-    double x_right = aSize / 1.6180339887;
-    double x_middle = x_right / 2.0;
-
-    VECTOR2D bottomPt = VECTOR2D{ x_middle, 0 };
-    VECTOR2D leftPt = VECTOR2D{ 0, 2.0 * -aSize / 3.0 };
-    VECTOR2D rightPt = VECTOR2D{ x_right, 2.0 * -aSize / 3.0 };
-
-    VECTOR2D bottomAnchorPt = VECTOR2D{ x_middle, -aSize / 4.0 };
-    VECTOR2D leftSideAnchorPt1 = VECTOR2D{ 0, -aSize / 2.5 };
-    VECTOR2D leftSideAnchorPt2 = VECTOR2D{ 0, -aSize * 1.15 };
-    VECTOR2D rightSideAnchorPt1 = VECTOR2D{ x_right, -aSize / 2.5 };
-    VECTOR2D rightSideAnchorPt2 = VECTOR2D{ x_right, -aSize * 1.15 };
-
-    m_gal->DrawCurve( bottomPt, bottomAnchorPt, leftSideAnchorPt1, leftPt );
-    m_gal->DrawCurve( leftPt, leftSideAnchorPt2, rightSideAnchorPt2, rightPt );
-    m_gal->DrawCurve( rightPt, rightSideAnchorPt1, bottomAnchorPt, bottomPt );
-
-    m_gal->SetIsFill( true );
-    m_gal->SetFillColor( aColor );
-    m_gal->DrawCircle( ( leftPt + rightPt ) / 2.0, aSize / 15.0 );
-
-    m_gal->Restore();
-};
 
 
 /**
@@ -1568,7 +1503,7 @@ void SCH_PAINTER::draw( const SCH_SHAPE* aShape, int aLayer, bool aDimmed )
             // Consider a NAND gate.  We have no idea which side of the arc is "inside"
             // so we can't reliably fill.
             if( aShape->GetShape() == SHAPE_T::ARC )
-                m_gal->SetIsFill( aShape->IsSolidFill() );
+                m_gal->SetIsFill( aShape->IsFilled() );
             else
                 m_gal->SetIsFill( true );
 
@@ -1599,20 +1534,6 @@ void SCH_PAINTER::draw( const SCH_SHAPE* aShape, int aLayer, bool aDimmed )
             // Fill in the foreground layer
             break;
 
-        case FILL_T::HATCH:
-        case FILL_T::REVERSE_HATCH:
-        case FILL_T::CROSS_HATCH:
-            if( aShape->IsSelected() )
-                color.a = color.a * 0.8;  // selected items already have reduced-alpha backgrounds
-            else
-                color.a = color.a * 0.4;
-
-            m_gal->SetIsFill( true );
-            m_gal->SetIsStroke( false );
-            m_gal->SetFillColor( color );
-            m_gal->DrawPolygon( aShape->GetHatching() );
-            break;
-
         case FILL_T::FILLED_WITH_COLOR:
         case FILL_T::FILLED_WITH_BG_BODYCOLOR:
             // Do not fill the shape in B&W print mode, to avoid to visible items inside the shape
@@ -1625,9 +1546,6 @@ void SCH_PAINTER::draw( const SCH_SHAPE* aShape, int aLayer, bool aDimmed )
                 drawShape( aShape );
             }
             break;
-
-        default:
-            wxFAIL_MSG( wxT( "Unsupported fill type" ) );
         }
     }
     else if( aLayer == LAYER_DEVICE || aLayer == LAYER_NOTES || aLayer == LAYER_PRIVATE_NOTES
@@ -1839,7 +1757,7 @@ void SCH_PAINTER::draw( const SCH_TEXT* aText, int aLayer, bool aDimmed )
     }
     else
     {
-        if( aText->IsHypertext() && aText->IsRollover() && !aText->IsMoving() )
+        if( aText->IsHypertext() && aText->IsRollover() )
         {
             m_gal->SetStrokeColor( m_schSettings.GetLayerColor( LAYER_HOVERED ) );
             m_gal->SetFillColor( m_schSettings.GetLayerColor( LAYER_HOVERED ) );
@@ -1958,7 +1876,7 @@ void SCH_PAINTER::draw( const SCH_TEXTBOX* aTextBox, int aLayer, bool aDimmed )
                 attrs.m_Angle = aTextBox->GetDrawRotation();
                 attrs.m_StrokeWidth = KiROUND( getTextThickness( aTextBox ) );
 
-                if( aTextBox->IsHypertext() && aTextBox->IsRollover() && !aTextBox->IsMoving() )
+                if( aTextBox->IsHypertext() && aTextBox->IsRollover() )
                 {
                     m_gal->SetStrokeColor( m_schSettings.GetLayerColor( LAYER_HOVERED ) );
                     m_gal->SetFillColor( m_schSettings.GetLayerColor( LAYER_HOVERED ) );
@@ -2001,7 +1919,7 @@ void SCH_PAINTER::draw( const SCH_TEXTBOX* aTextBox, int aLayer, bool aDimmed )
     {
         // Do not fill the shape in B&W print mode, to avoid to visible items
         // inside the shape
-        if( aTextBox->IsSolidFill() && !m_schSettings.PrintBlackAndWhiteReq() )
+        if( aTextBox->IsFilled() && !m_schSettings.PrintBlackAndWhiteReq() )
         {
             m_gal->SetIsFill( true );
             m_gal->SetIsStroke( false );
@@ -2252,7 +2170,7 @@ void SCH_PAINTER::draw( const SCH_SYMBOL* aSymbol, int aLayer )
     if( !drawingShadows || eeconfig()->m_Selection.draw_selected_children )
     {
         for( const SCH_FIELD& field : aSymbol->GetFields() )
-            draw( &field, aLayer, DNP );
+            draw( &field, aLayer, DNP || markExclusion );
     }
 
     if( isFieldsLayer( aLayer ) )
@@ -2324,7 +2242,7 @@ void SCH_PAINTER::draw( const SCH_SYMBOL* aSymbol, int aLayer )
     }
 
     draw( &tempSymbol, aLayer, false, aSymbol->GetUnit(), aSymbol->GetBodyStyle(),
-          DNP );
+          DNP || markExclusion );
 
     for( unsigned i = 0; i < tempPins.size(); ++i )
     {
@@ -2337,9 +2255,9 @@ void SCH_PAINTER::draw( const SCH_SYMBOL* aSymbol, int aLayer )
                                                         // IS_SHOWN_AS_BITMAP
     }
 
-    if( DNP )
+    if( DNP || markExclusion )
     {
-        int      layer = LAYER_DNP_MARKER;
+        int      layer = DNP ? LAYER_DNP_MARKER : LAYER_EXCLUDED_FROM_SIM;
         BOX2I    bbox = aSymbol->GetBodyBoundingBox();
         BOX2I    pins = aSymbol->GetBodyAndPinsBoundingBox();
         VECTOR2D margins( std::max( bbox.GetX() - pins.GetX(), pins.GetEnd().x - bbox.GetEnd().x ),
@@ -2364,40 +2282,6 @@ void SCH_PAINTER::draw( const SCH_SYMBOL* aSymbol, int aLayer )
         m_gal->DrawSegment( pt1, pt2, strokeWidth );
         std::swap( pt1.x, pt2.x );
         m_gal->DrawSegment( pt1, pt2, strokeWidth );
-    }
-
-    if( markExclusion )
-    {
-        int   layer = LAYER_EXCLUDED_FROM_SIM;
-        BOX2I bbox = aSymbol->GetBodyBoundingBox();
-        int   strokeWidth = schIUScale.MilsToIU( ADVANCED_CFG::GetCfg().m_ExcludeFromSimulationLineWidth );
-
-        bbox.Inflate( KiROUND( strokeWidth * 0.5 ) );
-
-        GAL_SCOPED_ATTRS scopedAttrs( *m_gal, GAL_SCOPED_ATTRS::ALL_ATTRS );
-        m_gal->AdvanceDepth();
-        m_gal->SetIsStroke( true );
-        m_gal->SetIsFill( true );
-        m_gal->SetStrokeColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.5 ) );
-        m_gal->SetFillColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.5 ) );
-
-        m_gal->DrawSegment( bbox.GetPosition(), VECTOR2D( bbox.GetEnd().x, bbox.GetY() ), strokeWidth );
-        m_gal->DrawSegment( VECTOR2D( bbox.GetEnd().x, bbox.GetY() ), bbox.GetEnd(), strokeWidth );
-        m_gal->DrawSegment( bbox.GetEnd(), VECTOR2D( bbox.GetX(), bbox.GetEnd().y ), strokeWidth );
-        m_gal->DrawSegment( VECTOR2D( bbox.GetX(), bbox.GetEnd().y ), bbox.GetPosition(), strokeWidth );
-
-        int offset = 2 * strokeWidth;
-        VECTOR2D center = bbox.GetEnd() + VECTOR2D( offset + strokeWidth, -offset );
-        VECTOR2D left = center + VECTOR2D( -offset, 0 );
-        VECTOR2D right = center + VECTOR2D( offset, 0 );
-        VECTOR2D top = center + VECTOR2D( 0, offset );
-        VECTOR2D bottom = center + VECTOR2D( 0, -offset );
-
-        m_gal->SetFillColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.1 ) );
-        m_gal->DrawCircle( center, offset );
-        m_gal->AdvanceDepth();
-        m_gal->SetFillColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.5 ) );
-        m_gal->DrawCurve( left, top, bottom, right, 1 );
     }
 }
 
@@ -2506,7 +2390,7 @@ void SCH_PAINTER::draw( const SCH_FIELD* aField, int aLayer, bool aDimmed )
         if( drawingShadows )
             attributes.m_StrokeWidth += getShadowWidth( !aField->IsSelected() );
 
-        if( aField->IsHypertext() && aField->IsRollover() && !aField->IsMoving() )
+        if( aField->IsHypertext() && aField->IsRollover() )
         {
             m_gal->SetStrokeColor( m_schSettings.GetLayerColor( LAYER_HOVERED ) );
             m_gal->SetFillColor( m_schSettings.GetLayerColor( LAYER_HOVERED ) );
@@ -2537,30 +2421,6 @@ void SCH_PAINTER::draw( const SCH_FIELD* aField, int aLayer, bool aDimmed )
 
             const_cast<SCH_FIELD*>( aField )->ClearFlags( IS_SHOWN_AS_BITMAP );
         }
-    }
-
-    if( aField->GetParent() && aField->GetParent()->Type() == SCH_SYMBOL_T )
-    {
-        SCH_SYMBOL* parent = static_cast<SCH_SYMBOL*>( aField->GetParent() );
-        bool rotated = !orient.IsHorizontal() && !aField->CanAutoplace();
-
-        VECTOR2D    pos;
-        double      size = bbox.GetHeight() / 1.5;
-
-        if( rotated )
-        {
-            pos = VECTOR2D( bbox.GetRight() - bbox.GetWidth() / 6.0,
-                            bbox.GetBottom() + bbox.GetWidth() / 2.0 );
-            size = bbox.GetWidth() / 1.5;
-        }
-        else
-        {
-            pos = VECTOR2D( bbox.GetLeft() - bbox.GetHeight() / 2.0,
-                            bbox.GetBottom() - bbox.GetHeight() / 6.0 );
-        }
-
-        if( parent->IsSymbolLikePowerLocalLabel() )
-            drawLocalPowerIcon( pos, size, rotated, color, drawingShadows, aField->IsBrightened() );
     }
 
     // Draw anchor or umbilical line
@@ -2816,10 +2676,10 @@ void SCH_PAINTER::draw( const SCH_SHEET* aSheet, int aLayer )
     if( !drawingShadows || eeconfig()->m_Selection.draw_selected_children )
     {
         for( const SCH_FIELD& field : aSheet->GetFields() )
-            draw( &field, aLayer, DNP );
+            draw( &field, aLayer, DNP || markExclusion );
 
         for( SCH_SHEET_PIN* sheetPin : aSheet->GetPins() )
-            draw( static_cast<SCH_HIERLABEL*>( sheetPin ), aLayer, DNP );
+            draw( static_cast<SCH_HIERLABEL*>( sheetPin ), aLayer, DNP || markExclusion );
     }
 
     if( isFieldsLayer( aLayer ) )
@@ -2852,9 +2712,9 @@ void SCH_PAINTER::draw( const SCH_SHEET* aSheet, int aLayer )
         m_gal->DrawRectangle( pos, pos + size );
     }
 
-    if( DNP )
+    if( DNP || markExclusion )
     {
-        int      layer = LAYER_DNP_MARKER;
+        int      layer = DNP ? LAYER_DNP_MARKER : LAYER_EXCLUDED_FROM_SIM;
         BOX2I    bbox = aSheet->GetBodyBoundingBox();
         BOX2I    pins = aSheet->GetBoundingBox();
         VECTOR2D margins( std::max( bbox.GetX() - pins.GetX(), pins.GetEnd().x - bbox.GetEnd().x ),
@@ -2878,40 +2738,6 @@ void SCH_PAINTER::draw( const SCH_SHEET* aSheet, int aLayer )
         m_gal->DrawSegment( pt1, pt2, strokeWidth );
         std::swap( pt1.x, pt2.x );
         m_gal->DrawSegment( pt1, pt2, strokeWidth );
-    }
-
-    if( markExclusion )
-    {
-        int   layer = LAYER_EXCLUDED_FROM_SIM;
-        BOX2I bbox = aSheet->GetBodyBoundingBox();
-        int   strokeWidth = schIUScale.MilsToIU( ADVANCED_CFG::GetCfg().m_ExcludeFromSimulationLineWidth );
-
-        bbox.Inflate( KiROUND( strokeWidth * 0.5 ) );
-
-        GAL_SCOPED_ATTRS scopedAttrs( *m_gal, GAL_SCOPED_ATTRS::ALL_ATTRS );
-        m_gal->AdvanceDepth();
-        m_gal->SetIsStroke( true );
-        m_gal->SetIsFill( true );
-        m_gal->SetStrokeColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.5 ) );
-        m_gal->SetFillColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.5 ) );
-
-        m_gal->DrawSegment( bbox.GetPosition(), VECTOR2D( bbox.GetEnd().x, bbox.GetY() ), strokeWidth );
-        m_gal->DrawSegment( VECTOR2D( bbox.GetEnd().x, bbox.GetY() ), bbox.GetEnd(), strokeWidth );
-        m_gal->DrawSegment( bbox.GetEnd(), VECTOR2D( bbox.GetX(), bbox.GetEnd().y ), strokeWidth );
-        m_gal->DrawSegment( VECTOR2D( bbox.GetX(), bbox.GetEnd().y ), bbox.GetPosition(), strokeWidth );
-
-        int offset = 2 * strokeWidth;
-        VECTOR2D center = bbox.GetEnd() + VECTOR2D( offset + strokeWidth, -offset );
-        VECTOR2D left = center + VECTOR2D( -offset, 0 );
-        VECTOR2D right = center + VECTOR2D( offset, 0 );
-        VECTOR2D top = center + VECTOR2D( 0, offset );
-        VECTOR2D bottom = center + VECTOR2D( 0, -offset );
-
-        m_gal->SetFillColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.1 ) );
-        m_gal->DrawCircle( center, offset );
-        m_gal->AdvanceDepth();
-        m_gal->SetFillColor( m_schSettings.GetLayerColor( layer ).WithAlpha( 0.5 ) );
-        m_gal->DrawCurve( left, top, bottom, right, 1 );
     }
 }
 

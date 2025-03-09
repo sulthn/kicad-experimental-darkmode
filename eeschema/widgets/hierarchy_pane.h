@@ -84,7 +84,7 @@ public:
     /**
      * Update the hierarchical tree of the schematic.
      */
-    void UpdateHierarchyTree( bool aClear = false );
+    void UpdateHierarchyTree();
 
     /**
      * Updates the tree's selection to match current page

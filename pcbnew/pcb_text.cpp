@@ -278,6 +278,9 @@ void PCB_TEXT::GetMsgPanelInfo( EDA_DRAW_FRAME* aFrame, std::vector<MSG_PANEL_IT
     if( aFrame->GetName() == PCB_EDIT_FRAME_NAME && IsLocked() )
         aList.emplace_back( _( "Status" ), _( "Locked" ) );
 
+    if( parentFP )
+        aList.emplace_back( _( "Display" ), IsVisible() ? _( "Yes" ) : _( "No" ) );
+
     aList.emplace_back( _( "Layer" ), GetLayerName() );
 
     aList.emplace_back( _( "Mirror" ), IsMirrored() ? _( "Yes" ) : _( "No" ) );
@@ -638,8 +641,13 @@ static struct PCB_TEXT_DESC
                 };
 
         propMgr.OverrideAvailability( TYPE_HASH( PCB_TEXT ), TYPE_HASH( EDA_TEXT ),
+                                      _HKI( "Visible" ), isFootprintText );
+
+        propMgr.OverrideAvailability( TYPE_HASH( PCB_TEXT ), TYPE_HASH( EDA_TEXT ),
                                       _HKI( "Keep Upright" ), isFootprintText );
 
-        propMgr.Mask( TYPE_HASH( PCB_TEXT ), TYPE_HASH( EDA_TEXT ), _HKI( "Hyperlink" ) );
+        propMgr.OverrideAvailability( TYPE_HASH( PCB_TEXT ), TYPE_HASH( EDA_TEXT ),
+                                      _HKI( "Hyperlink" ),
+                                      []( INSPECTABLE* aItem ) { return false; } );
     }
 } _PCB_TEXT_DESC;

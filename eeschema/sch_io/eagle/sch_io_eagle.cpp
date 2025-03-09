@@ -784,7 +784,7 @@ void SCH_IO_EAGLE::loadSchematic( const ESCHEMATIC& aSchematic )
 
             // Instantiate the missing symbol unit
             int            unit      = unitEntry.first;
-            const wxString reference = origSymbol->GetField( FIELD_T::REFERENCE )->GetText();
+            const wxString reference = origSymbol->GetField( REFERENCE_FIELD )->GetText();
             std::unique_ptr<SCH_SYMBOL> symbol( (SCH_SYMBOL*) origSymbol->Duplicate() );
 
             symbol->SetUnitSelection( &sheetpath, unit );
@@ -1817,7 +1817,7 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
     if( !package.IsEmpty() )
     {
         wxString footprint = m_schematic->Prj().GetProjectName() + wxT( ":" ) + package;
-        symbol->GetField( FIELD_T::FOOTPRINT )->SetText( footprint );
+        symbol->GetField( FOOTPRINT_FIELD )->SetText( footprint );
     }
 
     if( aInstance->rot )
@@ -1831,17 +1831,11 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
     std::vector<SCH_FIELD*> partFields;
     part->GetFields( partFields );
 
-    for( const SCH_FIELD* partField : partFields )
+    for( const SCH_FIELD* field : partFields )
     {
-        SCH_FIELD* symbolField;
-
-        if( partField->IsMandatory() )
-            symbolField = symbol->GetField( partField->GetId() );
-        else
-            symbolField = symbol->GetField( partField->GetName() );
-
-        symbolField->ImportValues( *partField );
-        symbolField->SetTextPos( symbol->GetPosition() + partField->GetTextPos() );
+        symbol->GetFieldById( field->GetId() )->ImportValues( *field );
+        symbol->GetFieldById( field->GetId() )->SetTextPos( (VECTOR2I)symbol->GetPosition()
+                                                            + field->GetTextPos() );
     }
 
     // If there is no footprint assigned, then prepend the reference value
@@ -1863,10 +1857,10 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
     if( aInstance->part.find_first_not_of( wxT( "#" ) ) != 0 )
         reference.Prepend( wxT( "UNK" ) );
 
-    SCH_FIELD* referenceField = symbol->GetField( FIELD_T::REFERENCE );
+    SCH_FIELD* referenceField = symbol->GetField( REFERENCE_FIELD );
     referenceField->SetText( reference );
 
-    SCH_FIELD* valueField = symbol->GetField( FIELD_T::VALUE );
+    SCH_FIELD* valueField = symbol->GetField( VALUE_FIELD );
     bool       userValue = m_userValue.at( libIdSymbolName );
 
     if( part->GetUnitCount() > 1 )
@@ -1889,12 +1883,13 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
 
     for( const auto& [ attrName, attr ] : epart->attributes )
     {
-        VECTOR2I newFieldPosition( 0, 0 );
+        VECTOR2I   newFieldPosition( 0, 0 );
+        SCH_FIELD* lastField = symbol->GetFieldById( symbol->GetFieldCount() - 1 );
 
-        if( !symbol->GetFields().empty() )
-            newFieldPosition = symbol->GetFields().back().GetPosition();
+        if( lastField )
+            newFieldPosition = lastField->GetPosition();
 
-        SCH_FIELD newField( newFieldPosition, FIELD_T::USER, symbol.get() );
+        SCH_FIELD newField( newFieldPosition, symbol->GetNextFieldId(), symbol.get() );
 
         newField.SetName( attrName );
 
@@ -1908,7 +1903,7 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
 
     for( const auto& [variantName, variant] : epart->variants )
     {
-        SCH_FIELD* field = symbol->AddField( *symbol->GetField( FIELD_T::VALUE ) );
+        SCH_FIELD* field = symbol->AddField( *symbol->GetField( VALUE_FIELD ) );
         field->SetName( wxT( "VARIANT_" ) + variant->name );
 
         if( variant->value )
@@ -1927,17 +1922,17 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
 
         if( eattr->name.Lower() == wxT( "name" ) )
         {
-            field              = symbol->GetField( FIELD_T::REFERENCE );
+            field              = symbol->GetField( REFERENCE_FIELD );
             nameAttributeFound = true;
         }
         else if( eattr->name.Lower() == wxT( "value" ) )
         {
-            field               = symbol->GetField( FIELD_T::VALUE );
+            field               = symbol->GetField( VALUE_FIELD );
             valueAttributeFound = true;
         }
         else
         {
-            field = symbol->GetField( eattr->name );
+            field = symbol->FindField( eattr->name );
 
             if( field )
                 field->SetVisible( false );
@@ -1969,8 +1964,8 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
     // Use the instance attribute to determine the reference and value field visibility.
     if( aInstance->smashed && aInstance->smashed.Get() )
     {
-        symbol->GetField( FIELD_T::VALUE )->SetVisible( valueAttributeFound );
-        symbol->GetField( FIELD_T::REFERENCE )->SetVisible( nameAttributeFound );
+        symbol->GetField( VALUE_FIELD )->SetVisible( valueAttributeFound );
+        symbol->GetField( REFERENCE_FIELD )->SetVisible( nameAttributeFound );
     }
 
     // Eagle has a brain dead module reference scheme where the module names separated by colons
@@ -1999,8 +1994,8 @@ void SCH_IO_EAGLE::loadInstance( const std::unique_ptr<EINSTANCE>& aInstance,
     for( const SCH_PIN* pin : symbol->GetLibPins() )
         m_connPoints[symbol->GetPinPhysicalPosition( pin )].emplace( pin );
 
-    if( part->IsGlobalPower() )
-        m_powerPorts[ reference ] = symbol->GetField( FIELD_T::VALUE )->GetText();
+    if( part->IsPower() )
+        m_powerPorts[ reference ] = symbol->GetField( VALUE_FIELD )->GetText();
 
     symbol->ClearFlags();
 
@@ -2042,7 +2037,7 @@ EAGLE_LIBRARY* SCH_IO_EAGLE::loadLibrary( const ELIBRARY* aLibrary, EAGLE_LIBRAR
             libSymbol->SetUnitCount( gate_count );
             libSymbol->LockUnits( true );
 
-            SCH_FIELD* reference = libSymbol->GetField( FIELD_T::REFERENCE );
+            SCH_FIELD* reference = libSymbol->GetFieldById( REFERENCE_FIELD );
 
             if( prefix.length() == 0 )
             {
@@ -2055,7 +2050,7 @@ EAGLE_LIBRARY* SCH_IO_EAGLE::loadLibrary( const ELIBRARY* aLibrary, EAGLE_LIBRAR
                 reference->SetText( edevice->package ? prefix : '#' + prefix );
             }
 
-            libSymbol->GetValueField().SetVisible( true );
+            libSymbol->GetFieldById( VALUE_FIELD )->SetVisible( true );
 
             int  gateindex = 1;
             bool ispower   = false;
@@ -2082,7 +2077,7 @@ EAGLE_LIBRARY* SCH_IO_EAGLE::loadLibrary( const ELIBRARY* aLibrary, EAGLE_LIBRAR
             libSymbol->SetUnitCount( gate_count );
 
             if( gate_count == 1 && ispower )
-                libSymbol->SetGlobalPower();
+                libSymbol->SetPower();
 
             // Don't set the footprint field if no package is defined in the Eagle schematic.
             if( edevice->package )
@@ -2134,7 +2129,7 @@ EAGLE_LIBRARY* SCH_IO_EAGLE::loadLibrary( const ELIBRARY* aLibrary, EAGLE_LIBRAR
 
             aEagleLibrary->KiCadSymbols[ libName ] = std::move( libSymbol );
 
-            // Store information on whether the value of FIELD_T::VALUE for a part should be
+            // Store information on whether the value of VALUE_FIELD for a part should be
             // part/@value or part/@deviceset + part/@device.
             m_userValue.emplace( std::make_pair( libName, edeviceset->uservalue == true ) );
         }
@@ -2236,7 +2231,8 @@ bool SCH_IO_EAGLE::loadSymbol( const std::unique_ptr<ESYMBOL>& aEsymbol,
         if( libtext->GetText() == wxT( "${REFERENCE}" ) )
         {
             // Move text & attributes to Reference field and discard LIB_TEXT item
-            loadFieldAttributes( &aSymbol->GetReferenceField(), libtext.get() );
+            SCH_FIELD* field = aSymbol->GetFieldById( REFERENCE_FIELD );
+            loadFieldAttributes( field, libtext.get() );
 
             // Show Reference field if Eagle reference was uppercase
             showRefDes = etext->text == wxT( ">NAME" );
@@ -2244,7 +2240,8 @@ bool SCH_IO_EAGLE::loadSymbol( const std::unique_ptr<ESYMBOL>& aEsymbol,
         else if( libtext->GetText() == wxT( "${VALUE}" ) )
         {
             // Move text & attributes to Value field and discard LIB_TEXT item
-            loadFieldAttributes( &aSymbol->GetValueField(), libtext.get() );
+            SCH_FIELD* field = aSymbol->GetFieldById( VALUE_FIELD );
+            loadFieldAttributes( field, libtext.get() );
 
             // Show Value field if Eagle reference was uppercase
             showValue = etext->text == wxT( ">VALUE" );
@@ -2272,8 +2269,8 @@ bool SCH_IO_EAGLE::loadSymbol( const std::unique_ptr<ESYMBOL>& aEsymbol,
         }
     }
 
-    aSymbol->GetReferenceField().SetVisible( showRefDes );
-    aSymbol->GetValueField().SetVisible( showValue );
+    aSymbol->GetFieldById( REFERENCE_FIELD )->SetVisible( showRefDes );
+    aSymbol->GetFieldById( VALUE_FIELD )->SetVisible( showValue );
 
     return pincount == 1 ? ispower : false;
 }
@@ -3346,11 +3343,11 @@ void SCH_IO_EAGLE::addImplicitConnections( SCH_SYMBOL* aSymbol, SCH_SCREEN* aScr
 
     // Normally power parts also have power input pins,
     // but they already force net names on the attached wires
-    if( aSymbol->GetLibSymbolRef()->IsGlobalPower() )
+    if( aSymbol->GetLibSymbolRef()->IsPower() )
         return;
 
     int                   unit      = aSymbol->GetUnit();
-    const wxString        reference = aSymbol->GetField( FIELD_T::REFERENCE )->GetText();
+    const wxString        reference = aSymbol->GetField( REFERENCE_FIELD )->GetText();
     std::vector<SCH_PIN*> pins      = aSymbol->GetLibSymbolRef()->GetPins();
     std::set<int>         missingUnits;
 

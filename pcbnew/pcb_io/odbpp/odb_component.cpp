@@ -63,7 +63,7 @@ ODB_COMPONENT& COMPONENTS_MANAGER::AddComponent( const FOOTPRINT*         aFp,
 
     for( PCB_FIELD* field : aFp->GetFields() )
     {
-        if( field->GetId() == FIELD_T::REFERENCE )
+        if( field->GetId() == REFERENCE_FIELD )
             continue;
 
         wxString key = field->GetName();
@@ -78,7 +78,7 @@ ODB_COMPONENT& COMPONENTS_MANAGER::AddComponent( const FOOTPRINT*         aFp,
 
     if( aFp->GetAttributes() & FP_SMD )
     {
-        AddSystemAttribute( comp, ODB_ATTR::COMP_MOUNT_TYPE::MT_SMD );
+        AddSystemAttribute( comp, ODB_ATTR::COMP_MOUNT_TYPE::SMD );
     }
     else if( aFp->GetAttributes() & FP_THROUGH_HOLE )
     {

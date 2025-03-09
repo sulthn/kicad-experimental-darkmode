@@ -58,9 +58,8 @@ ACTION_MANAGER::ACTION_MANAGER( TOOL_MANAGER* aToolManager ) :
 
         wxLogTrace( kicadTraceToolStack,
                     "ACTION_MANAGER::ACTION_MANAGER: Registering action %s with ID %d, UI ID %d, "
-                    "group %s(%d), toolbar state %s",
-                    action->m_name, action->m_id, action->GetUIId(), groupName, groupID,
-                    action->m_toolbarState.to_string() );
+                    "and group %s(%d)",
+                    action->m_name, action->m_id, action->GetUIId(), groupName, groupID );
 
         RegisterAction( action );
     }
@@ -79,8 +78,7 @@ void ACTION_MANAGER::RegisterAction( TOOL_ACTION* aAction )
     wxASSERT( aAction->GetName().find( '.', 0 ) != std::string::npos );
 
     // TOOL_ACTIONs must have unique names & ids
-    wxASSERT_MSG( m_actionNameIndex.find( aAction->m_name ) == m_actionNameIndex.end(),
-                  wxString::Format( "Action '%s' already registered", aAction->m_name ) );
+    wxASSERT( m_actionNameIndex.find( aAction->m_name ) == m_actionNameIndex.end() );
 
     m_actionNameIndex[aAction->m_name] = aAction;
 

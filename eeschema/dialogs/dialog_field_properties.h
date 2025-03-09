@@ -62,7 +62,7 @@ public:
 protected:
     void init();
 
-    void updateText( SCH_FIELD* aField );
+    void updateText( EDA_TEXT* aText );
 
     void onScintillaCharAdded( wxStyledTextEvent &aEvent );
 
@@ -91,7 +91,7 @@ protected:
     UNIT_BINDER       m_posY;
     UNIT_BINDER       m_textSize;
 
-    FIELD_T           m_fieldId;
+    int               m_fieldId;
     wxString          m_text;
     KIFONT::FONT*     m_font;
     bool              m_isItalic;

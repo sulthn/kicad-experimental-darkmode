@@ -149,7 +149,8 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMAT
     else
         aSymbol->GetEmbeddedFiles()->ClearEmbeddedFonts();
 
-    std::vector<SCH_FIELD*> orderedFields;
+    int nextFreeFieldId = MANDATORY_FIELD_COUNT;
+    std::vector<SCH_FIELD*> fields;
     std::string name = aFormatter.Quotew( aSymbol->GetLibId().GetLibItemName().wx_str() );
     std::string unitName = aSymbol->GetLibId().GetLibItemName();
 
@@ -168,10 +169,8 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMAT
     {
         aFormatter.Print( "(symbol %s", name.c_str() );
 
-        if( aSymbol->IsGlobalPower() )
-            aFormatter.Print( "(power global)" );
-        else if( aSymbol->IsLocalPower() )
-            aFormatter.Print( "(power local)" );
+        if( aSymbol->IsPower() )
+            aFormatter.Print( "(power)" );
 
         // TODO: add uuid token here.
 
@@ -206,21 +205,24 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMAT
 
         // TODO: add required token here."
 
-        aSymbol->GetFields( orderedFields );
+        aSymbol->GetFields( fields );
 
-        for( SCH_FIELD* field : orderedFields )
+        for( SCH_FIELD* field : fields )
             saveField( field, aFormatter );
+
+        nextFreeFieldId = aSymbol->GetNextAvailableFieldId();
 
         // @todo At some point in the future the lock status (all units interchangeable) should
         // be set deterministically.  For now a custom lock property is used to preserve the
         // locked flag state.
         if( aSymbol->UnitsLocked() )
         {
-            SCH_FIELD locked( nullptr, FIELD_T::USER, "ki_locked" );
+            SCH_FIELD locked( nullptr, nextFreeFieldId, "ki_locked" );
             saveField( &locked, aFormatter );
+            nextFreeFieldId += 1;
         }
 
-        saveDcmInfoAsFields( aSymbol, aFormatter );
+        saveDcmInfoAsFields( aSymbol, aFormatter, nextFreeFieldId );
 
         // Save the draw items grouped by units.
         std::vector<LIB_SYMBOL_UNIT> units = aSymbol->GetUnitDrawItems();
@@ -284,12 +286,14 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMAT
                           name.c_str(),
                           aFormatter.Quotew( parent->GetName() ).c_str() );
 
-        aSymbol->GetFields( orderedFields );
+        aSymbol->GetFields( fields );
 
-        for( SCH_FIELD* field : orderedFields )
+        for( SCH_FIELD* field : fields )
             saveField( field, aFormatter );
 
-        saveDcmInfoAsFields( aSymbol, aFormatter );
+        nextFreeFieldId = aSymbol->GetNextAvailableFieldId();
+
+        saveDcmInfoAsFields( aSymbol, aFormatter, nextFreeFieldId );
     }
 
     aFormatter.Print( ")" );
@@ -297,16 +301,18 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::SaveSymbol( LIB_SYMBOL* aSymbol, OUTPUTFORMAT
 
 
 void SCH_IO_KICAD_SEXPR_LIB_CACHE::saveDcmInfoAsFields( LIB_SYMBOL* aSymbol,
-                                                        OUTPUTFORMATTER& aFormatter )
+                                                        OUTPUTFORMATTER& aFormatter,
+                                                        int& aNextFreeFieldId )
 {
     wxCHECK_RET( aSymbol, "Invalid LIB_SYMBOL pointer." );
 
     if( !aSymbol->GetKeyWords().IsEmpty() )
     {
-        SCH_FIELD keywords( nullptr, FIELD_T::USER, wxString( "ki_keywords" ) );
+        SCH_FIELD keywords( nullptr, aNextFreeFieldId, wxString( "ki_keywords" ) );
         keywords.SetVisible( false );
         keywords.SetText( aSymbol->GetKeyWords() );
         saveField( &keywords, aFormatter );
+        aNextFreeFieldId += 1;
     }
 
     wxArrayString fpFilters = aSymbol->GetFPFilters();
@@ -326,10 +332,11 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::saveDcmInfoAsFields( LIB_SYMBOL* aSymbol,
                 tmp += " " + curr_filter;
         }
 
-        SCH_FIELD description( nullptr, FIELD_T::USER, wxString( "ki_fp_filters" ) );
+        SCH_FIELD description( nullptr, aNextFreeFieldId, wxString( "ki_fp_filters" ) );
         description.SetVisible( false );
         description.SetText( tmp );
         saveField( &description, aFormatter );
+        aNextFreeFieldId += 1;
     }
 }
 
@@ -419,9 +426,6 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::saveField( SCH_FIELD* aField, OUTPUTFORMATTER
 
     if( !aField->CanAutoplace() )
         aFormatter.Print( "(do_not_autoplace)" );
-
-    if( !aField->IsVisible() )
-        KICAD_FORMAT::FormatBool( &aFormatter, "hide", true );
 
     aField->Format( &aFormatter, 0 );
     aFormatter.Print( ")" );
@@ -544,7 +548,7 @@ void SCH_IO_KICAD_SEXPR_LIB_CACHE::DeleteSymbol( const wxString& aSymbolName )
 
         while( it1 != m_symbols.end() )
         {
-            if( it1->second->IsDerived()
+            if( it1->second->IsAlias()
               && it1->second->GetParent().lock() == rootSymbol->SharedPtr() )
             {
                 delete it1->second;

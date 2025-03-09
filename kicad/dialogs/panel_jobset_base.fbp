@@ -104,7 +104,7 @@
                     <property name="cell_font"></property>
                     <property name="cell_horiz_alignment">wxALIGN_LEFT</property>
                     <property name="cell_text"></property>
-                    <property name="cell_vert_alignment">wxALIGN_CENTER</property>
+                    <property name="cell_vert_alignment">wxALIGN_TOP</property>
                     <property name="center_pane">0</property>
                     <property name="close_button">1</property>
                     <property name="col_label_horiz_alignment">wxALIGN_CENTER</property>
@@ -511,15 +511,15 @@
               <property name="proportion">4</property>
               <object class="wxStaticBoxSizer" expanded="true">
                 <property name="id">wxID_ANY</property>
-                <property name="label">Destinations</property>
+                <property name="label">Outputs</property>
                 <property name="minimum_size"></property>
-                <property name="name">sbDestinations</property>
+                <property name="name">sbOutputs</property>
                 <property name="orient">wxVERTICAL</property>
                 <property name="parent">1</property>
                 <property name="permission">none</property>
                 <object class="sizeritem" expanded="true">
                   <property name="border">0</property>
-                  <property name="flag">wxEXPAND</property>
+                  <property name="flag">wxEXPAND|wxALL</property>
                   <property name="proportion">1</property>
                   <object class="wxScrolledWindow" expanded="true">
                     <property name="BottomDockable">1</property>
@@ -557,7 +557,7 @@
                     <property name="minimize_button">0</property>
                     <property name="minimum_size"></property>
                     <property name="moveable">1</property>
-                    <property name="name">m_destinationList</property>
+                    <property name="name">m_outputList</property>
                     <property name="pane_border">1</property>
                     <property name="pane_position"></property>
                     <property name="pane_size"></property>
@@ -577,7 +577,7 @@
                     <property name="window_style">wxVSCROLL</property>
                     <object class="wxBoxSizer" expanded="false">
                       <property name="minimum_size"></property>
-                      <property name="name">m_destinationListSizer</property>
+                      <property name="name">m_outputListSizer</property>
                       <property name="orient">wxVERTICAL</property>
                       <property name="permission">protected</property>
                     </object>
@@ -631,7 +631,7 @@
                         <property name="gripper">0</property>
                         <property name="hidden">0</property>
                         <property name="id">wxID_ANY</property>
-                        <property name="label">Add destination</property>
+                        <property name="label">Add output</property>
                         <property name="margins"></property>
                         <property name="markup">0</property>
                         <property name="max_size"></property>
@@ -641,7 +641,7 @@
                         <property name="minimize_button">0</property>
                         <property name="minimum_size"></property>
                         <property name="moveable">1</property>
-                        <property name="name">m_buttonAddDestination</property>
+                        <property name="name">m_buttonOutputAdd</property>
                         <property name="pane_border">1</property>
                         <property name="pane_position"></property>
                         <property name="pane_size"></property>
@@ -664,7 +664,7 @@
                         <property name="window_extra_style"></property>
                         <property name="window_name"></property>
                         <property name="window_style"></property>
-                        <event name="OnButtonClick">OnAddDestinationClick</event>
+                        <event name="OnButtonClick">OnAddOutputClick</event>
                       </object>
                     </object>
                   </object>
@@ -816,7 +816,7 @@
                 <property name="gripper">0</property>
                 <property name="hidden">0</property>
                 <property name="id">wxID_ANY</property>
-                <property name="label">Generate All Destinations</property>
+                <property name="label">Generate All Outputs</property>
                 <property name="margins"></property>
                 <property name="markup">0</property>
                 <property name="max_size"></property>
@@ -826,7 +826,7 @@
                 <property name="minimize_button">0</property>
                 <property name="minimum_size"></property>
                 <property name="moveable">1</property>
-                <property name="name">m_buttonGenerateAllDestinations</property>
+                <property name="name">m_buttonRunAllOutputs</property>
                 <property name="pane_border">1</property>
                 <property name="pane_position"></property>
                 <property name="pane_size"></property>
@@ -849,7 +849,7 @@
                 <property name="window_extra_style"></property>
                 <property name="window_name"></property>
                 <property name="window_style"></property>
-                <event name="OnButtonClick">OnGenerateAllDestinationsClick</event>
+                <event name="OnButtonClick">OnGenerateAllOutputsClick</event>
               </object>
             </object>
           </object>
@@ -871,7 +871,7 @@
       <property name="id">wxID_ANY</property>
       <property name="maximum_size"></property>
       <property name="minimum_size"></property>
-      <property name="name">PANEL_DESTINATION_BASE</property>
+      <property name="name">PANEL_JOBSET_OUTPUT_BASE</property>
       <property name="pos"></property>
       <property name="size">-1,-1</property>
       <property name="subclass">; ; forward_declare</property>
@@ -1350,18 +1350,17 @@
       <property name="id">wxID_ANY</property>
       <property name="maximum_size"></property>
       <property name="minimum_size">450,250</property>
-      <property name="name">DIALOG_JOBSET_RUN_LOG_BASE</property>
+      <property name="name">DIALOG_OUTPUT_RUN_RESULTS_BASE</property>
       <property name="pos"></property>
       <property name="size"></property>
       <property name="style">wxDEFAULT_DIALOG_STYLE|wxRESIZE_BORDER</property>
       <property name="subclass">DIALOG_SHIM; dialog_shim.h; forward_declare</property>
-      <property name="title">Jobset Run Log</property>
+      <property name="title">Job Output Run Log</property>
       <property name="tooltip"></property>
       <property name="two_step_creation">0</property>
       <property name="window_extra_style"></property>
       <property name="window_name"></property>
       <property name="window_style"></property>
-      <event name="OnUpdateUI">OnUpdateUI</event>
       <object class="wxBoxSizer" expanded="true">
         <property name="minimum_size"></property>
         <property name="name">bMainSizer</property>
@@ -1441,7 +1440,7 @@
             <object class="sizeritem" expanded="false">
               <property name="border">5</property>
               <property name="flag">wxALL|wxEXPAND</property>
-              <property name="proportion">1</property>
+              <property name="proportion">3</property>
               <object class="wxListCtrl" expanded="false">
                 <property name="BottomDockable">1</property>
                 <property name="LeftDockable">1</property>
@@ -1500,12 +1499,13 @@
                 <property name="window_name"></property>
                 <property name="window_style"></property>
                 <event name="OnListItemSelected">OnJobListItemSelected</event>
+                <event name="OnSize">onJobListSize</event>
               </object>
             </object>
             <object class="sizeritem" expanded="true">
               <property name="border">5</property>
               <property name="flag">wxALL|wxEXPAND</property>
-              <property name="proportion">1</property>
+              <property name="proportion">4</property>
               <object class="wxTextCtrl" expanded="true">
                 <property name="BottomDockable">1</property>
                 <property name="LeftDockable">1</property>
@@ -1571,7 +1571,7 @@
         </object>
         <object class="sizeritem" expanded="false">
           <property name="border">5</property>
-          <property name="flag">wxALL|wxEXPAND</property>
+          <property name="flag">wxEXPAND</property>
           <property name="proportion">0</property>
           <object class="wxStdDialogButtonSizer" expanded="false">
             <property name="Apply">0</property>

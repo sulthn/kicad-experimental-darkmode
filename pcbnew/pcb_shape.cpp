@@ -124,8 +124,6 @@ bool PCB_SHAPE::Deserialize( const google::protobuf::Any &aContainer )
 
     // TODO m_hasSolderMask and m_solderMaskMargin
 
-    m_hatchingDirty = true;
-
     return true;
 }
 
@@ -192,7 +190,7 @@ int PCB_SHAPE::GetSolderMaskExpansion() const
     }
 
     // Ensure the resulting mask opening has a non-negative size
-    if( margin < 0 && !IsSolidFill() )
+    if( margin < 0 && !IsFilled() )
         margin = std::max( margin, -GetWidth() / 2 );
 
     return margin;
@@ -252,7 +250,7 @@ std::vector<VECTOR2I> PCB_SHAPE::GetConnectionPoints() const
     std::vector<VECTOR2I> ret;
 
     // For filled shapes, we may as well use a centroid
-    if( IsSolidFill() )
+    if( IsFilled() )
     {
         ret.emplace_back( GetCenter() );
         return ret;
@@ -263,16 +261,16 @@ std::vector<VECTOR2I> PCB_SHAPE::GetConnectionPoints() const
     case SHAPE_T::CIRCLE:
     {
         const CIRCLE circle( GetCenter(), GetRadius() );
-
         for( const TYPED_POINT2I& pt : KIGEOM::GetCircleKeyPoints( circle, false ) )
+        {
             ret.emplace_back( pt.m_point );
-
+        }
         break;
     }
-
     case SHAPE_T::ARC:
         ret.emplace_back( GetArcMid() );
         KI_FALLTHROUGH;
+
     case SHAPE_T::SEGMENT:
     case SHAPE_T::BEZIER:
         ret.emplace_back( GetStart() );
@@ -292,75 +290,11 @@ std::vector<VECTOR2I> PCB_SHAPE::GetConnectionPoints() const
         break;
 
     case SHAPE_T::UNDEFINED:
-        UNIMPLEMENTED_FOR( SHAPE_T_asString() );
+        // No default - handle all cases, even if just break
         break;
     }
 
     return ret;
-}
-
-
-void PCB_SHAPE::updateHatching() const
-{
-    EDA_SHAPE::updateHatching();
-
-    if( !m_hatching.IsEmpty() )
-    {
-        PCB_LAYER_ID   layer = GetLayer();
-        BOX2I          bbox = GetBoundingBox();
-        SHAPE_POLY_SET holes;
-        int            maxError = ARC_LOW_DEF;
-
-        auto knockoutItem =
-                [&]( BOARD_ITEM* item )
-                {
-                    int margin = GetHatchLineSpacing() / 2;
-
-                    if( item->Type() == PCB_TEXTBOX_T )
-                        margin = 0;
-
-                    item->TransformShapeToPolygon( holes, layer, margin, maxError, ERROR_OUTSIDE );
-                };
-
-        for( BOARD_ITEM* item : GetBoard()->Drawings() )
-        {
-            if( item == this )
-                continue;
-
-            if( item->Type() == PCB_FIELD_T
-                    || item->Type() == PCB_TEXT_T
-                    || item->Type() == PCB_TEXTBOX_T
-                    || item->Type() == PCB_SHAPE_T )
-            {
-                if( item->GetLayer() == layer && item->GetBoundingBox().Intersects( bbox ) )
-                    knockoutItem( item );
-            }
-        }
-
-        for( FOOTPRINT* footprint : GetBoard()->Footprints() )
-        {
-            if( footprint == GetParentFootprint() )
-                continue;
-
-            // Knockout footprint courtyard
-            holes.Append( footprint->GetCourtyard( layer ) );
-
-            // Knockout footprint fields
-            footprint->RunOnDescendants(
-                    [&]( BOARD_ITEM* item )
-                    {
-                        if( item->Type() == PCB_FIELD_T
-                                && item->GetLayer() == layer
-                                && item->GetBoundingBox().Intersects( bbox ) )
-                        {
-                            knockoutItem( item );
-                        }
-                    } );
-        }
-
-        m_hatching.BooleanSubtract( holes );
-        m_hatching.Fracture();
-    }
 }
 
 
@@ -388,19 +322,19 @@ const VECTOR2I PCB_SHAPE::GetFocusPosition() const
     switch( m_shape )
     {
     case SHAPE_T::CIRCLE:
-        if( !IsAnyFill() )
+        if( !IsFilled() )
             return VECTOR2I( GetCenter().x + GetRadius(), GetCenter().y );
         else
             return GetCenter();
 
     case SHAPE_T::RECTANGLE:
-        if( !IsAnyFill() )
+        if( !IsFilled() )
             return GetStart();
         else
             return GetCenter();
 
     case SHAPE_T::POLY:
-        if( !IsAnyFill() )
+        if( !IsFilled() )
         {
             VECTOR2I pos = GetPolyShape().Outline(0).CPoint(0);
             return VECTOR2I( pos.x, pos.y );
@@ -590,8 +524,6 @@ void PCB_SHAPE::Mirror( const VECTOR2I& aCentre, FLIP_DIRECTION aFlipDirection )
     default:
         UNIMPLEMENTED_FOR( SHAPE_T_asString() );
     }
-
-    m_hatchingDirty = true;
 }
 
 
@@ -717,11 +649,13 @@ void PCB_SHAPE::GetMsgPanelInfo( EDA_DRAW_FRAME* aFrame, std::vector<MSG_PANEL_I
 
 wxString PCB_SHAPE::GetItemDescription( UNITS_PROVIDER* aUnitsProvider, bool aFull ) const
 {
-    FOOTPRINT* parentFP = GetParentFootprint();
+    FOOTPRINT* parentFP = nullptr;
 
-    // Don't report parent footprint info from footprint editor, viewer, etc.
-    if( GetBoard() && GetBoard()->GetBoardUse() == BOARD_USE::FPHOLDER )
-        parentFP = nullptr;
+    if( EDA_DRAW_FRAME* frame = dynamic_cast<EDA_DRAW_FRAME*>( aUnitsProvider ) )
+    {
+        if( frame->GetName() == PCB_EDIT_FRAME_NAME )
+            parentFP = GetParentFootprint();
+    }
 
     if( IsOnCopperLayer() )
     {
@@ -838,15 +772,7 @@ void PCB_SHAPE::TransformShapeToPolygon( SHAPE_POLY_SET& aBuffer, PCB_LAYER_ID a
                                          int aClearance, int aError, ERROR_LOC aErrorLoc,
                                          bool ignoreLineWidth ) const
 {
-    EDA_SHAPE::TransformShapeToPolygon( aBuffer, aClearance, aError, aErrorLoc, ignoreLineWidth,
-                                        false );
-}
-
-
-void PCB_SHAPE::TransformShapeToPolySet( SHAPE_POLY_SET& aBuffer, PCB_LAYER_ID aLayer,
-                                         int aClearance, int aError, ERROR_LOC aErrorLoc ) const
-{
-    EDA_SHAPE::TransformShapeToPolygon( aBuffer, aClearance, aError, aErrorLoc, false, true );
+    EDA_SHAPE::TransformShapeToPolygon( aBuffer, aClearance, aError, aErrorLoc, ignoreLineWidth );
 }
 
 

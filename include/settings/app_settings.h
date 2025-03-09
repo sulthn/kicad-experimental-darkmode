@@ -198,9 +198,6 @@ public:
     /// Active color theme name.
     wxString m_ColorTheme;
 
-    /// Use custom toolbars
-    bool m_CustomToolbars;
-
 
     ///! Local schema version for common app settings.
     int m_appSettingsSchemaVersion;

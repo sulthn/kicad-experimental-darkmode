@@ -156,26 +156,18 @@ void DRC_TEST_PROVIDER_SCHEMATIC_PARITY::testNetlist( NETLIST& aNetlist )
 
             if( !m_drcEngine->IsErrorLimitExceeded( DRCE_FOOTPRINT_FILTERS ) )
             {
-                wxString libIdLower = footprint->GetFPID().GetUniStringLibId().Lower();
-                wxString fpNameLower = footprint->GetFPID().GetUniStringLibItemName().Lower();
+                wxString fpName = footprint->GetFPID().GetUniStringLibItemName();
                 size_t   filtercount = component->GetFootprintFilters().GetCount();
                 bool     found = ( 0 == filtercount ); // if no entries, do not filter
 
                 for( size_t jj = 0; jj < filtercount && !found; jj++ )
-                {
-                    wxString filterLower = component->GetFootprintFilters()[jj].Lower();
-
-                    if( filterLower.Find( ':' ) == wxNOT_FOUND )
-                        found = fpNameLower.Matches( filterLower );
-                    else
-                        found = libIdLower.Matches( filterLower );
-                }
+                    found = fpName.Matches( component->GetFootprintFilters()[jj] );
 
                 if( !found )
                 {
                     wxString msg;
                     msg.Printf( _( "%s doesn't match symbol's footprint filters (%s)." ),
-                                footprint->GetFPID().GetUniStringLibId(),
+                                fpName,
                                 wxJoin( component->GetFootprintFilters(), ' ' ) );
 
                     std::shared_ptr<DRC_ITEM> drcItem = DRC_ITEM::Create( DRCE_FOOTPRINT_FILTERS );

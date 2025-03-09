@@ -126,8 +126,7 @@ public:
      *                 possible.
      */
     virtual BOARD* LoadBoard( const wxString& aFileName, BOARD* aAppendToMe,
-                              const std::map<std::string, UTF8>* aProperties = nullptr,
-                              PROJECT* aProject = nullptr );
+                         const std::map<std::string, UTF8>* aProperties = nullptr, PROJECT* aProject = nullptr );
 
     /**
      * Return a container with the cached library footprints generated in the last call to
@@ -175,8 +174,7 @@ public:
      * @throw IO_ERROR if the library cannot be found, or footprint cannot be loaded.
      */
     virtual void FootprintEnumerate( wxArrayString& aFootprintNames, const wxString& aLibraryPath,
-                                     bool aBestEfforts,
-                                     const std::map<std::string, UTF8>* aProperties = nullptr );
+                                     bool aBestEfforts, const std::map<std::string, UTF8>* aProperties = nullptr );
 
     /**
      * Generate a timestamp representing all the files in the library (including the library

@@ -112,10 +112,6 @@ void KICAD_MANAGER_FRAME::doReCreateMenuBar()
     importMenu->SetTitle( _( "Import Non-KiCad Project..." ) );
     importMenu->SetIcon( BITMAPS::import_project );
 
-    importMenu->Add( _( "Altium Project..." ),
-                     _( "Import Altium Schematic and PCB (*.PrjPcb)" ),
-                     ID_IMPORT_ALTIUM_PROJECT,
-                     BITMAPS::import_project );
     importMenu->Add( _( "CADSTAR Project..." ),
                      _( "Import CADSTAR Archive Schematic and PCB (*.csa, *.cpa)" ),
                      ID_IMPORT_CADSTAR_ARCHIVE_PROJECT,
@@ -138,8 +134,15 @@ void KICAD_MANAGER_FRAME::doReCreateMenuBar()
     fileMenu->Add( importMenu );
 
     fileMenu->AppendSeparator();
-    fileMenu->Add( KICAD_MANAGER_ACTIONS::archiveProject );
-    fileMenu->Add( KICAD_MANAGER_ACTIONS::unarchiveProject );
+    fileMenu->Add( _( "&Archive Project..." ),
+                   _( "Archive all needed project files into zip archive" ),
+                   ID_SAVE_AND_ZIP_FILES,
+                   BITMAPS::zip );
+
+    fileMenu->Add( _( "&Unarchive Project..." ),
+                   _( "Unarchive project files from zip archive" ),
+                   ID_READ_ZIP_ARCHIVE,
+                   BITMAPS::unzip );
 
     fileMenu->AppendSeparator();
     fileMenu->AddQuitOrClose( nullptr, wxS( "KiCad" ) );
@@ -165,7 +168,10 @@ void KICAD_MANAGER_FRAME::doReCreateMenuBar()
 
     viewMenu->AppendSeparator();
     viewMenu->Add( KICAD_MANAGER_ACTIONS::openTextEditor );
-    viewMenu->Add( KICAD_MANAGER_ACTIONS::openProjectDirectory );
+    viewMenu->Add( _( "Browse Project Files" ),
+                   _( "Open project directory in file browser" ),
+                   ID_BROWSE_IN_FILE_EXPLORER,
+                   BITMAPS::directory_browser );
 
 #ifdef __APPLE__
     // Add a separator only on macOS because the OS adds menu items to the view menu after ours
@@ -227,4 +233,56 @@ void KICAD_MANAGER_FRAME::doReCreateMenuBar()
 
     SetMenuBar( menuBar );
     delete oldMenuBar;
+}
+
+
+/**
+ * @brief (Re)Create the left vertical toolbar
+ */
+void KICAD_MANAGER_FRAME::RecreateBaseLeftToolbar()
+{
+    if( m_mainToolBar )
+    {
+        m_mainToolBar->ClearToolbar();
+    }
+    else
+    {
+        m_mainToolBar = new ACTION_TOOLBAR( this, ID_H_TOOLBAR, wxDefaultPosition, wxDefaultSize,
+                                            KICAD_AUI_TB_STYLE | wxAUI_TB_VERTICAL );
+        m_mainToolBar->SetAuiManager( &m_auimgr );
+    }
+
+    // New
+    m_mainToolBar->Add( KICAD_MANAGER_ACTIONS::newProject );
+    m_mainToolBar->Add( KICAD_MANAGER_ACTIONS::openProject );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->AddTool( ID_SAVE_AND_ZIP_FILES, wxEmptyString,
+                            KiBitmapBundle( BITMAPS::zip ),
+                            KiDisabledBitmapBundle( BITMAPS::zip ),
+                            wxITEM_NORMAL,
+                            _( "Archive all project files" ),
+                            wxEmptyString, nullptr );
+
+    m_mainToolBar->AddTool( ID_READ_ZIP_ARCHIVE, wxEmptyString,
+                            KiBitmapBundle( BITMAPS::unzip ),
+                            KiDisabledBitmapBundle( BITMAPS::unzip ),
+                            wxITEM_NORMAL,
+                            _( "Unarchive project files from zip archive" ),
+                            wxEmptyString, nullptr );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( ACTIONS::zoomRedraw );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->AddTool( ID_BROWSE_IN_FILE_EXPLORER, wxEmptyString,
+                            KiBitmapBundle( BITMAPS::directory_browser ),
+#ifdef __APPLE__
+                            _( "Reveal project folder in Finder" ) );
+#else
+                            _( "Open project directory in file explorer" ) );
+#endif
+
+    // Create m_mainToolBar
+    m_mainToolBar->KiRealize();
 }

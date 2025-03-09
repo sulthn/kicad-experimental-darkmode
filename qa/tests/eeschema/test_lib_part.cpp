@@ -67,7 +67,7 @@ BOOST_AUTO_TEST_CASE( DefaultProperties )
 
     // only get the root
     BOOST_CHECK_EQUAL( m_part_no_data.IsRoot(), true );
-    BOOST_CHECK_EQUAL( m_part_no_data.IsDerived(), false );
+    BOOST_CHECK_EQUAL( m_part_no_data.IsAlias(), false );
     BOOST_CHECK_EQUAL( m_part_no_data.SharedPtr().use_count(), 2 );
 
     // no sub units
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE( DefaultProperties )
 BOOST_AUTO_TEST_CASE( DefaultDrawings )
 {
     // default drawings exist
-    BOOST_CHECK_EQUAL( m_part_no_data.GetDrawItems().size(), 5 );
+    BOOST_CHECK_EQUAL( m_part_no_data.GetDrawItems().size(), MANDATORY_FIELD_COUNT );
     BOOST_CHECK_EQUAL( m_part_no_data.GetPins().size(), 0 );
 }
 
@@ -102,19 +102,19 @@ BOOST_AUTO_TEST_CASE( DefaultFields )
     BOOST_CHECK_PREDICATE( KI_TEST::AreDefaultFieldsCorrect, ( fields ) );
 
     // but no more (we didn't set them)
-    BOOST_CHECK_EQUAL( fields.size(), 5 );
+    BOOST_CHECK_EQUAL( fields.size(), MANDATORY_FIELD_COUNT );
 
     // also check the default field accessors
     BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches,
-            ( m_part_no_data.GetReferenceField() )( "Reference" )( (int) FIELD_T::REFERENCE ) );
+            ( m_part_no_data.GetReferenceField() )( "Reference" )( MANDATORY_FIELD_T::REFERENCE_FIELD ) );
     BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches,
-            ( m_part_no_data.GetValueField() )( "Value" )( (int) FIELD_T::VALUE ) );
+            ( m_part_no_data.GetValueField() )( "Value" )( MANDATORY_FIELD_T::VALUE_FIELD ) );
     BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches,
-            ( m_part_no_data.GetFootprintField() )( "Footprint" )( (int) FIELD_T::FOOTPRINT ) );
+            ( m_part_no_data.GetFootprintField() )( "Footprint" )( MANDATORY_FIELD_T::FOOTPRINT_FIELD ) );
     BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches,
-            ( m_part_no_data.GetDatasheetField() )( "Datasheet" )( (int) FIELD_T::DATASHEET ) );
+            ( m_part_no_data.GetDatasheetField() )( "Datasheet" )( MANDATORY_FIELD_T::DATASHEET_FIELD) );
     BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches,
-            ( m_part_no_data.GetDescriptionField() )( "Description" )( (int) FIELD_T::DESCRIPTION ) );
+            ( m_part_no_data.GetDescriptionField() )( "Description" )( MANDATORY_FIELD_T::DESCRIPTION_FIELD) );
 }
 
 
@@ -129,7 +129,7 @@ BOOST_AUTO_TEST_CASE( AddedFields )
     // Ctor takes non-const ref (?!)
     const std::string newFieldName = "new_field";
     wxString          nonConstNewFieldName = newFieldName;
-    fields.push_back( SCH_FIELD( nullptr, FIELD_T::USER, nonConstNewFieldName ) );
+    fields.push_back( SCH_FIELD( nullptr, 42, nonConstNewFieldName ) );
 
     // fairly roundabout way to add a field, but it is what it is
     m_part_no_data.SetFields( fields );
@@ -138,14 +138,25 @@ BOOST_AUTO_TEST_CASE( AddedFields )
     BOOST_CHECK_PREDICATE( KI_TEST::AreDefaultFieldsCorrect, ( fields ) );
 
     // and our new one
-    BOOST_REQUIRE_EQUAL( fields.size(), 6 );
+    BOOST_REQUIRE_EQUAL( fields.size(), MANDATORY_FIELD_COUNT + 1 );
+
+    BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches,
+            ( fields[MANDATORY_FIELD_COUNT] )( newFieldName )( 42 ) );
+
+    // Check by-id lookup
+
+    SCH_FIELD* gotNewField = m_part_no_data.GetFieldById( 42 );
+
+    BOOST_REQUIRE_NE( gotNewField, nullptr );
+
+    BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches, ( *gotNewField )( newFieldName )( 42 ) );
 
     // Check by-name lookup
 
-    SCH_FIELD* gotNewField = m_part_no_data.GetField( newFieldName );
+    gotNewField = m_part_no_data.FindField( newFieldName );
 
     BOOST_REQUIRE_NE( gotNewField, nullptr );
-    BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches, ( *gotNewField )( newFieldName )( 0 ) );
+    BOOST_CHECK_PREDICATE( KI_TEST::FieldNameIdMatches, ( *gotNewField )( newFieldName )( 42 ) );
 }
 
 
@@ -391,10 +402,10 @@ BOOST_AUTO_TEST_CASE( Compare )
     m_part_no_data.SetUnitCount( 1 );
 
     // Options flag comparison tests.
-    testPart.SetGlobalPower();
+    testPart.SetPower();
     BOOST_CHECK( m_part_no_data.Compare( testPart ) < 0 );
     testPart.SetNormal();
-    m_part_no_data.SetGlobalPower();
+    m_part_no_data.SetPower();
     BOOST_CHECK( m_part_no_data.Compare( testPart ) > 0 );
     m_part_no_data.SetNormal();
 
@@ -584,12 +595,12 @@ BOOST_AUTO_TEST_CASE( Inheritance )
     std::unique_ptr<LIB_SYMBOL> ref = std::make_unique<LIB_SYMBOL>( *parent );
 
     std::unique_ptr<LIB_SYMBOL> child = std::make_unique<LIB_SYMBOL>( "child", parent.get() );
-    BOOST_CHECK( child->IsDerived() );
+    BOOST_CHECK( child->IsAlias() );
     BOOST_CHECK_EQUAL( child->GetInheritanceDepth(), 1 );
 
     std::unique_ptr<LIB_SYMBOL> grandChild = std::make_unique<LIB_SYMBOL>( "grandchild",
                                                                            child.get() );
-    BOOST_CHECK( grandChild->IsDerived() );
+    BOOST_CHECK( grandChild->IsAlias() );
     BOOST_CHECK_EQUAL( grandChild->GetInheritanceDepth(), 2 );
 
     BOOST_CHECK( parent->GetRootSymbol().get() == parent.get() );
@@ -611,18 +622,18 @@ BOOST_AUTO_TEST_CASE( Inheritance )
     BOOST_CHECK_EQUAL( child->GetUnitCount(), 4 );
     parent->SetUnitCount( 1 );
 
-    parent->GetField( FIELD_T::DATASHEET )->SetText( "https://kicad/resistors.pdf" );
-    ref->GetField( FIELD_T::DATASHEET )->SetText( "https://kicad/resistors.pdf" );
+    parent->GetDatasheetField().SetText( "https://kicad/resistors.pdf" );
+    ref->GetDatasheetField().SetText( "https://kicad/resistors.pdf" );
 
     BOOST_CHECK( *parent == *ref );
 
     ref->SetName( "child" );
-    SCH_FIELD* field = new SCH_FIELD( nullptr, FIELD_T::USER, "Manufacturer" );
+    SCH_FIELD* field = new SCH_FIELD( nullptr, MANDATORY_FIELD_COUNT, "Manufacturer" );
     field->SetText( "KiCad" );
     child->AddField( field );
     field->SetParent( child.get() );
 
-    field = new SCH_FIELD( nullptr, FIELD_T::USER, "Manufacturer" );
+    field = new SCH_FIELD( nullptr, MANDATORY_FIELD_COUNT, "Manufacturer" );
     field->SetText( "KiCad" );
     ref->AddField( field );
     field->SetParent( ref.get() );
@@ -630,19 +641,19 @@ BOOST_AUTO_TEST_CASE( Inheritance )
     BOOST_CHECK( *ref == *child->Flatten() );
 
     ref->SetName( "grandchild" );
-    field = new SCH_FIELD( nullptr, FIELD_T::USER, "MPN" );
+    field = new SCH_FIELD( nullptr, MANDATORY_FIELD_COUNT + 1, "MPN" );
     field->SetText( "123456" );
     grandChild->AddField( field );
     field->SetParent( grandChild.get() );
 
-    field = new SCH_FIELD( nullptr, FIELD_T::USER, "MPN" );
+    field = new SCH_FIELD( nullptr, MANDATORY_FIELD_COUNT + 1, "MPN" );
     field->SetText( "123456" );
     ref->AddField( field );
     field->SetParent( ref.get() );
 
     BOOST_CHECK( *ref == *grandChild->Flatten() );
 
-    BOOST_CHECK_EQUAL( grandChild->Flatten()->GetField( FIELD_T::DATASHEET )->GetText(),
+    BOOST_CHECK_EQUAL( grandChild->Flatten()->GetDatasheetField().GetText(),
                        "https://kicad/resistors.pdf" );
 
     child->SetParent();
@@ -678,7 +689,7 @@ BOOST_AUTO_TEST_CASE( IsPowerTest )
     BOOST_CHECK( !symbol->IsPower() );
     BOOST_CHECK( symbol->IsNormal() );
 
-    symbol->SetGlobalPower();
+    symbol->SetPower();
     BOOST_CHECK( symbol->IsPower() );
     BOOST_CHECK( !symbol->IsNormal() );
 

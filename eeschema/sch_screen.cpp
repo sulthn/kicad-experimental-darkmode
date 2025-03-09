@@ -703,8 +703,8 @@ void SCH_SCREEN::UpdateSymbolLinks( REPORTER* aReporter )
             if( aReporter )
             {
                 msg.Printf( _( "Setting schematic symbol '%s %s' library identifier to '%s'." ),
-                            symbol->GetField( FIELD_T::REFERENCE )->GetText(),
-                            symbol->GetField( FIELD_T::VALUE )->GetText(),
+                            symbol->GetField( REFERENCE_FIELD )->GetText(),
+                            symbol->GetField( VALUE_FIELD )->GetText(),
                             UnescapeString( symbol->GetLibId().Format() ) );
                 aReporter->ReportTail( msg, RPT_SEVERITY_INFO );
             }
@@ -774,8 +774,8 @@ void SCH_SCREEN::UpdateSymbolLinks( REPORTER* aReporter )
             if( aReporter )
             {
                 msg.Printf( _( "Falling back to cache to set symbol '%s:%s' link '%s'." ),
-                            symbol->GetField( FIELD_T::REFERENCE )->GetText(),
-                            symbol->GetField( FIELD_T::VALUE )->GetText(),
+                            symbol->GetField( REFERENCE_FIELD )->GetText(),
+                            symbol->GetField( VALUE_FIELD )->GetText(),
                             UnescapeString( id ) );
                 aReporter->ReportTail( msg, RPT_SEVERITY_WARNING );
             }
@@ -795,8 +795,8 @@ void SCH_SCREEN::UpdateSymbolLinks( REPORTER* aReporter )
             if( aReporter )
             {
                 msg.Printf( _( "Setting schematic symbol '%s %s' library identifier to '%s'." ),
-                            symbol->GetField( FIELD_T::REFERENCE )->GetText(),
-                            symbol->GetField( FIELD_T::VALUE )->GetText(),
+                            symbol->GetField( REFERENCE_FIELD )->GetText(),
+                            symbol->GetField( VALUE_FIELD )->GetText(),
                             UnescapeString( symbol->GetLibId().Format() ) );
                 aReporter->ReportTail( msg, RPT_SEVERITY_INFO );
             }
@@ -806,8 +806,8 @@ void SCH_SCREEN::UpdateSymbolLinks( REPORTER* aReporter )
             if( aReporter )
             {
                 msg.Printf( _( "No library symbol found for schematic symbol '%s %s'." ),
-                            symbol->GetField( FIELD_T::REFERENCE )->GetText(),
-                            symbol->GetField( FIELD_T::VALUE )->GetText() );
+                            symbol->GetField( REFERENCE_FIELD )->GetText(),
+                            symbol->GetField( VALUE_FIELD )->GetText() );
                 aReporter->ReportTail( msg, RPT_SEVERITY_ERROR );
             }
         }
@@ -853,6 +853,50 @@ void SCH_SCREEN::SetConnectivityDirty()
 {
     for( SCH_ITEM* item : Items() )
         item->SetConnectivityDirty( true );
+}
+
+
+void SCH_SCREEN::Print( const SCH_RENDER_SETTINGS* aSettings )
+{
+    // Ensure links are up to date, even if a library was reloaded for some reason:
+    std::vector<SCH_ITEM*> junctions;
+    std::vector<SCH_ITEM*> bitmaps;
+    std::vector<SCH_ITEM*> other;
+
+    for( SCH_ITEM* item : Items() )
+    {
+        if( item->IsMoving() )
+            continue;
+
+        if( item->Type() == SCH_JUNCTION_T )
+            junctions.push_back( item );
+        else if( item->Type() == SCH_BITMAP_T )
+            bitmaps.push_back( item );
+        else
+            other.push_back( item );
+    }
+
+    // Sort to ensure plot-order consistency with screen drawing.
+    std::stable_sort( other.begin(), other.end(),
+               []( const SCH_ITEM* a, const SCH_ITEM* b )
+               {
+                    if( a->Type() == b->Type() )
+                        return a->GetLayer() > b->GetLayer();
+
+                    return a->Type() < b->Type();
+               } );
+
+    for( SCH_ITEM* item : bitmaps )
+        item->Print( aSettings, 0, 0, VECTOR2I( 0, 0 ), false, false );
+
+    for( SCH_ITEM* item : other )
+        item->PrintBackground( aSettings, 0, 0, VECTOR2I( 0, 0 ), false );
+
+    for( SCH_ITEM* item : other )
+        item->Print( aSettings, 0, 0, VECTOR2I( 0, 0 ), false, false );
+
+    for( SCH_ITEM* item : junctions )
+        item->Print( aSettings, 0, 0, VECTOR2I( 0, 0 ), false, false );
 }
 
 
@@ -1424,7 +1468,7 @@ void SCH_SCREEN::FixLegacyPowerSymbolMismatches()
         // Fix pre-8.0 legacy power symbols with invisible pins
         // that have mismatched pin names and value fields
         if( symbol->GetLibSymbolRef()
-            && symbol->GetLibSymbolRef()->IsGlobalPower()
+            && symbol->GetLibSymbolRef()->IsPower()
             && symbol->GetAllLibPins().size() > 0
             && symbol->GetAllLibPins()[0]->IsGlobalPower()
             && !symbol->GetAllLibPins()[0]->IsVisible() )

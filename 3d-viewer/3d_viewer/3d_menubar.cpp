@@ -48,8 +48,15 @@ void EDA_3D_VIEWER_FRAME::doReCreateMenuBar()
     //
     ACTION_MENU* fileMenu = new ACTION_MENU( false, tool );
 
-    fileMenu->Add( EDA_3D_ACTIONS::exportAsPNG );
-    fileMenu->Add( EDA_3D_ACTIONS::exportAsJPEG );
+    fileMenu->Add( _( "Export Current View as PNG..." ),
+                   wxEmptyString,
+                   ID_MENU_SCREENCOPY_PNG,
+                   BITMAPS::export_png );
+
+    fileMenu->Add( _( "Export Current View as JPEG..." ),
+                   wxEmptyString,
+                   ID_MENU_SCREENCOPY_JPEG,
+                   BITMAPS::export_file );
 
     fileMenu->AppendSeparator();
     fileMenu->AddClose( _( "3D Viewer" ) );
@@ -60,7 +67,10 @@ void EDA_3D_VIEWER_FRAME::doReCreateMenuBar()
     // The translated modifiers do not always work
     ACTION_MENU* editMenu = new ACTION_MENU( false, tool );
 
-    editMenu->Add( EDA_3D_ACTIONS::copyToClipboard );
+    editMenu->Add( _( "Copy 3D Image" ),
+                   wxEmptyString,
+                   ID_TOOL_SCREENCOPY_TOCLIBBOARD,
+                   BITMAPS::copy );
 
 
     //-- View menu -------------------------------------------------------
@@ -112,7 +122,10 @@ void EDA_3D_VIEWER_FRAME::doReCreateMenuBar()
     //
     ACTION_MENU* prefsMenu = new ACTION_MENU( false, tool );
 
-    prefsMenu->Add( EDA_3D_ACTIONS::toggleRaytacing, ACTION_MENU::CHECK );
+    prefsMenu->Add( _( "Raytracing" ), "",
+                    ID_RENDER_CURRENT_VIEW,
+                    BITMAPS::tools,
+                    ACTION_MENU::CHECK );
 
     prefsMenu->Add( ACTIONS::openPreferences );
 

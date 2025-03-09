@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 4.0.0-0-g0efcecf)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -41,8 +41,8 @@ class TEXT_CTRL_EVAL;
 
 ///////////////////////////////////////////////////////////////////////////
 
-#define wxID_DIALOG_EDIT_PAD 10000
-#define wxID_PADNUMCTRL 10001
+#define wxID_DIALOG_EDIT_PAD 1000
+#define wxID_PADNUMCTRL 1001
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class DIALOG_PAD_PROPERTIES_BASE
@@ -123,6 +123,7 @@ class DIALOG_PAD_PROPERTIES_BASE : public DIALOG_SHIM
 		wxStaticText* m_PadOrientText;
 		wxComboBox* m_cb_padrotation;
 		wxStaticText* m_orientationUnits;
+		wxStaticLine* m_staticline6;
 		wxCheckBox* m_offsetShapeOpt;
 		wxStaticText* m_offsetShapeOptLabel;
 		wxFlexGridSizer* m_offsetCtrls;

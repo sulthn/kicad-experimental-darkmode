@@ -26,7 +26,6 @@
 #define _REPORTER_H_
 
 #include <memory>
-#include <map>
 
 #include <eda_units.h>
 #include <widgets/report_severity.h>
@@ -130,7 +129,7 @@ public:
 
     virtual EDA_UNITS GetUnits() const
     {
-        return EDA_UNITS::MM;
+        return EDA_UNITS::MILLIMETRES;
     }
 
     virtual ~REPORTER()
@@ -239,10 +238,6 @@ public:
     REPORTER& Report( const wxString& aMsg, SEVERITY aSeverity = RPT_SEVERITY_UNDEFINED ) override;
 
     bool HasMessage() const override { return false; }
-    bool HasMessageOfSeverity( int aSeverityMask ) const override;
-
-private:
-    std::map<SEVERITY, bool> m_hasMessageMap;
 };
 
 

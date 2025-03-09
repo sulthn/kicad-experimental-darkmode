@@ -46,11 +46,10 @@ DIALOG_UPDATE_SYMBOL_FIELDS::DIALOG_UPDATE_SYMBOL_FIELDS( SYMBOL_EDIT_FRAME* aPa
 
     m_parentSymbolReadOnly->SetValue( UnescapeString( m_symbol->GetParent().lock()->GetName() ) );
 
-    for( FIELD_T fieldId : MANDATORY_FIELDS )
+    for( int i = 0; i < MANDATORY_FIELD_COUNT; ++i )
     {
-        m_mandatoryFieldListIndexes[fieldId] = m_fieldsBox->GetCount();
-        m_fieldsBox->Append( GetDefaultFieldName( fieldId, DO_TRANSLATE ) );
-        m_fieldsBox->Check( m_fieldsBox->GetCount() - 1, true );
+        m_fieldsBox->Append( GetDefaultFieldName( i, DO_TRANSLATE ) );
+        m_fieldsBox->Check( i, true );
     }
 
     updateFieldsList();
@@ -106,35 +105,17 @@ void DIALOG_UPDATE_SYMBOL_FIELDS::updateFieldsList()
             fieldNames.insert( libField->GetName() );
     }
 
-    auto isMandatoryField =
-            [&]( int listbox_idx )
-            {
-                for( FIELD_T fieldId : MANDATORY_FIELDS )
-                {
-                    if( m_mandatoryFieldListIndexes[fieldId] == listbox_idx )
-                        return true;
-                }
-
-                return false;
-            };
-
     libFields.clear();
 
     // Update the listbox widget
-    for( int i = (int) m_fieldsBox->GetCount() - 1; i >= 0; --i )
-    {
-        if( !isMandatoryField( i ) )
-            m_fieldsBox->Delete( i );
-    }
+    for( unsigned i = m_fieldsBox->GetCount() - 1; i >= MANDATORY_FIELD_COUNT; --i )
+        m_fieldsBox->Delete( i );
 
     for( const wxString& fieldName : fieldNames )
         m_fieldsBox->Append( fieldName );
 
-    for( int i = 0; i < (int) m_fieldsBox->GetCount(); ++i )
-    {
-        if( !isMandatoryField( i ) )
-            m_fieldsBox->Check( i, true );
-    }
+    for( unsigned i = MANDATORY_FIELD_COUNT; i < m_fieldsBox->GetCount(); ++i )
+        m_fieldsBox->Check( i, true );
 }
 
 
@@ -179,10 +160,7 @@ void DIALOG_UPDATE_SYMBOL_FIELDS::onOkButtonClicked( wxCommandEvent& aEvent )
 
         if( alg::contains( m_updateFields, field.GetName() ) )
         {
-            if( field.IsMandatory() )
-                parentField = flattenedParent->GetField( field.GetId() );
-            else
-                parentField = flattenedParent->GetField( field.GetName() );
+            parentField = flattenedParent->FindField( field.GetName() );
 
             if( parentField )
             {
@@ -224,6 +202,7 @@ void DIALOG_UPDATE_SYMBOL_FIELDS::onOkButtonClicked( wxCommandEvent& aEvent )
     }
 
     std::vector<SCH_FIELD*> parentFields;
+    int                     idx = result.size();
 
     flattenedParent->GetFields( parentFields );
 
@@ -232,9 +211,9 @@ void DIALOG_UPDATE_SYMBOL_FIELDS::onOkButtonClicked( wxCommandEvent& aEvent )
         if( !alg::contains( m_updateFields, parentField->GetName() ) )
             continue;
 
-        if( !m_symbol->GetField( parentField->GetName() ) )
+        if( !m_symbol->FindField( parentField->GetName() ) )
         {
-            result.emplace_back( m_symbol, FIELD_T::USER );
+            result.emplace_back( m_symbol, idx++ );
             SCH_FIELD* newField = &result.back();
 
             newField->SetName( parentField->GetCanonicalName() );

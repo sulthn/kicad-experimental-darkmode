@@ -78,9 +78,6 @@ public:
 
         DESIGN_BLOCK_LIB_TABLE,
 
-        SCHEMATIC,
-        BOARD,
-
         COUNT
     };
 
@@ -268,11 +265,16 @@ public:
     virtual void   SetElem( PROJECT::ELEM aIndex, _ELEM* aElem );
 
     /**
+     * Delete all the _ELEMs and set their pointers to NULL.
+     */
+    virtual void ElemsClear();
+
+    /**
      * Clear the _ELEMs and RSTRINGs.
      */
     void Clear()        // inline not virtual
     {
-        elemsClear();
+        ElemsClear();
 
         for( unsigned i = 0; i<RSTRING_COUNT;  ++i )
             SetRString( RSTRING_T( i ), wxEmptyString );
@@ -300,12 +302,6 @@ public:
 private:
     friend class SETTINGS_MANAGER; // so that SM can set project path
     friend class TEST_NETLISTS_FIXTURE; // TODO(JE) make this not required
-
-
-    /**
-     * Delete all the _ELEMs and set their pointers to NULL.
-     */
-    virtual void elemsClear();
 
     /**
      * Set the full directory, basename, and extension of the project.

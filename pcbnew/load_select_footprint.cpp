@@ -30,9 +30,10 @@ using namespace std::placeholders;
 #include <footprint.h>
 #include <confirm.h>
 #include <connectivity/connectivity_data.h>
+#include <dialog_footprint_chooser.h>
 #include <eda_list_dialog.h>
 #include <footprint_edit_frame.h>
-#include <footprint_chooser_frame.h>
+#include <footprint_tree_pane.h>
 #include <footprint_viewer_frame.h>
 #include <fp_lib_table.h>
 #include <pcb_io/pcb_io_mgr.h>
@@ -185,22 +186,23 @@ bool FOOTPRINT_EDIT_FRAME::LoadFootprintFromBoard( FOOTPRINT* aFootprint )
 
 FOOTPRINT* PCB_BASE_FRAME::SelectFootprintFromLibrary( LIB_ID aPreselect )
 {
-    wxString        footprintName = aPreselect.Format().wx_str();
+    wxString        footprintName;
     LIB_ID          fpid;
     FOOTPRINT*      footprint = nullptr;
 
     static wxString lastComponentName;
 
-    if( KIWAY_PLAYER* frame = Kiway().Player( FRAME_FOOTPRINT_CHOOSER, true, this ) )
-    {
-        if( frame->ShowModal( &footprintName, this ) )
-            fpid.Parse( UTF8( footprintName ) );
+    DIALOG_FOOTPRINT_CHOOSER dialog( this, aPreselect, s_FootprintHistoryList );
 
-        frame->Destroy();
-    }
+    if( dialog.ShowQuasiModal() == wxID_CANCEL )
+        return nullptr;
+
+    fpid = dialog.GetSelectedLibId();
 
     if( !fpid.IsValid() )
         return nullptr;
+    else
+        footprintName = fpid.Format().wx_str();
 
     try
     {

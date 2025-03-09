@@ -111,8 +111,10 @@ public:
     inline bool IsEntered() const { return m_flags & ENTERED; }
     inline bool IsBrightened() const { return m_flags & BRIGHTENED; }
 
-    inline bool IsRollover() const { return m_isRollover; }
-    inline void SetIsRollover( bool aIsRollover ) { m_isRollover = aIsRollover; }
+    inline bool IsRollover() const
+    {
+        return ( m_flags & ( IS_ROLLOVER | IS_MOVING ) ) == IS_ROLLOVER;
+    }
 
     inline void SetSelected() { SetFlags( SELECTED ); }
     inline void SetBrightened() { SetFlags( BRIGHTENED ); }
@@ -499,7 +501,6 @@ protected:
     EDA_ITEM_FLAGS m_flags;
     EDA_ITEM*      m_parent; ///< Linked list: Link (parent struct).
     bool           m_forceVisible;
-    bool           m_isRollover;
 };
 
 

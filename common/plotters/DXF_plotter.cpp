@@ -136,12 +136,12 @@ void DXF_PLOTTER::SetUnits( DXF_UNITS aUnit )
 
     switch( aUnit )
     {
-    case DXF_UNITS::MM:
+    case DXF_UNITS::MILLIMETERS:
         m_unitScalingFactor = 0.00254;
         m_measurementDirective = 1;
         break;
 
-    case DXF_UNITS::INCH:
+    case DXF_UNITS::INCHES:
     default:
         m_unitScalingFactor = 0.0001;
         m_measurementDirective = 0;
@@ -200,7 +200,7 @@ bool DXF_PLOTTER::StartPlot( const wxString& aPageNumber )
     // DXF HEADER - Boilerplate
     // Defines the minimum for drawing i.e. the angle system and the
     // 4 linetypes (CONTINUOUS, DOTDASH, DASHED and DOTTED)
-    fmt::print( m_outputFile,
+    fprintf( m_outputFile,
             "  0\n"
             "SECTION\n"
             "  2\n"
@@ -216,7 +216,7 @@ bool DXF_PLOTTER::StartPlot( const wxString& aPageNumber )
             "  9\n"
             "$MEASUREMENT\n"
             "  70\n"
-            "{}\n"
+            "%u\n"
             "  0\n"
             "ENDSEC\n"
             "  0\n"
@@ -315,23 +315,22 @@ bool DXF_PLOTTER::StartPlot( const wxString& aPageNumber )
 
     // Text styles table
     // Defines 4 text styles, one for each bold/italic combination
-    fmt::print( m_outputFile,
-	            "  0\n"
-	            "TABLE\n"
-	            "  2\n"
-	            "STYLE\n"
-	            "  70\n"
-	            "4\n" );
+    fputs( "  0\n"
+           "TABLE\n"
+           "  2\n"
+           "STYLE\n"
+           "  70\n"
+           "4\n", m_outputFile );
 
     static const char *style_name[4] = {"KICAD", "KICADB", "KICADI", "KICADBI"};
 
     for(int i = 0; i < 4; i++ )
     {
-        fmt::print( m_outputFile,
+        fprintf( m_outputFile,
                  "  0\n"
                  "STYLE\n"
                  "  2\n"
-                 "{}\n"         // Style name
+                 "%s\n"         // Style name
                  "  70\n"
                  "0\n"          // Standard flags
                  "  40\n"
@@ -341,7 +340,7 @@ bool DXF_PLOTTER::StartPlot( const wxString& aPageNumber )
                  "  42\n"
                  "1\n"          // Last height (mandatory)
                  "  50\n"
-                 "{:g}\n"         // Oblique angle
+                 "%g\n"         // Oblique angle
                  "  71\n"
                  "0\n"          // Generation flags (default)
                  "  3\n"
@@ -359,7 +358,7 @@ bool DXF_PLOTTER::StartPlot( const wxString& aPageNumber )
         numLayers = static_cast<EDA_COLOR_T>( 1 );
 
     // Layer table - one layer per color
-    fmt::print( m_outputFile,
+    fprintf( m_outputFile,
              "  0\n"
              "ENDTAB\n"
              "  0\n"
@@ -367,7 +366,7 @@ bool DXF_PLOTTER::StartPlot( const wxString& aPageNumber )
              "  2\n"
              "LAYER\n"
              "  70\n"
-             "{}\n", (int)numLayers );
+             "%d\n", numLayers );
 
     /* The layer/colors palette. The acad/DXF palette is divided in 3 zones:
 
@@ -380,30 +379,29 @@ bool DXF_PLOTTER::StartPlot( const wxString& aPageNumber )
 
     for( EDA_COLOR_T i = BLACK; i < numLayers; i = static_cast<EDA_COLOR_T>( int( i ) + 1 )  )
     {
-        fmt::print( m_outputFile,
+        fprintf( m_outputFile,
                  "  0\n"
                  "LAYER\n"
                  "  2\n"
-                 "{}\n"         // Layer name
+                 "%s\n"         // Layer name
                  "  70\n"
                  "0\n"          // Standard flags
                  "  62\n"
-                 "{}\n"         // Color number
+                 "%d\n"         // Color number
                  "  6\n"
                  "CONTINUOUS\n",// Linetype name
                  dxf_layer[i].name, dxf_layer[i].color );
     }
 
     // End of layer table, begin entities
-    fmt::print( m_outputFile,
-           "  0\n"
+    fputs( "  0\n"
            "ENDTAB\n"
            "  0\n"
            "ENDSEC\n"
            "  0\n"
            "SECTION\n"
            "  2\n"
-           "ENTITIES\n" );
+           "ENTITIES\n", m_outputFile );
 
     return true;
 }
@@ -414,11 +412,10 @@ bool DXF_PLOTTER::EndPlot()
     wxASSERT( m_outputFile );
 
     // DXF FOOTER
-    fmt::print( m_outputFile,
-            "  0\n"
+    fputs( "  0\n"
            "ENDSEC\n"
            "  0\n"
-           "EOF\n" );
+           "EOF\n", m_outputFile );
     fclose( m_outputFile );
     m_outputFile = nullptr;
 
@@ -459,10 +456,10 @@ void DXF_PLOTTER::Rect( const VECTOR2I& p1, const VECTOR2I& p2, FILL_T fill, int
         wxString cname = getDXFColorName( m_currentColor );
         VECTOR2D point_dev = userToDeviceCoordinates( p1 );
 
-        fmt::print( m_outputFile, "0\nPOINT\n8\n{}\n10\n{}\n20\n{}\n",
+        fprintf( m_outputFile, "0\nPOINT\n8\n%s\n10\n%s\n20\n%s\n",
                  TO_UTF8( cname ),
-                 formatCoord( point_dev.x ),
-                 formatCoord( point_dev.y ) );
+                 formatCoord( point_dev.x ).c_str(),
+                 formatCoord( point_dev.y ).c_str() );
     }
 }
 
@@ -479,38 +476,38 @@ void DXF_PLOTTER::Circle( const VECTOR2I& centre, int diameter, FILL_T fill, int
     {
         if( fill == FILL_T::NO_FILL )
         {
-            fmt::print( m_outputFile, "0\nCIRCLE\n8\n{}\n10\n{}\n20\n{}\n40\n{}\n",
-                        TO_UTF8( cname ),
-                        formatCoord( centre_dev.x ),
-                        formatCoord( centre_dev.y ),
-                        formatCoord( radius ) );
+            fprintf( m_outputFile, "0\nCIRCLE\n8\n%s\n10\n%s\n20\n%s\n40\n%s\n",
+                     TO_UTF8( cname ),
+                     formatCoord( centre_dev.x ).c_str(),
+                     formatCoord( centre_dev.y ).c_str(),
+                     formatCoord( radius ).c_str() );
         }
         else if( fill == FILL_T::FILLED_SHAPE )
         {
             double r = radius * 0.5;
-            fmt::print( m_outputFile, "0\nPOLYLINE\n" );
-            fmt::print( m_outputFile, "8\n{}\n66\n1\n70\n1\n", TO_UTF8( cname ) );
-            fmt::print( m_outputFile, "40\n{}\n41\n{}\n",
-                                    formatCoord( radius ),
-                                    formatCoord( radius ) );
-            fmt::print( m_outputFile, "0\nVERTEX\n8\n{}\n", TO_UTF8( cname ) );
-            fmt::print( m_outputFile, "10\n{}\n 20\n{}\n42\n1.0\n",
-                                    formatCoord( centre_dev.x-r ),
-                                    formatCoord( centre_dev.y ) );
-            fmt::print( m_outputFile, "0\nVERTEX\n8\n{}\n", TO_UTF8( cname ) );
-            fmt::print( m_outputFile, "10\n{}\n 20\n{}\n42\n1.0\n",
-                                    formatCoord( centre_dev.x+r ),
-                                    formatCoord( centre_dev.y ) );
-            fmt::print( m_outputFile, "0\nSEQEND\n" );
+            fprintf( m_outputFile, "0\nPOLYLINE\n" );
+            fprintf( m_outputFile, "8\n%s\n66\n1\n70\n1\n", TO_UTF8( cname ) );
+            fprintf( m_outputFile, "40\n%s\n41\n%s\n",
+                                    formatCoord( radius ).c_str(),
+                                    formatCoord( radius ).c_str() );
+            fprintf( m_outputFile, "0\nVERTEX\n8\n%s\n", TO_UTF8( cname ) );
+            fprintf( m_outputFile, "10\n%s\n 20\n%s\n42\n1.0\n",
+                                    formatCoord( centre_dev.x-r ).c_str(),
+                                    formatCoord( centre_dev.y ).c_str() );
+            fprintf( m_outputFile, "0\nVERTEX\n8\n%s\n", TO_UTF8( cname ) );
+            fprintf( m_outputFile, "10\n%s\n 20\n%s\n42\n1.0\n",
+                                    formatCoord( centre_dev.x+r ).c_str(),
+                                    formatCoord( centre_dev.y ).c_str() );
+            fprintf( m_outputFile, "0\nSEQEND\n");
         }
     }
     else
     {
         // Draw as a point
-        fmt::print( m_outputFile, "0\nPOINT\n8\n{}\n10\n{}\n20\n{}\n",
-                    TO_UTF8( cname ),
-                    formatCoord( centre_dev.x ),
-                    formatCoord( centre_dev.y ) );
+        fprintf( m_outputFile, "0\nPOINT\n8\n%s\n10\n%s\n20\n%s\n",
+                 TO_UTF8( cname ),
+                 formatCoord( centre_dev.x ).c_str(),
+                 formatCoord( centre_dev.y ).c_str() );
     }
 }
 
@@ -635,12 +632,12 @@ void DXF_PLOTTER::PenTo( const VECTOR2I& pos, char plume )
         // DXF LINE
         wxString    cname = getDXFColorName( m_currentColor );
         const char* lname = getDXFLineType( static_cast<LINE_STYLE>( m_currentLineType ) );
-        fmt::print( m_outputFile, "0\nLINE\n8\n{}\n6\n{}\n10\n{}\n20\n{}\n11\n{}\n21\n{}\n",
+        fprintf( m_outputFile, "0\nLINE\n8\n%s\n6\n%s\n10\n%s\n20\n%s\n11\n%s\n21\n%s\n",
                  TO_UTF8( cname ), lname,
-                 formatCoord( pen_lastpos_dev.x ),
-                 formatCoord( pen_lastpos_dev.y ),
-                 formatCoord( pos_dev.x ),
-                 formatCoord( pos_dev.y ) );
+                 formatCoord( pen_lastpos_dev.x ).c_str(),
+                 formatCoord( pen_lastpos_dev.y ).c_str(),
+                 formatCoord( pos_dev.x ).c_str(),
+                 formatCoord( pos_dev.y ).c_str() );
     }
 
     m_penLastpos = pos;
@@ -707,14 +704,13 @@ void DXF_PLOTTER::Arc( const VECTOR2D& aCenter, const EDA_ANGLE& aStartAngle,
 
     // Emit a DXF ARC entity
     wxString cname = getDXFColorName( m_currentColor );
-    fmt::print( m_outputFile,
-                "0\nARC\n8\n{}\n10\n{}\n20\n{}\n40\n{}\n50\n{:.8f}\n51\n{:.8f}\n",
-                TO_UTF8( cname ),
-                formatCoord( centre_device.x ),
-                formatCoord( centre_device.y ),
-                formatCoord( radius_device ),
-                startAngle.AsDegrees(),
-                endAngle.AsDegrees() );
+    fprintf( m_outputFile,
+             "0\nARC\n8\n%s\n10\n%s\n20\n%s\n40\n%s\n50\n%.8f\n51\n%.8f\n",
+             TO_UTF8( cname ),
+             formatCoord( centre_device.x ).c_str(),
+             formatCoord( centre_device.y ).c_str(),
+             formatCoord( radius_device ).c_str(),
+             startAngle.AsDegrees(), endAngle.AsDegrees() );
 }
 
 
@@ -1001,57 +997,45 @@ void DXF_PLOTTER::plotOneLineOfText( const VECTOR2I& aPos, const COLOR4D& aColor
         break;
     }
 
-    std::string textStyle = "KICAD";
-    if( aAttributes.m_Bold )
-    {
-        if( aAttributes.m_Italic )
-            textStyle = "KICADBI";
-        else
-            textStyle = "KICADB";
-    }
-    else if( aAttributes.m_Italic )
-        textStyle = "KICADI";
-
     // Position, size, rotation and alignment
     // The two alignment point usages is somewhat idiot (see the DXF ref)
     // Anyway since we don't use the fit/aligned options, they're the same
-    fmt::print( m_outputFile,
+    fprintf( m_outputFile,
              "  0\n"
              "TEXT\n"
              "  7\n"
-             "{}\n"          // Text style
+             "%s\n"          // Text style
              "  8\n"
-             "{}\n"          // Layer name
+             "%s\n"          // Layer name
              "  10\n"
-             "{}\n"          // First point X
+             "%s\n"          // First point X
              "  11\n"
-             "{}\n"          // Second point X
+             "%s\n"          // Second point X
              "  20\n"
-             "{}\n"          // First point Y
+             "%s\n"          // First point Y
              "  21\n"
-             "{}\n"          // Second point Y
+             "%s\n"          // Second point Y
              "  40\n"
-             "{}\n"          // Text height
+             "%s\n"          // Text height
              "  41\n"
-             "{}\n"          // Width factor
+             "%s\n"          // Width factor
              "  50\n"
-             "{:.8f}\n"        // Rotation
+             "%.8f\n"        // Rotation
              "  51\n"
-             "{:.8f}\n"        // Oblique angle
+             "%.8f\n"        // Oblique angle
              "  71\n"
-             "{}\n"          // Mirror flags
+             "%d\n"          // Mirror flags
              "  72\n"
-             "{}\n"          // H alignment
+             "%d\n"          // H alignment
              "  73\n"
-             "{}\n",         // V alignment
-             textStyle,
+             "%d\n",         // V alignment
+             aAttributes.m_Bold ? ( aAttributes.m_Italic ? "KICADBI" : "KICADB" )
+                                : ( aAttributes.m_Italic ? "KICADI" : "KICAD" ),
              TO_UTF8( cname ),
-             formatCoord( origin_dev.x ),
-             formatCoord( origin_dev.x ),
-             formatCoord( origin_dev.y ),
-             formatCoord( origin_dev.y ),
-             formatCoord( size_dev.y ),
-             formatCoord( fabs( size_dev.x / size_dev.y ) ),
+             formatCoord( origin_dev.x ).c_str(), formatCoord( origin_dev.x ).c_str(),
+             formatCoord( origin_dev.y ).c_str(), formatCoord( origin_dev.y ).c_str(),
+             formatCoord( size_dev.y ).c_str(),
+             formatCoord( fabs( size_dev.x / size_dev.y ) ).c_str(),
              aAttributes.m_Angle.AsDegrees(),
              aAttributes.m_Italic ? DXF_OBLIQUE_ANGLE : 0,
              aAttributes.m_Mirrored ? 2 : 0, // X mirror flag
@@ -1082,7 +1066,7 @@ void DXF_PLOTTER::plotOneLineOfText( const VECTOR2I& aPos, const COLOR4D& aColor
     int braceNesting = 0;
     int overbarDepth = -1;
 
-    fmt::print( m_outputFile, "  1\n" );
+    fputs( "  1\n", m_outputFile );
 
     for( unsigned int i = 0; i < aText.length(); i++ )
     {
@@ -1103,7 +1087,7 @@ void DXF_PLOTTER::plotOneLineOfText( const VECTOR2I& aPos, const COLOR4D& aColor
         {
             if( aText[i] == '~' && i+1 < aText.length() && aText[i+1] == '{' )
             {
-                fmt::print( m_outputFile, "%%o" );
+                fputs( "%%o", m_outputFile );
                 overbarDepth = braceNesting;
 
                 // Skip the '{'
@@ -1121,7 +1105,7 @@ void DXF_PLOTTER::plotOneLineOfText( const VECTOR2I& aPos, const COLOR4D& aColor
 
                 if( braceNesting == overbarDepth )
                 {
-                    fmt::print( m_outputFile, "%%O" );
+                    fputs( "%%O", m_outputFile );
                     overbarDepth = -1;
                     continue;
                 }
@@ -1131,5 +1115,5 @@ void DXF_PLOTTER::plotOneLineOfText( const VECTOR2I& aPos, const COLOR4D& aColor
         }
     }
 
-    fmt::print( m_outputFile, "\n" );
+    putc( '\n', m_outputFile );
 }

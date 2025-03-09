@@ -245,13 +245,11 @@ public:
      * @param aType is the type ( shape ) of tool.
      * @param aApertureAttribute is an aperture attribute of the tool (a tool can have only one
      *                           attribute) 0 = no specific attribute.
-     * @param aCustomAttribute a String describing custom tools
      * @return an index to the aperture in aperture list which meets the size and type of tool
      *         if the aperture does not exist, it is created and entered in aperture list.
      */
     int GetOrCreateAperture( const VECTOR2I& aSize, int aRadius, const EDA_ANGLE& aRotation,
-                             APERTURE::APERTURE_TYPE aType, int aApertureAttribute,
-                             const std::string& aCustomAttribute );
+                             APERTURE::APERTURE_TYPE aType, int aApertureAttribute );
 
     /**
      * @param aCorners is the corner list.
@@ -259,13 +257,11 @@ public:
      * @param aType is the type ( shape ) of tool that can manage a list of corners (polygon).
      * @param aApertureAttribute is an aperture attribute of the tool (a tool can have only one
      *        attribute) 0 = no specific attribute.
-     * @param aCustomAttribute a String describing custom tools
      * @return an index to the aperture in aperture list which meets the data and type of tool
      *         if the aperture does not exist, it is created and entered in aperture list.
      */
     int GetOrCreateAperture( const std::vector<VECTOR2I>& aCorners, const EDA_ANGLE& aRotation,
-                             APERTURE::APERTURE_TYPE aType, int aApertureAttribute,
-                             const std::string& aCustomAttribute );
+                             APERTURE::APERTURE_TYPE aType, int aApertureAttribute );
 
 protected:
     virtual void ThickArc( const VECTOR2D& aCentre, const EDA_ANGLE& aStartAngle,
@@ -305,8 +301,7 @@ protected:
      * Write the DCode selection on gerber file.
      */
     void selectAperture( const VECTOR2I& aSize, int aRadius, const EDA_ANGLE& aRotation,
-                         APERTURE::APERTURE_TYPE aType, int aApertureAttribute,
-                         const std::string& aCustomAttribute );
+                         APERTURE::APERTURE_TYPE aType, int aApertureAttribute );
     /**
      * Pick an existing aperture or create a new one, matching the aDiameter, aPolygonRotation,
      * type and attributes.
@@ -315,17 +310,18 @@ protected:
      * write the DCode selection on gerber file
      */
     void selectAperture( const std::vector<VECTOR2I>& aCorners, const EDA_ANGLE& aPolygonRotation,
-                         APERTURE::APERTURE_TYPE aType, int aApertureAttribute,
-                         const std::string& aCustomAttribute );
-
+                         APERTURE::APERTURE_TYPE aType, int aApertureAttribute );
 
     /**
-     * Pick an aperture or create a new one and emits the DCode.
-     * 
+     * Pick an existing aperture or create a new one, matching the corner list, aRotDegree,
+     * type and attributes.
+     *
+     * It only applies to apertures managing a polygon that differs from AT_REGULAR_POLY3
+     * to AT_REGULAR_POLY12 (for instance APER_MACRO_TRAPEZOID ) write the DCode selection
+     * on gerber file.
      */
-    void selectApertureWithAttributes( const VECTOR2I& aPos, GBR_METADATA* aGbrMetadata,
-                                       VECTOR2I aSize, int aRadius, const EDA_ANGLE& aAngle,
-                                       APERTURE::APERTURE_TYPE aType );
+    void selectAperture( int aDiameter, const EDA_ANGLE& aRotation,
+                         APERTURE::APERTURE_TYPE aType, int aApertureAttribute );
 
     /**
      * Emit a D-Code record, using proper conversions to format a leading zero omitted gerber

@@ -221,27 +221,27 @@ void SYMBOL_EDIT_FRAME::centerItemIdleHandler( wxIdleEvent& aEvent )
 }
 
 
-bool SYMBOL_EDIT_FRAME::LoadSymbolFromCurrentLib( const wxString& aSymbolName, int aUnit,
+bool SYMBOL_EDIT_FRAME::LoadSymbolFromCurrentLib( const wxString& aAliasName, int aUnit,
                                                   int aBodyStyle )
 {
-    LIB_SYMBOL* symbol = nullptr;
+    LIB_SYMBOL* alias = nullptr;
 
     try
     {
-        symbol = PROJECT_SCH::SchSymbolLibTable( &Prj() )->LoadSymbol( GetCurLib(), aSymbolName );
+        alias = PROJECT_SCH::SchSymbolLibTable( &Prj() )->LoadSymbol( GetCurLib(), aAliasName );
     }
     catch( const IO_ERROR& ioe )
     {
         wxString msg;
 
         msg.Printf( _( "Error loading symbol %s from library '%s'." ),
-                    aSymbolName,
+                    aAliasName,
                     GetCurLib() );
         DisplayErrorMessage( this, msg, ioe.What() );
         return false;
     }
 
-    if( !symbol || !LoadOneLibrarySymbolAux( symbol, GetCurLib(), aUnit, aBodyStyle ) )
+    if( !alias || !LoadOneLibrarySymbolAux( alias, GetCurLib(), aUnit, aBodyStyle ) )
         return false;
 
     // Enable synchronized pin edit mode for symbols with interchangeable units
@@ -303,7 +303,7 @@ bool SYMBOL_EDIT_FRAME::LoadOneLibrarySymbolAux( LIB_SYMBOL* aEntry, const wxStr
     if( rebuildMenuAndToolbar )
     {
         ReCreateMenuBar();
-        RecreateToolbars();
+        ReCreateHToolbar();
         GetInfoBar()->Dismiss();
     }
 
@@ -356,8 +356,7 @@ void SYMBOL_EDIT_FRAME::CreateNewSymbol( const wxString& aInheritFrom )
             return;
     }
 
-    const auto validator =
-            [&]( wxString newName ) -> bool
+    const auto validator = [&]( wxString newName ) -> bool
             {
                 if( newName.IsEmpty() )
                 {
@@ -365,17 +364,12 @@ void SYMBOL_EDIT_FRAME::CreateNewSymbol( const wxString& aInheritFrom )
                     return false;
                 }
 
-                if( !lib.empty() && m_libMgr->SymbolNameInUse( newName, lib ) )
+                if( !lib.empty() && m_libMgr->SymbolExists( newName, lib ) )
                 {
-                    wxString msg;
+                    wxString msg = wxString::Format(
+                            _( "Symbol '%s' already exists in library '%s'." ), newName, lib );
 
-                    msg.Printf( _( "Symbol '%s' already exists in library '%s'." ),
-                                UnescapeString( newName ),
-                                lib );
-
-                    KIDIALOG errorDlg( this, msg, _( "Confirmation" ),
-                                       wxOK | wxCANCEL | wxICON_WARNING );
-
+                    KIDIALOG errorDlg( this, msg, _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
                     errorDlg.SetOKLabel( _( "Overwrite" ) );
 
                     return errorDlg.ShowModal() == wxID_OK;
@@ -420,7 +414,7 @@ void SYMBOL_EDIT_FRAME::CreateNewSymbol( const wxString& aInheritFrom )
             new_symbol.SetPinNameOffset( 0 );
         }
 
-        ( dlg.GetPowerSymbol() ) ? new_symbol.SetGlobalPower() : new_symbol.SetNormal();
+        ( dlg.GetPowerSymbol() ) ? new_symbol.SetPower() : new_symbol.SetNormal();
         new_symbol.SetShowPinNumbers( dlg.GetShowPinNumber() );
         new_symbol.SetShowPinNames( dlg.GetShowPinName() );
         new_symbol.LockUnits( !dlg.GetUnitsInterchangeable() );
@@ -434,38 +428,41 @@ void SYMBOL_EDIT_FRAME::CreateNewSymbol( const wxString& aInheritFrom )
     }
     else
     {
-        LIB_SYMBOL* parent = m_libMgr->GetSymbol( parentSymbolName, lib );
+        LIB_SYMBOL* parent = m_libMgr->GetAlias( parentSymbolName, lib );
         wxCHECK( parent, /* void */ );
         new_symbol.SetParent( parent );
 
         // Inherit the parent mandatory field attributes.
-        for( FIELD_T fieldId : MANDATORY_FIELDS )
+        for( int fieldId : MANDATORY_FIELDS )
         {
-            SCH_FIELD* field = new_symbol.GetField( fieldId );
-            SCH_FIELD* parentField = parent->GetField( fieldId );
+            SCH_FIELD* field = new_symbol.GetFieldById( fieldId );
+
+            // the MANDATORY_FIELD_COUNT are exactly that in RAM.
+            wxCHECK( field, /* void */ );
+
+            SCH_FIELD* parentField = parent->GetFieldById( fieldId );
+
+            wxCHECK( parentField, /* void */ );
 
             *field = *parentField;
 
             switch( fieldId )
             {
-            case FIELD_T::REFERENCE:
+            case REFERENCE_FIELD:
                 // parent's reference already copied
                 break;
 
-            case FIELD_T::VALUE:
+            case VALUE_FIELD:
                 if( parent->IsPower() )
                     field->SetText( name );
                 break;
 
-            case FIELD_T::FOOTPRINT:
-            case FIELD_T::DATASHEET:
+            case FOOTPRINT_FIELD:
+            case DATASHEET_FIELD:
                 // - footprint might be the same as parent, but might not
                 // - datasheet is most likely different
                 // - probably best to play it safe and copy neither
                 field->SetText( wxEmptyString );
-                break;
-
-            default:
                 break;
             }
 
@@ -549,7 +546,7 @@ static std::vector<LIB_SYMBOL_SPTR> GetParentChain( const LIB_SYMBOL& aSymbol )
 {
     std::vector<LIB_SYMBOL_SPTR> chain( { aSymbol.SharedPtr() } );
 
-    while( chain.back()->IsDerived() )
+    while( chain.back()->IsAlias() )
     {
         LIB_SYMBOL_SPTR parent = chain.back()->GetParent().lock();
         chain.push_back( parent );
@@ -580,7 +577,7 @@ static std::pair<bool, bool> CheckSavingIntoOwnInheritance( LIB_SYMBOL_LIBRARY_M
         return { false, false };
 
     // Or if the target symbol doesn't exist
-    if( !aLibMgr.SymbolNameInUse( aNewSymbolName, aNewLibraryName ) )
+    if( !aLibMgr.SymbolExists( aNewSymbolName, aNewLibraryName ) )
         return { false, false };
 
     bool inAncestry = false;
@@ -602,7 +599,7 @@ static std::pair<bool, bool> CheckSavingIntoOwnInheritance( LIB_SYMBOL_LIBRARY_M
     }
 
     {
-        LIB_SYMBOL* targetSymbol = aLibMgr.GetSymbol( aNewSymbolName, aNewLibraryName );
+        LIB_SYMBOL* targetSymbol = aLibMgr.GetAlias( aNewSymbolName, aNewLibraryName );
         const std::vector<LIB_SYMBOL_SPTR> parentChainFromTarget = GetParentChain( *targetSymbol );
         const wxString                     oldSymbolName = aSymbol.GetName();
 
@@ -640,8 +637,10 @@ static std::vector<wxString> CheckForParentalChainConflicts( LIB_SYMBOL_LIBRARY_
     if( newLibraryName == oldLibraryName )
     {
         // Saving into the same library - the only conflict could be the symbol itself
-        if( aLibMgr.SymbolNameInUse( newSymbolName, newLibraryName ) )
+        if( aLibMgr.SymbolExists( newSymbolName, newLibraryName ) )
+        {
             conflicts.push_back( newSymbolName );
+        }
     }
     else
     {
@@ -653,15 +652,18 @@ static std::vector<wxString> CheckForParentalChainConflicts( LIB_SYMBOL_LIBRARY_
             if( i == 0 )
             {
                 // This is the leaf symbol which the user actually named
-                if( aLibMgr.SymbolNameInUse( newSymbolName, newLibraryName ) )
+                if( aLibMgr.SymbolExists( newSymbolName, newLibraryName ) )
+                {
                     conflicts.push_back( newSymbolName );
+                }
             }
             else
             {
                 LIB_SYMBOL_SPTR chainSymbol = parentChain[i];
-
-                if( aLibMgr.SymbolNameInUse( chainSymbol->GetName(), newLibraryName ) )
+                if( aLibMgr.SymbolExists( chainSymbol->GetName(), newLibraryName ) )
+                {
                     conflicts.push_back( chainSymbol->GetName() );
+                }
             }
         }
     }
@@ -692,9 +694,7 @@ public:
 
     SYMBOL_SAVE_AS_HANDLER( LIB_SYMBOL_LIBRARY_MANAGER& aLibMgr, CONFLICT_STRATEGY aStrategy,
                             bool aValueFollowsName ) :
-            m_libMgr( aLibMgr ),
-            m_strategy( aStrategy ),
-            m_valueFollowsName( aValueFollowsName )
+            m_libMgr( aLibMgr ), m_strategy( aStrategy ), m_valueFollowsName( aValueFollowsName )
     {
     }
 
@@ -743,7 +743,7 @@ public:
             else
             {
                 // Get the buffered new copy in the new library (with the name we gave it)
-                LIB_SYMBOL* newParent = m_libMgr.GetSymbol( newNames.back(), aNewLibName );
+                LIB_SYMBOL* newParent = m_libMgr.GetAlias( newNames.back(), aNewLibName );
 
                 // We should have stored this already, why didn't we get it back?
                 wxASSERT( newParent );
@@ -776,7 +776,7 @@ private:
             {
                 wxString newName = wxString::Format( "%s_%d", proposed, suffix );
 
-                if( !m_libMgr.SymbolNameInUse( newName, aNewLibName ) )
+                if( !m_libMgr.SymbolExists( newName, aNewLibName ) )
                     return newName;
 
                 ++suffix;
@@ -935,105 +935,101 @@ void SYMBOL_EDIT_FRAME::saveSymbolCopyAs( bool aOpenCopy )
     wxString msg;
     bool     done = false;
 
-    // This is the function that will be called when the user clicks OK in the dialog and checks
-    // if the proposed name has problems, and asks for clarification.
-    const auto dialogValidatorFunc =
-            [&]( const wxString& newLib, const wxString& newName ) -> int
+    // This is the function that will be called when the user clicks OK in the dialog
+    // and checks if the proposed name has problems, and asks for clarification.
+    const auto dialogValidatorFunc = [&]( const wxString& newLib, const wxString& newName ) -> int
+    {
+        if( newLib.IsEmpty() )
+        {
+            wxMessageBox( _( "A library must be specified." ) );
+            return wxID_CANCEL;
+        }
+
+        if( newName.IsEmpty() )
+        {
+            wxMessageBox( _( "Symbol must have a name." ) );
+            return wxID_CANCEL;
+        }
+
+        if( m_libMgr->IsLibraryReadOnly( newLib ) )
+        {
+            msg = wxString::Format( _( "Library '%s' is read-only. Choose a "
+                                       "different library to save the symbol '%s' to." ),
+                                    newLib, newName );
+            wxMessageBox( msg );
+            return wxID_CANCEL;
+        }
+
+        /**
+         * If we save over a symbol that is in the inheritance chain of the symbol we're saving,
+         * we'll end up with a circular inheritance chain, which is bad.
+         */
+        const auto& [inAncestry, inDescendents] =
+                CheckSavingIntoOwnInheritance( *m_libMgr, *symbol, newName, newLib );
+
+        if( inAncestry )
+        {
+            msg = wxString::Format( _( "Symbol '%s' cannot replace another symbol '%s' that it "
+                                       "descends from" ),
+                                    symbolName, newName );
+            wxMessageBox( msg );
+            return wxID_CANCEL;
+        }
+
+        if( inDescendents )
+        {
+            msg = wxString::Format( _( "Symbol '%s' cannot replace another symbol '%s' that is "
+                                       "a descendent of it." ),
+                                    symbolName, newName );
+            wxMessageBox( msg );
+            return wxID_CANCEL;
+        }
+
+        const std::vector<wxString> conflicts =
+                CheckForParentalChainConflicts( *m_libMgr, *symbol, newName, newLib );
+
+        if( conflicts.size() == 1 && conflicts.front() == newName )
+        {
+            // The simplest case is when the symbol itself has a conflict
+            msg = wxString::Format( _( "Symbol '%s' already exists in library '%s'."
+                                       "Do you want to overwrite it?" ),
+                                    newName, newLib );
+
+            KIDIALOG errorDlg( this, msg, _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
+            errorDlg.SetOKLabel( _( "Overwrite" ) );
+
+            return errorDlg.ShowModal() == wxID_OK ? ID_OVERWRITE_CONFLICTS : (int) wxID_CANCEL;
+        }
+        else if( !conflicts.empty() )
+        {
+            // If there are conflicts in the parental chain, we need to ask the user
+            // if they want to overwrite all of them.
+            // A more complex UI might allow the user to re-parent the symbol to an existing
+            // symbol in the target lib, or rename all the parents somehow.
+            msg = wxString::Format( _( "The following symbols in the inheritance chain of '%s' "
+                                       "already exist in library '%s':\n" ),
+                                    symbolName, newLib );
+
+            for( const wxString& conflict : conflicts )
+                msg += wxString::Format( "  %s\n", conflict );
+
+            msg += _( "\nDo you want to overwrite all of them, or rename the new symbols?" );
+
+            KIDIALOG errorDlg( this, msg, _( "Confirmation" ),
+                               wxYES_NO | wxCANCEL | wxICON_WARNING );
+            errorDlg.SetYesNoCancelLabels( _( "Overwrite All" ), _( "Rename All" ), _( "Cancel" ) );
+
+            switch( errorDlg.ShowModal() )
             {
-                if( newLib.IsEmpty() )
-                {
-                    wxMessageBox( _( "A library must be specified." ) );
-                    return wxID_CANCEL;
-                }
+            case wxID_YES: return ID_OVERWRITE_CONFLICTS;
+            case wxID_NO: return ID_RENAME_CONFLICTS;
+            default: break;
+            }
+            return wxID_CANCEL;
+        }
 
-                if( newName.IsEmpty() )
-                {
-                    wxMessageBox( _( "Symbol must have a name." ) );
-                    return wxID_CANCEL;
-                }
-
-                if( m_libMgr->IsLibraryReadOnly( newLib ) )
-                {
-                    msg = wxString::Format( _( "Library '%s' is read-only. Choose a "
-                                               "different library to save the symbol '%s' to." ),
-                                            newLib, newName );
-                    wxMessageBox( msg );
-                    return wxID_CANCEL;
-                }
-
-                /**
-                 * If we save over a symbol that is in the inheritance chain of the symbol we're
-                 * saving, we'll end up with a circular inheritance chain, which is bad.
-                 */
-                const auto& [inAncestry, inDescendents] =
-                        CheckSavingIntoOwnInheritance( *m_libMgr, *symbol, newName, newLib );
-
-                if( inAncestry )
-                {
-                    msg = wxString::Format( _( "Symbol '%s' cannot replace another symbol '%s' "
-                                               "that it descends from" ),
-                                            symbolName, newName );
-                    wxMessageBox( msg );
-                    return wxID_CANCEL;
-                }
-
-                if( inDescendents )
-                {
-                    msg = wxString::Format( _( "Symbol '%s' cannot replace another symbol '%s' "
-                                               "that is a descendent of it." ),
-                                            symbolName, newName );
-                    wxMessageBox( msg );
-                    return wxID_CANCEL;
-                }
-
-                const std::vector<wxString> conflicts =
-                        CheckForParentalChainConflicts( *m_libMgr, *symbol, newName, newLib );
-
-                if( conflicts.size() == 1 && conflicts.front() == newName )
-                {
-                    // The simplest case is when the symbol itself has a conflict
-                    msg = wxString::Format( _( "Symbol '%s' already exists in library '%s'. "
-                                               "Do you want to overwrite it?" ),
-                                            newName, newLib );
-
-                    KIDIALOG errorDlg( this, msg, _( "Confirmation" ),
-                                       wxOK | wxCANCEL | wxICON_WARNING );
-                    errorDlg.SetOKLabel( _( "Overwrite" ) );
-
-                    return errorDlg.ShowModal() == wxID_OK ? ID_OVERWRITE_CONFLICTS
-                                                           : (int) wxID_CANCEL;
-                }
-                else if( !conflicts.empty() )
-                {
-                    // If there are conflicts in the parental chain, we need to ask the user
-                    // if they want to overwrite all of them.
-                    // A more complex UI might allow the user to re-parent the symbol to an
-                    // existing symbol in the target lib, or rename all the parents somehow.
-                    msg = wxString::Format( _( "The following symbols in the inheritance chain of "
-                                               "'%s' already exist in library '%s':\n" ),
-                                            symbolName, newLib );
-
-                    for( const wxString& conflict : conflicts )
-                        msg += wxString::Format( "  %s\n", conflict );
-
-                    msg += _( "\nDo you want to overwrite all of them, or rename the new symbols?" );
-
-                    KIDIALOG errorDlg( this, msg, _( "Confirmation" ),
-                                       wxYES_NO | wxCANCEL | wxICON_WARNING );
-                    errorDlg.SetYesNoCancelLabels( _( "Overwrite All" ), _( "Rename All" ),
-                                                   _( "Cancel" ) );
-
-                    switch( errorDlg.ShowModal() )
-                    {
-                    case wxID_YES: return ID_OVERWRITE_CONFLICTS;
-                    case wxID_NO: return ID_RENAME_CONFLICTS;
-                    default: break;
-                    }
-                    return wxID_CANCEL;
-                }
-
-                return wxID_OK;
-            };
+        return wxID_OK;
+    };
 
     auto strategy = SYMBOL_SAVE_AS_HANDLER::CONFLICT_STRATEGY::OVERWRITE;
 
@@ -1047,11 +1043,14 @@ void SYMBOL_EDIT_FRAME::saveSymbolCopyAs( bool aOpenCopy )
         switch( ret )
         {
         case wxID_CANCEL:
+        {
             return;
+        }
 
         case wxID_OK: // No conflicts
         case ID_OVERWRITE_CONFLICTS:
         case ID_RENAME_CONFLICTS:
+        {
             symbolName = dlg.GetSymbolName();
             libraryName = dlg.GetTextSelection();
 
@@ -1060,6 +1059,7 @@ void SYMBOL_EDIT_FRAME::saveSymbolCopyAs( bool aOpenCopy )
 
             done = true;
             break;
+        }
 
         case ID_MAKE_NEW_LIBRARY:
         {
@@ -1084,144 +1084,6 @@ void SYMBOL_EDIT_FRAME::saveSymbolCopyAs( bool aOpenCopy )
 }
 
 
-void SYMBOL_EDIT_FRAME::ExportSymbol()
-{
-    wxString msg;
-    LIB_SYMBOL* symbol = getTargetSymbol();
-
-    if( !symbol )
-    {
-        ShowInfoBarError( _( "There is no symbol selected to save." ) );
-        return;
-    }
-
-    wxFileName fn;
-
-    fn.SetName( symbol->GetName().Lower() );
-    fn.SetExt( FILEEXT::KiCadSymbolLibFileExtension );
-
-    wxFileDialog dlg( this, _( "Export Symbol" ), m_mruPath, fn.GetFullName(),
-                      FILEEXT::KiCadSymbolLibFileWildcard(), wxFD_SAVE );
-
-    if( dlg.ShowModal() == wxID_CANCEL )
-        return;
-
-    auto strategy = SYMBOL_SAVE_AS_HANDLER::CONFLICT_STRATEGY::OVERWRITE;
-
-    fn = dlg.GetPath();
-    fn.MakeAbsolute();
-
-    wxString                    libraryName;
-    std::unique_ptr<LIB_SYMBOL> flattenedSymbol = symbol->Flatten();
-
-    for( const wxString& candidate : m_libMgr->GetLibraryNames() )
-    {
-        if( m_libMgr->GetLibrary( candidate )->GetFullURI( true ) == fn.GetFullPath() )
-            libraryName = candidate;
-    }
-
-    if( !libraryName.IsEmpty() )
-    {
-        SYMBOL_SAVE_AS_HANDLER saver( *m_libMgr, strategy, false );
-
-        if( m_libMgr->IsLibraryReadOnly( libraryName ) )
-        {
-            msg = wxString::Format( _( "Library '%s' is read-only." ), libraryName );
-            DisplayError( this, msg );
-            return;
-        }
-
-        if( m_libMgr->SymbolNameInUse( symbol->GetName(), libraryName ) )
-        {
-            msg = wxString::Format( _( "Symbol '%s' already exists in library '%s'." ),
-                                    symbol->GetName(), libraryName );
-
-            KIDIALOG errorDlg( this, msg, _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
-            errorDlg.SetOKLabel( _( "Overwrite" ) );
-            errorDlg.DoNotShowCheckbox( __FILE__, __LINE__ );
-
-            if( errorDlg.ShowModal() == wxID_CANCEL )
-                return;
-        }
-
-        saver.DoSave( *flattenedSymbol, symbol->GetName(), libraryName );
-
-        SyncLibraries( false );
-        return;
-    }
-
-    LIB_SYMBOL* old_symbol = nullptr;
-    SCH_IO_MGR::SCH_FILE_T pluginType = SCH_IO_MGR::GuessPluginTypeFromLibPath( fn.GetFullPath() );
-
-    if( pluginType == SCH_IO_MGR::SCH_FILE_UNKNOWN )
-        pluginType = SCH_IO_MGR::SCH_KICAD;
-
-    IO_RELEASER<SCH_IO> pi( SCH_IO_MGR::FindPlugin( pluginType ) );
-
-    if( fn.FileExists() )
-    {
-        try
-        {
-            old_symbol = pi->LoadSymbol( fn.GetFullPath(), symbol->GetName() );
-        }
-        catch( const IO_ERROR& ioe )
-        {
-            msg.Printf( _( "Error occurred attempting to load symbol library file '%s'." ),
-                        fn.GetFullPath() );
-            DisplayErrorMessage( this, msg, ioe.What() );
-            return;
-        }
-
-        if( old_symbol )
-        {
-            msg.Printf( _( "Symbol %s already exists in library '%s'." ),
-                        UnescapeString( symbol->GetName() ),
-                        fn.GetFullName() );
-
-            KIDIALOG errorDlg( this, msg, _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
-            errorDlg.SetOKLabel( _( "Overwrite" ) );
-            errorDlg.DoNotShowCheckbox( __FILE__, __LINE__ );
-
-            if( errorDlg.ShowModal() == wxID_CANCEL )
-                return;
-        }
-    }
-
-    if( !fn.IsDirWritable() )
-    {
-        msg.Printf( _( "Insufficient permissions to save library '%s'." ), fn.GetFullPath() );
-        DisplayError( this, msg );
-        return;
-    }
-
-    try
-    {
-        if( !fn.FileExists() )
-            pi->CreateLibrary( fn.GetFullPath() );
-
-        // The flattened symbol is most likely what the user would want.  As some point in
-        // the future as more of the symbol library inheritance is implemented, this may have
-        // to be changes to save symbols of inherited symbols.
-        pi->SaveSymbol( fn.GetFullPath(), flattenedSymbol.release() );
-    }
-    catch( const IO_ERROR& ioe )
-    {
-        msg.Printf( _( "Failed to create symbol library file '%s'." ), fn.GetFullPath() );
-        DisplayErrorMessage( this, msg, ioe.What() );
-        msg.Printf( _( "Error creating symbol library '%s'." ), fn.GetFullName() );
-        SetStatusText( msg );
-        return;
-    }
-
-    m_mruPath = fn.GetPath();
-
-    msg.Printf( _( "Symbol %s saved to library '%s'." ),
-                UnescapeString( symbol->GetName() ),
-                fn.GetFullPath() );
-    SetStatusText( msg );
-}
-
-
 void SYMBOL_EDIT_FRAME::UpdateAfterSymbolProperties( wxString* aOldName )
 {
     wxCHECK( m_symbol, /* void */ );
@@ -1231,7 +1093,7 @@ void SYMBOL_EDIT_FRAME::UpdateAfterSymbolProperties( wxString* aOldName )
     if( !lib.IsEmpty() && aOldName && *aOldName != m_symbol->GetName() )
     {
         // Test the current library for name conflicts
-        if( m_libMgr->SymbolNameInUse( m_symbol->GetName(), lib ) )
+        if( m_libMgr->SymbolExists( m_symbol->GetName(), lib ) )
         {
             wxString msg = wxString::Format( _( "Symbol name '%s' already in use." ),
                                              UnescapeString( m_symbol->GetName() ) );
@@ -1376,7 +1238,7 @@ void SYMBOL_EDIT_FRAME::DuplicateSymbol( bool aFromClipboard )
         newSymbols.emplace_back( new LIB_SYMBOL( *srcSymbol ) );
 
         // Derive from same parent.
-        if( srcSymbol->IsDerived() )
+        if( srcSymbol->IsAlias() )
         {
             if( std::shared_ptr<LIB_SYMBOL> srcParent = srcSymbol->GetParent().lock() )
                 newSymbols.back()->SetParent( srcParent.get() );
@@ -1410,7 +1272,7 @@ void SYMBOL_EDIT_FRAME::ensureUniqueName( LIB_SYMBOL* aSymbol, const wxString& a
         wxString newName = aSymbol->GetName();
 
         // Append a number to the name until the name is unique in the library.
-        while( m_libMgr->SymbolNameInUse( newName, aLibrary ) )
+        while( m_libMgr->SymbolExists( newName, aLibrary ) )
             newName.Printf( "%s_%d", aSymbol->GetName(), i++ );
 
         aSymbol->SetName( newName );
@@ -1735,7 +1597,7 @@ void SYMBOL_EDIT_FRAME::UpdateSymbolMsgPanelInfo()
 
     AppendMsgPanel( _( "Name" ), UnescapeString( msg ), 8 );
 
-    if( m_symbol->IsDerived() )
+    if( m_symbol->IsAlias() )
     {
         LIB_SYMBOL_SPTR parent = m_symbol->GetParent().lock();
 
@@ -1757,10 +1619,8 @@ void SYMBOL_EDIT_FRAME::UpdateSymbolMsgPanelInfo()
 
     AppendMsgPanel( _( "Body" ), msg, 8 );
 
-    if( m_symbol->IsGlobalPower() )
+    if( m_symbol->IsPower() )
         msg = _( "Power Symbol" );
-    else if( m_symbol->IsLocalPower() )
-        msg = _( "Power Symbol (Local)" );
     else
         msg = _( "Symbol" );
 

@@ -97,70 +97,8 @@ void transformFPShapesToPolySet( const FOOTPRINT* aFootprint, PCB_LAYER_ID aLaye
         if( item->Type() == PCB_SHAPE_T || BaseType( item->Type() ) == PCB_DIMENSION_T )
         {
             if( item->GetLayer() == aLayer )
-                item->TransformShapeToPolySet( aBuffer, aLayer, 0, aMaxError, aErrorLoc );
+                item->TransformShapeToPolygon( aBuffer, aLayer, 0, aMaxError, aErrorLoc );
         }
-    }
-}
-
-
-void transformFPTextToPolySet( const FOOTPRINT* aFootprint, PCB_LAYER_ID aLayer,
-                               const std::bitset<LAYER_3D_END>& aFlags, SHAPE_POLY_SET& aBuffer,
-                               int aMaxError, ERROR_LOC aErrorLoc )
-{
-    for( BOARD_ITEM* item : aFootprint->GraphicalItems() )
-    {
-        if( item->GetLayer() != aLayer )
-            continue;
-
-        if( item->Type() == PCB_TEXT_T )
-        {
-            PCB_TEXT* text = static_cast<PCB_TEXT*>( item );
-
-            if( !aFlags.test( LAYER_FP_TEXT ) )
-                continue;
-
-            if( text->GetText() == wxT( "${REFERENCE}" ) && !aFlags.test( LAYER_FP_REFERENCES ) )
-                continue;
-
-            if( text->GetText() == wxT( "${VALUE}" ) && !aFlags.test( LAYER_FP_VALUES ) )
-                continue;
-
-            if( aLayer != UNDEFINED_LAYER && text->GetLayer() == aLayer )
-                text->TransformTextToPolySet( aBuffer, 0, aMaxError, aErrorLoc );
-        }
-
-        if( item->Type() == PCB_TEXTBOX_T )
-        {
-            PCB_TEXTBOX* textbox = static_cast<PCB_TEXTBOX*>( item );
-
-            if( aLayer != UNDEFINED_LAYER && textbox->GetLayer() == aLayer )
-            {
-                // border
-                if( textbox->IsBorderEnabled() )
-                {
-                    textbox->PCB_SHAPE::TransformShapeToPolygon( aBuffer, aLayer, 0, aMaxError,
-                                                                 aErrorLoc );
-                }
-
-                // text
-                textbox->TransformTextToPolySet( aBuffer, 0, aMaxError, aErrorLoc );
-            }
-        }
-    }
-
-    for( const PCB_FIELD* field : aFootprint->GetFields() )
-    {
-        if( !aFlags.test( LAYER_FP_TEXT ) )
-            continue;
-
-        if( field->IsReference() && !aFlags.test( LAYER_FP_REFERENCES ) )
-            continue;
-
-        if( field->IsValue() && !aFlags.test( LAYER_FP_VALUES ) )
-            continue;
-
-        if(  field->GetLayer() == aLayer && field->IsVisible() )
-            field->TransformTextToPolySet( aBuffer, 0, aMaxError, aErrorLoc );
     }
 }
 
@@ -716,22 +654,20 @@ void BOARD_ADAPTER::createLayers( REPORTER* aStatusReporter )
                     {
                         PCB_TEXTBOX* text_box = static_cast<PCB_TEXTBOX*>( item );
                         text_box->TransformTextToPolySet( *platedCopperPolys,
-                                                          0, maxError, ERROR_INSIDE );
+                                                           0, maxError, ERROR_INSIDE );
                         // Add box outlines
                         text_box->PCB_SHAPE::TransformShapeToPolygon( *platedCopperPolys, layer,
                                                                        0, maxError, ERROR_INSIDE );
                     }
                     else if( item->Type() == PCB_TEXT_T )
                     {
-                        static_cast<PCB_TEXT*>( item )->TransformTextToPolySet( *platedCopperPolys,
-                                                                                0, maxError,
-                                                                                ERROR_INSIDE );
+                        static_cast<PCB_TEXT*>( item )->TransformTextToPolySet(
+                                                                *platedCopperPolys,
+                                                                0, maxError, ERROR_INSIDE );
                     }
                     else
-                    {
-                        item->TransformShapeToPolySet( *platedCopperPolys, layer,
-                                                       0, maxError, ERROR_INSIDE );
-                    }
+                        item->TransformShapeToPolygon( *platedCopperPolys, layer,
+                                                        0, maxError, ERROR_INSIDE );
                 }
             }
         }
@@ -755,7 +691,7 @@ void BOARD_ADAPTER::createLayers( REPORTER* aStatusReporter )
                 switch( item->Type() )
                 {
                 case PCB_SHAPE_T:
-                    item->TransformShapeToPolySet( *layerPoly, layer, 0, maxError, ERROR_INSIDE );
+                    item->TransformShapeToPolygon( *layerPoly, layer, 0, maxError, ERROR_INSIDE );
                     break;
 
                 case PCB_TEXT_T:
@@ -967,13 +903,9 @@ void BOARD_ADAPTER::createLayers( REPORTER* aStatusReporter )
                     // Only vias on a external copper layer can have a solder mask
                     PCB_LAYER_ID copper_layer = layer == F_Mask ? F_Cu : B_Cu;
 
-                    if( track->Type() == PCB_VIA_T )
-                    {
-                        const PCB_VIA* via = static_cast<const PCB_VIA*>( track );
-
-                        if( !via->FlashLayer( copper_layer ) )
-                            continue;
-                    }
+                    if( track->Type() == PCB_VIA_T
+                            && !static_cast<const PCB_VIA*>( track )->FlashLayer( copper_layer ) )
+                        continue;
 
                     int maskExpansion = track->GetSolderMaskExpansion();
                     createTrackWithMargin( track, layerContainer, layer, maskExpansion );
@@ -1028,7 +960,7 @@ void BOARD_ADAPTER::createLayers( REPORTER* aStatusReporter )
                 switch( item->Type() )
                 {
                 case PCB_SHAPE_T:
-                    item->TransformShapeToPolySet( *layerPoly, layer, 0, maxError, ERROR_INSIDE );
+                    item->TransformShapeToPolygon( *layerPoly, layer, 0, maxError, ERROR_INSIDE );
                     break;
 
                 case PCB_TEXT_T:
@@ -1091,14 +1023,14 @@ void BOARD_ADAPTER::createLayers( REPORTER* aStatusReporter )
                 }
                 else
                 {
-                    footprint->TransformPadsToPolySet( *layerPoly, layer, 0, maxError,
-                                                       ERROR_INSIDE );
+                    footprint->TransformPadsToPolySet( *layerPoly, layer, 0, maxError, ERROR_INSIDE );
                 }
 
-                transformFPTextToPolySet( footprint, layer, visibilityFlags, *layerPoly, maxError,
-                                          ERROR_INSIDE );
-                transformFPShapesToPolySet( footprint, layer, *layerPoly, maxError,
-                                            ERROR_INSIDE );
+                // On tech layers, use a poor circle approximation, only for texts (stroke font)
+                footprint->TransformFPTextToPolySet( *layerPoly, layer, 0, maxError, ERROR_INSIDE );
+
+                // Add the remaining things with dynamic seg count for circles
+                transformFPShapesToPolySet( footprint, layer, *layerPoly, maxError, ERROR_INSIDE );
             }
 
             if( cfg.show_zones || layer == F_Mask || layer == B_Mask )

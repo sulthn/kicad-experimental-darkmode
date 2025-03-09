@@ -22,14 +22,12 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
-#include <filename_resolver.h>
 #include <pgm_base.h>
 #include <string>
 #include <string_utils.h>
 #include <common.h>
 #include <functional>
 #include <sch_symbol.h>
-#include <schematic.h>
 
 // Include simulator headers after wxWidgets headers to avoid conflicts with Windows headers
 // (especially on msys2 + wxWidgets 3.0.x)
@@ -41,8 +39,7 @@
 using namespace std::placeholders;
 
 
-SIM_LIB_MGR::SIM_LIB_MGR( const PROJECT* aPrj, EMBEDDED_FILES* aFiles ) :
-        m_files( aFiles ),
+SIM_LIB_MGR::SIM_LIB_MGR( const PROJECT* aPrj ) :
         m_project( aPrj ),
         m_forceFullParse( false )
 {
@@ -56,20 +53,20 @@ void SIM_LIB_MGR::Clear()
 }
 
 
-wxString SIM_LIB_MGR::ResolveLibraryPath( const wxString& aLibraryPath, REPORTER& aReporter )
+wxString SIM_LIB_MGR::ResolveLibraryPath( const wxString& aLibraryPath, const PROJECT* aProject,
+                                          REPORTER& aReporter )
 {
-    FILENAME_RESOLVER resolver;
+    wxString expandedPath = ExpandEnvVarSubstitutions( aLibraryPath, aProject );
 
-    resolver.SetProject( m_project );
-
-    wxString expandedPath = resolver.ResolvePath( aLibraryPath, wxEmptyString, m_files );
+    // Convert it to UNIX format
+    expandedPath.Replace( '\\', '/' );
 
     wxFileName fn( expandedPath );
 
     if( fn.IsAbsolute() )
         return fn.GetFullPath();
 
-    wxFileName projectFn( m_project ? m_project->AbsolutePath( expandedPath ) : expandedPath );
+    wxFileName projectFn( aProject ? aProject->AbsolutePath( expandedPath ) : expandedPath );
 
     if( projectFn.Exists() )
         return projectFn.GetFullPath();
@@ -109,7 +106,7 @@ wxString SIM_LIB_MGR::ResolveEmbeddedLibraryPath( const wxString& aLibPath,
     {
         wxString relLib( aRelativeLib );
 
-        relLib = ResolveLibraryPath( relLib, aReporter );
+        relLib = ResolveLibraryPath( relLib, m_project, aReporter );
 
         wxFileName fn( relLib );
 
@@ -122,7 +119,7 @@ wxString SIM_LIB_MGR::ResolveEmbeddedLibraryPath( const wxString& aLibPath,
     if( !fn.Exists() )
         fullPath = aLibPath;
 
-    fullPath = ResolveLibraryPath( fullPath, aReporter );
+    fullPath = ResolveLibraryPath( fullPath, m_project, aReporter );
 
     return fullPath;
 }
@@ -130,7 +127,7 @@ wxString SIM_LIB_MGR::ResolveEmbeddedLibraryPath( const wxString& aLibPath,
 
 void SIM_LIB_MGR::SetLibrary( const wxString& aLibraryPath, REPORTER& aReporter )
 {
-    wxString path = ResolveLibraryPath( aLibraryPath, aReporter );
+    wxString path = ResolveLibraryPath( aLibraryPath, m_project, aReporter );
 
     if( aReporter.HasMessageOfSeverity( RPT_SEVERITY_UNDEFINED | RPT_SEVERITY_ERROR ) )
         return;
@@ -191,14 +188,15 @@ SIM_LIBRARY::MODEL SIM_LIB_MGR::CreateModel( const SCH_SHEET_PATH* aSheetPath, S
 
     for( const SCH_FIELD& field : aSymbol.GetFields() )
     {
-        if( field.GetId() == FIELD_T::REFERENCE )
+        if( field.GetId() == REFERENCE_FIELD )
         {
-            fields.emplace_back( VECTOR2I(), FIELD_T::USER, &aSymbol, field.GetName() );
+            fields.emplace_back( VECTOR2I(), -1, &aSymbol, field.GetName() );
             fields.back().SetText( aSymbol.GetRef( aSheetPath ) );
         }
-        else if( field.GetId() == FIELD_T::VALUE || field.GetName().StartsWith( wxS( "Sim." ) ) )
+        else if( field.GetId() == VALUE_FIELD
+                 || field.GetName().StartsWith( wxS( "Sim." ) ) )
         {
-            fields.emplace_back( VECTOR2I(), FIELD_T::USER, &aSymbol, field.GetName() );
+            fields.emplace_back( VECTOR2I(), -1, &aSymbol, field.GetName() );
             fields.back().SetText( field.GetShownText( aSheetPath, false ) );
         }
     }
@@ -212,7 +210,7 @@ SIM_LIBRARY::MODEL SIM_LIB_MGR::CreateModel( const SCH_SHEET_PATH* aSheetPath, S
                         return &field;
                 }
 
-                fields.emplace_back( &aSymbol, FIELD_T::USER, name );
+                fields.emplace_back( &aSymbol, -1, name );
                 return &fields.back();
             };
 
@@ -257,8 +255,8 @@ SIM_LIBRARY::MODEL SIM_LIB_MGR::CreateModel( const std::vector<SCH_FIELD>& aFiel
                                              const std::vector<SCH_PIN*>& aPins, bool aResolved,
                                              REPORTER& aReporter )
 {
-    std::string libraryPath = GetFieldValue( &aFields, SIM_LIBRARY::LIBRARY_FIELD );
-    std::string baseModelName = GetFieldValue( &aFields, SIM_LIBRARY::NAME_FIELD );
+    std::string libraryPath = SIM_MODEL::GetFieldValue( &aFields, SIM_LIBRARY::LIBRARY_FIELD );
+    std::string baseModelName = SIM_MODEL::GetFieldValue( &aFields, SIM_LIBRARY::NAME_FIELD );
 
     if( libraryPath != "" )
     {
@@ -282,7 +280,7 @@ SIM_LIBRARY::MODEL SIM_LIB_MGR::CreateModel( const wxString& aLibraryPath,
     SIM_LIBRARY* library = nullptr;
     SIM_MODEL*   baseModel = nullptr;
     std::string  modelName;
-    wxString     path = ResolveLibraryPath( aLibraryPath, aReporter );
+    wxString     path = ResolveLibraryPath( aLibraryPath, m_project, aReporter );
 
     auto it = m_libraries.find( path );
 

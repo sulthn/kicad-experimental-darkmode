@@ -308,14 +308,15 @@ void SCH_EDIT_FRAME::SaveSheetAsDesignBlock( const wxString& aLibraryName,
     blk.SetLibId( LIB_ID( aLibraryName, fn.GetName() ) );
 
     // Copy all fields from the sheet to the design block
+    std::vector<SCH_FIELD>& shFields = aSheetPath.Last()->GetFields();
     nlohmann::ordered_map<wxString, wxString> dbFields;
 
-    for( SCH_FIELD& field : aSheetPath.Last()->GetFields() )
+    for( int i = 0; i < (int) shFields.size(); i++ )
     {
-        if( field.IsMandatory() )
+        if( i == SHEETNAME || i == SHEETFILENAME )
             continue;
 
-        dbFields[field.GetCanonicalName()] = field.GetText();
+        dbFields[shFields[i].GetCanonicalName()] = shFields[i].GetText();
     }
 
     blk.SetFields( dbFields );

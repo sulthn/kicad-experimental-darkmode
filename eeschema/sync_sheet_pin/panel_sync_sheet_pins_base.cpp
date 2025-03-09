@@ -96,12 +96,12 @@ PANEL_SYNC_SHEET_PINS_BASE::PANEL_SYNC_SHEET_PINS_BASE( wxWindow* parent, wxWind
 	bSizer14 = new wxBoxSizer( wxVERTICAL );
 
 	m_btnUseLabelAsTemplate = new wxBitmapButton( m_panel8, wxID_ANY, wxNullBitmap, wxDefaultPosition, wxDefaultSize, wxBU_AUTODRAW|0 );
-	m_btnUseLabelAsTemplate->SetToolTip( _("Associate selected sheet pin and hierarchical label using the label name") );
+	m_btnUseLabelAsTemplate->SetToolTip( _("Change sheet pin to hierarchical label") );
 
 	bSizer14->Add( m_btnUseLabelAsTemplate, 0, wxBOTTOM|wxEXPAND|wxLEFT|wxRIGHT, 5 );
 
 	m_btnUsePinAsTemplate = new wxBitmapButton( m_panel8, wxID_ANY, wxNullBitmap, wxDefaultPosition, wxDefaultSize, wxBU_AUTODRAW|0 );
-	m_btnUsePinAsTemplate->SetToolTip( _("Associate selected sheet pin and hierarchical label using the pin name") );
+	m_btnUsePinAsTemplate->SetToolTip( _("Change hierarchical label to sheet pin") );
 
 	bSizer14->Add( m_btnUsePinAsTemplate, 0, wxALL|wxEXPAND, 5 );
 

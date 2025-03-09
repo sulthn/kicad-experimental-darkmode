@@ -332,11 +332,11 @@ bool DIALOG_TEXT_PROPERTIES::TransferDataToWindow()
         m_borderStyleLabel->Enable( textBox->GetWidth() >= 0 );
         m_borderStyleCombo->Enable( textBox->GetWidth() >= 0 );
 
-        m_filledCtrl->SetValue( textBox->IsSolidFill() );
+        m_filledCtrl->SetValue( textBox->IsFilled() );
         m_fillColorSwatch->SetSwatchColor( textBox->GetFillColor(), false );
 
-        m_fillColorLabel->Enable( textBox->IsSolidFill() );
-        m_fillColorSwatch->Enable( textBox->IsSolidFill() );
+        m_fillColorLabel->Enable( textBox->IsFilled() );
+        m_fillColorSwatch->Enable( textBox->IsFilled() );
     }
 
     if( m_isSymbolEditor )
@@ -448,7 +448,7 @@ bool DIALOG_TEXT_PROPERTIES::TransferDataFromWindow()
         return false;
 
     // Don't allow text to disappear; it can be difficult to correct if you can't select it
-    if( !m_textSize.Validate( 0.01, 1000.0, EDA_UNITS::MM ) )
+    if( !m_textSize.Validate( 0.01, 1000.0, EDA_UNITS::MILLIMETRES ) )
         return false;
 
     SCH_COMMIT commit( m_frame );

@@ -36,19 +36,18 @@
 const int jobsFileSchemaVersion = 1;
 
 
-KICOMMON_API std::map<JOBSET_DESTINATION_T, JOBSET_DESTINATION_T_INFO> JobsetDestinationTypeInfos = 
-{
-    { JOBSET_DESTINATION_T::FOLDER,
+KICOMMON_API std::map<JOBSET_OUTPUT_TYPE, JOBSET_OUTPUT_TYPE_INFO> JobsetOutputTypeInfos = {
+    { JOBSET_OUTPUT_TYPE::FOLDER,
         { _HKI( "Folder" ), BITMAPS::small_folder, true, "" } },
-    { JOBSET_DESTINATION_T::ARCHIVE,
+    { JOBSET_OUTPUT_TYPE::ARCHIVE,
         { _HKI( "Archive" ), BITMAPS::zip, false, FILEEXT::ZipFileWildcard() } },
 };
 
 
-NLOHMANN_JSON_SERIALIZE_ENUM( JOBSET_DESTINATION_T,
+NLOHMANN_JSON_SERIALIZE_ENUM( JOBSET_OUTPUT_TYPE,
                               {
-                                      { JOBSET_DESTINATION_T::FOLDER, "folder" },
-                                      { JOBSET_DESTINATION_T::ARCHIVE, "archive" }
+                                      { JOBSET_OUTPUT_TYPE::FOLDER, "folder" },
+                                      { JOBSET_OUTPUT_TYPE::ARCHIVE, "archive" }
                               } )
 
 KICOMMON_API void to_json( nlohmann::json& j, const JOBSET_JOB& f )
@@ -80,42 +79,44 @@ KICOMMON_API void from_json( const nlohmann::json& j, JOBSET_JOB& f )
 }
 
 
-KICOMMON_API void to_json( nlohmann::json& j, const JOBSET_DESTINATION& destination )
+KICOMMON_API void to_json( nlohmann::json& j, const JOBSET_OUTPUT& f )
 {
-    j = nlohmann::json{ { "id", destination.m_id },
-                        { "type", destination.m_type },
-                        { "only", destination.m_only },
-                        { "description", destination.m_description },
+    j = nlohmann::json{ { "id", f.m_id },
+                        { "type", f.m_type },
+                        { "only", f.m_only },
+                        { "description", f.m_description },
                         { "settings", nlohmann::json::object( {} ) }
                         };
 
-    destination.m_outputHandler->ToJson( j.at( "settings" ) );
+    f.m_outputHandler->ToJson( j.at( "settings" ) );
 }
 
 
-KICOMMON_API void from_json( const nlohmann::json& j, JOBSET_DESTINATION& destination )
+KICOMMON_API void from_json( const nlohmann::json& j, JOBSET_OUTPUT& f )
 {
     // During 9.0 development outputs didn't get ids.
     if( j.contains( "id" ) )
-        j.at( "id" ).get_to( destination.m_id );
+        j.at( "id" ).get_to( f.m_id );
     else
-        destination.m_id = KIID().AsString();
+        f.m_id = KIID().AsString();
 
-    j.at( "type" ).get_to( destination.m_type );
-    destination.m_only = j.value( "only", std::vector<wxString>() );
-    destination.m_description = j.value( "description", "" );
+    j.at( "type" ).get_to( f.m_type );
+    f.m_only = j.value( "only", std::vector<wxString>() );
+    f.m_description = j.value( "description", "" );
 
     const nlohmann::json& settings_obj = j.at( "settings" );
 
-    destination.InitOutputHandler();
+    f.InitOutputHandler();
 
-    if( destination.m_outputHandler != nullptr )
-        destination.m_outputHandler->FromJson( settings_obj );
+    if( f.m_outputHandler != nullptr )
+    {
+        f.m_outputHandler->FromJson( settings_obj );
+    }
 }
 
 
-JOBSET_DESTINATION::JOBSET_DESTINATION() :
-        m_type( JOBSET_DESTINATION_T::FOLDER ),
+JOBSET_OUTPUT::JOBSET_OUTPUT() :
+        m_type( JOBSET_OUTPUT_TYPE::FOLDER ),
         m_outputHandler( nullptr ),
         m_lastRunSuccess(),
         m_lastRunReporters()
@@ -123,7 +124,7 @@ JOBSET_DESTINATION::JOBSET_DESTINATION() :
 }
 
 
-JOBSET_DESTINATION::JOBSET_DESTINATION( const wxString& id, JOBSET_DESTINATION_T type ) :
+JOBSET_OUTPUT::JOBSET_OUTPUT( const wxString& id, JOBSET_OUTPUT_TYPE type ) :
         m_id( id ),
         m_type( type ),
         m_outputHandler( nullptr ),
@@ -134,7 +135,7 @@ JOBSET_DESTINATION::JOBSET_DESTINATION( const wxString& id, JOBSET_DESTINATION_T
 }
 
 
-JOBSET_DESTINATION::~JOBSET_DESTINATION()
+JOBSET_OUTPUT::~JOBSET_OUTPUT()
 {
     for( auto& [name, reporter] : m_lastRunReporters )
         delete reporter;
@@ -143,26 +144,26 @@ JOBSET_DESTINATION::~JOBSET_DESTINATION()
 }
 
 
-void JOBSET_DESTINATION::InitOutputHandler()
+void JOBSET_OUTPUT::InitOutputHandler()
 {
-    if( m_type == JOBSET_DESTINATION_T::FOLDER )
+    if( m_type == JOBSET_OUTPUT_TYPE::FOLDER )
     {
         m_outputHandler = new JOBS_OUTPUT_FOLDER();
     }
-    else if( m_type == JOBSET_DESTINATION_T::ARCHIVE )
+    else if( m_type == JOBSET_OUTPUT_TYPE::ARCHIVE )
     {
         m_outputHandler = new JOBS_OUTPUT_ARCHIVE();
     }
 }
 
 
-wxString JOBSET_DESTINATION::GetDescription() const
+wxString JOBSET_OUTPUT::GetDescription() const
 {
     return m_description.IsEmpty() ? m_outputHandler->GetDefaultDescription() : m_description;
 }
 
 
-void JOBSET_DESTINATION::SetDescription( const wxString& aDescription )
+void JOBSET_OUTPUT::SetDescription( const wxString& aDescription )
 {
     if( aDescription == m_outputHandler->GetDefaultDescription() )
         m_description = wxEmptyString;
@@ -192,7 +193,7 @@ void JOBSET_JOB::SetDescription( const wxString& aDescription )
 }
 
 
-bool JOBSET_DESTINATION::operator==( const JOBSET_DESTINATION& rhs ) const
+bool JOBSET_OUTPUT::operator==( const JOBSET_OUTPUT& rhs ) const
 {
     return rhs.m_type == m_type;
 }
@@ -203,7 +204,7 @@ JOBSET::JOBSET( const wxString& aFilename ) :
         m_dirty( false )
 {
     m_params.emplace_back( new PARAM_LIST<JOBSET_JOB>( "jobs", &m_jobs, {} ) );
-    m_params.emplace_back( new PARAM_LIST<JOBSET_DESTINATION>( "outputs", &m_destinations, {} ) );
+    m_params.emplace_back( new PARAM_LIST<JOBSET_OUTPUT>( "outputs", &m_outputs, {} ) );
 
     m_fileNameWithoutPath = wxFileName( aFilename ).GetFullName();
 }
@@ -222,21 +223,21 @@ void JOBSET::AddNewJob( wxString aType, JOB* aJob )
 }
 
 
-JOBSET_DESTINATION* JOBSET::AddNewDestination( JOBSET_DESTINATION_T aType )
+JOBSET_OUTPUT* JOBSET::AddNewJobOutput( JOBSET_OUTPUT_TYPE aType )
 {
-    m_destinations.emplace_back( KIID().AsString(), aType );
+    m_outputs.emplace_back( KIID().AsString(), aType);
     SetDirty();
 
-    return &m_destinations.back();
+    return &m_outputs.back();
 }
 
 
-void JOBSET::RemoveDestination( JOBSET_DESTINATION* aDestination )
+void JOBSET::RemoveOutput( JOBSET_OUTPUT* aOutput )
 {
-    std::erase_if( m_destinations,
-                   [&]( JOBSET_DESTINATION const& destination )
+    std::erase_if( m_outputs,
+                   [&]( JOBSET_OUTPUT const& output )
                    {
-                       return destination.m_id == aDestination->m_id;
+                       return output.m_id == aOutput->m_id;
                    } );
 }
 
@@ -280,35 +281,35 @@ bool JOBSET::SaveToFile( const wxString& aDirectory, bool aForce )
 }
 
 
-JOBSET_DESTINATION* JOBSET::GetDestination( wxString& aDestination )
+JOBSET_OUTPUT* JOBSET::GetOutput( wxString& aOutput )
 {
-    auto it = std::find_if( m_destinations.begin(), m_destinations.end(),
-                            [&]( const JOBSET_DESTINATION& destination )
+    auto it = std::find_if( m_outputs.begin(), m_outputs.end(),
+                            [&]( const JOBSET_OUTPUT& output )
                             {
-                                if( destination.m_id == aDestination )
+                                if( output.m_id == aOutput )
                                     return true;
 
                                 return false;
                             } );
 
-    if( it != m_destinations.end() )
+    if( it != m_outputs.end() )
         return &(*it);
 
     return nullptr;
 }
 
 
-std::vector<JOBSET_JOB> JOBSET::GetJobsForDestination( JOBSET_DESTINATION* aDestination )
+std::vector<JOBSET_JOB> JOBSET::GetJobsForOutput( JOBSET_OUTPUT* aOutput )
 {
-    wxASSERT( aDestination != nullptr );
+    wxASSERT( aOutput != nullptr );
 
-    if( aDestination->m_only.size() == 0 )
+    if( aOutput->m_only.size() == 0 )
     {
         return m_jobs;
     }
 
     std::vector<JOBSET_JOB> result;
-    for( wxString& onlyId : aDestination->m_only )
+    for( wxString& onlyId : aOutput->m_only )
     {
         auto it = std::find_if( m_jobs.begin(), m_jobs.end(),
                                 [&]( const JOBSET_JOB& job )
@@ -329,5 +330,5 @@ std::vector<JOBSET_JOB> JOBSET::GetJobsForDestination( JOBSET_DESTINATION* aDest
 
 #if !defined( __MINGW32__ )
 template class KICOMMON_API PARAM_LIST<JOBSET_JOB>;
-template class KICOMMON_API PARAM_LIST<JOBSET_DESTINATION>;
+template class KICOMMON_API PARAM_LIST<JOBSET_OUTPUT>;
 #endif

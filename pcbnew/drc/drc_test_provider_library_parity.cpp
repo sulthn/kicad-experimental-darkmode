@@ -123,7 +123,7 @@ public:
 #define PAD_DESC( pad ) wxString::Format( _( "Pad %s" ), ( pad )->GetNumber() )
 
 
-UNITS_PROVIDER g_unitsProvider( pcbIUScale, EDA_UNITS::MM );
+UNITS_PROVIDER g_unitsProvider( pcbIUScale, EDA_UNITS::MILLIMETRES );
 
 
 bool primitiveNeedsUpdate( const std::shared_ptr<PCB_SHAPE>& a,
@@ -186,7 +186,7 @@ bool primitiveNeedsUpdate( const std::shared_ptr<PCB_SHAPE>& a,
     }
 
     TEST( a->GetStroke(), b->GetStroke(), "" );
-    TEST( a->GetFillMode(), b->GetFillMode(), "" );
+    TEST( a->IsFilled(), b->IsFilled(), "" );
 
     return diff;
 }
@@ -475,7 +475,7 @@ bool shapeNeedsUpdate( const PCB_SHAPE& curr_shape, const PCB_SHAPE& ref_shape )
     if( curr_shape.IsOnCopperLayer() )
         TEST( curr_shape.GetStroke(), ref_shape.GetStroke(), "" );
 
-    TEST( curr_shape.GetFillMode(), ref_shape.GetFillMode(), "" );
+    TEST( curr_shape.IsFilled(), ref_shape.IsFilled(), "" );
 
     TEST( curr_shape.GetLayer(), ref_shape.GetLayer(), "" );
 
@@ -572,6 +572,8 @@ bool zoneNeedsUpdate( const ZONE* a, const ZONE* b, REPORTER* aReporter )
 bool FOOTPRINT::FootprintNeedsUpdate( const FOOTPRINT* aLibFP, int aCompareFlags,
                                       REPORTER* aReporter )
 {
+    UNITS_PROVIDER unitsProvider( pcbIUScale, EDA_UNITS::MILLIMETRES );
+
     wxASSERT( aLibFP );
     bool diff = false;
 
@@ -835,10 +837,10 @@ bool DRC_TEST_PROVIDER_LIBRARY_PARITY::Run()
         if( !reportProgress( ii++, (int) board->Footprints().size(), progressDelta ) )
             return false;   // DRC cancelled
 
-        LIB_ID               fpID = footprint->GetFPID();
-        wxString             libName = fpID.GetLibNickname();
-        wxString             fpName = fpID.GetLibItemName();
-        const LIB_TABLE_ROW* libTableRow = nullptr;
+        LIB_ID                  fpID = footprint->GetFPID();
+        wxString                libName = fpID.GetLibNickname();
+        wxString                fpName = fpID.GetLibItemName();
+        const FP_LIB_TABLE_ROW* libTableRow = nullptr;
 
         if( libName.IsEmpty() )
         {
@@ -860,7 +862,7 @@ bool DRC_TEST_PROVIDER_LIBRARY_PARITY::Run()
             {
                 std::shared_ptr<DRC_ITEM> drcItem = DRC_ITEM::Create( DRCE_LIB_FOOTPRINT_ISSUES );
                 msg.Printf( _( "The current configuration does not include the footprint library '%s'." ),
-                            UnescapeString( libName ) );
+                            libName );
                 drcItem->SetErrorMessage( msg );
                 drcItem->SetItems( footprint );
                 reportViolation( drcItem, footprint->GetCenter(), UNDEFINED_LAYER );
@@ -874,7 +876,7 @@ bool DRC_TEST_PROVIDER_LIBRARY_PARITY::Run()
             {
                 std::shared_ptr<DRC_ITEM> drcItem = DRC_ITEM::Create( DRCE_LIB_FOOTPRINT_ISSUES );
                 msg.Printf( _( "The footprint library '%s' is not enabled in the current configuration." ),
-                            UnescapeString( libName ) );
+                            libName );
                 drcItem->SetErrorMessage( msg );
                 drcItem->SetItems( footprint );
                 reportViolation( drcItem, footprint->GetCenter(), UNDEFINED_LAYER );
@@ -887,9 +889,8 @@ bool DRC_TEST_PROVIDER_LIBRARY_PARITY::Run()
             if( !m_drcEngine->IsErrorLimitExceeded( DRCE_LIB_FOOTPRINT_ISSUES ) )
             {
                 std::shared_ptr<DRC_ITEM> drcItem = DRC_ITEM::Create( DRCE_LIB_FOOTPRINT_ISSUES );
-                msg.Printf( _( "The footprint library '%s' was not found at '%s'." ),
-                            UnescapeString( libName ),
-                            libTableRow->GetFullURI( true ) );
+                msg.Printf( _( "The footprint library '%s' was not found." ),
+                            libName );
                 drcItem->SetErrorMessage( msg );
                 drcItem->SetItems( footprint );
                 reportViolation( drcItem, footprint->GetCenter(), UNDEFINED_LAYER );

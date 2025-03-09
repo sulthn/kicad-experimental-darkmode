@@ -773,7 +773,7 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSchematicSymbolInstances()
             if( copy )
                 delete kiSym;
 
-            SCH_FIELD* refField = symbol->GetField( FIELD_T::REFERENCE );
+            SCH_FIELD* refField = symbol->GetField( REFERENCE_FIELD );
 
             sym.ComponentRef.Designator.Replace( wxT( "\n" ), wxT( "\\n" ) );
             sym.ComponentRef.Designator.Replace( wxT( "\r" ), wxT( "\\r" ) );
@@ -785,12 +785,12 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSchematicSymbolInstances()
 
             if( sym.HasPartRef )
             {
-                SCH_FIELD* partField = symbol->GetField( PartNameFieldName );
+                SCH_FIELD* partField = symbol->FindField( PartNameFieldName );
 
                 if( !partField )
                 {
-                    partField = symbol->AddField( SCH_FIELD( { 0, 0 }, FIELD_T::USER, symbol,
-                                                             PartNameFieldName ) );
+                    partField = symbol->AddField( SCH_FIELD( VECTOR2I(), symbol->GetNextFieldId(),
+                                                             symbol, PartNameFieldName ) );
                 }
 
                 wxASSERT( partField->GetName() == PartNameFieldName );
@@ -813,12 +813,13 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSchematicSymbolInstances()
                 if( attrVal.HasLocation )
                 {
                     wxString attrName = getAttributeName( attrVal.AttributeID );
-                    SCH_FIELD* attrField = symbol->GetField( attrName );
+                    SCH_FIELD* attrField = symbol->FindField( attrName );
 
                     if( !attrField )
                     {
-                        attrField = symbol->AddField( SCH_FIELD( { 0, 0 }, FIELD_T::USER, symbol,
-                                                                 attrName ) );
+                        attrField = symbol->AddField( SCH_FIELD( VECTOR2I(),
+                                                                 symbol->GetNextFieldId(),
+                                                                 symbol, attrName ) );
                     }
 
                     wxASSERT( attrField->GetName() == attrName );
@@ -893,7 +894,7 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSchematicSymbolInstances()
                     wxCHECK( templatePart, /*void*/ );
 
                     kiPart = new LIB_SYMBOL( *templatePart );
-                    kiPart->SetGlobalPower();
+                    kiPart->SetPower();
                     kiPart->SetName( libPartName );
                     kiPart->GetValueField().SetText( symbolInstanceNetName );
                     kiPart->SetShowPinNames( false );
@@ -1122,7 +1123,7 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadNets()
 
             if( m_powerSymMap.find( netTerm.SymbolID ) != m_powerSymMap.end() )
             {
-                SCH_FIELD* val = m_powerSymMap.at( netTerm.SymbolID )->GetField( FIELD_T::VALUE );
+                SCH_FIELD* val = m_powerSymMap.at( netTerm.SymbolID )->GetField( VALUE_FIELD );
                 val->SetText( netName );
                 val->SetBold( false );
                 val->SetVisible( false );
@@ -1593,10 +1594,13 @@ CADSTAR_SCH_ARCHIVE_LOADER::addNewFieldToSymbol( const wxString&              aF
                                                  std::unique_ptr<LIB_SYMBOL>& aKiCadSymbol )
 {
     // First Check if field already exists
-    if( SCH_FIELD* existingField = aKiCadSymbol->GetField( aFieldName ) )
+    SCH_FIELD* existingField = aKiCadSymbol->FindField( aFieldName );
+
+    if( existingField != nullptr )
         return existingField;
 
-    SCH_FIELD* newfield = new SCH_FIELD( aKiCadSymbol.get(), FIELD_T::USER, aFieldName );
+    SCH_FIELD* newfield = new SCH_FIELD( aKiCadSymbol.get(),
+                                         aKiCadSymbol->GetNextAvailableFieldId(), aFieldName );
     newfield->SetVisible( false );
     aKiCadSymbol->AddField( newfield );
     /*
@@ -1877,7 +1881,9 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSymbolGateAndPartFields( const SYMDEF_ID& a
     tempSymbol->GetValueField().SetVisible( false );
 
 
-    if( SCH_FIELD* partNameField = tempSymbol->GetField( PartNameFieldName ) )
+    SCH_FIELD* partNameField = tempSymbol->FindField( PartNameFieldName );
+
+    if( partNameField )
         partNameField->SetText( EscapeFieldText( aCadstarPart.Name ) );
 
     const POINT& symDefOrigin = Library.SymbolDefinitions.at( aSymdefID ).Origin;
@@ -1921,7 +1927,7 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSymbolGateAndPartFields( const SYMDEF_ID& a
             return;
         }
 
-        bool       attrIsNew = tempSymbol->GetField( attrName ) == nullptr;
+        bool       attrIsNew = tempSymbol->FindField( attrName ) == nullptr;
         SCH_FIELD* attrField = addNewFieldToSymbol( attrName, tempSymbol );
 
         wxASSERT( attrField->GetName() == attrName );
@@ -2483,7 +2489,10 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSheetAndChildSheets( const LAYER_ID&       
 
     wxString name = Sheets.SheetNames.at( aCadstarSheetID );
 
-    sheet->GetField( FIELD_T::SHEET_NAME )->SetText( name );
+    SCH_FIELD& sheetNameField = sheet->GetFields()[SHEETNAME];
+    SCH_FIELD& filenameField  = sheet->GetFields()[SHEETFILENAME];
+
+    sheetNameField.SetText( name );
 
     int         sheetNum = getSheetNumber( aCadstarSheetID );
     wxString    loadedFilename = wxFileName( Filename ).GetName();
@@ -2492,7 +2501,7 @@ void CADSTAR_SCH_ARCHIVE_LOADER::loadSheetAndChildSheets( const LAYER_ID&       
     ReplaceIllegalFileNameChars( &filename );
     filename += wxT( "." ) + wxString( FILEEXT::KiCadSchematicFileExtension );
 
-    sheet->GetField( FIELD_T::SHEET_FILENAME )->SetText( filename );
+    filenameField.SetText( filename );
 
     wxFileName fn( m_schematic->Prj().GetProjectPath() + filename );
     sheet->GetScreen()->SetFileName( fn.GetFullPath() );

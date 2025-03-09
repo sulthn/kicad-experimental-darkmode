@@ -114,8 +114,6 @@ BOARD_ADAPTER::BOARD_ADAPTER() :
     m_frontCopperThickness3DU      = DEFAULT_COPPER_THICKNESS     * m_biuTo3Dunits;
     m_backCopperThickness3DU       = DEFAULT_COPPER_THICKNESS     * m_biuTo3Dunits;
     m_nonCopperLayerThickness3DU   = DEFAULT_TECH_LAYER_THICKNESS * m_biuTo3Dunits;
-    m_frontMaskThickness3DU        = DEFAULT_TECH_LAYER_THICKNESS * m_biuTo3Dunits;
-    m_backMaskThickness3DU         = DEFAULT_TECH_LAYER_THICKNESS * m_biuTo3Dunits;
     m_solderPasteLayerThickness3DU = SOLDERPASTE_LAYER_THICKNESS  * m_biuTo3Dunits;
 
     m_trackCount = 0;
@@ -374,8 +372,6 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
     m_frontCopperThickness3DU      = DEFAULT_COPPER_THICKNESS     * m_biuTo3Dunits;
     m_backCopperThickness3DU       = DEFAULT_COPPER_THICKNESS     * m_biuTo3Dunits;
     m_nonCopperLayerThickness3DU   = DEFAULT_TECH_LAYER_THICKNESS * m_biuTo3Dunits;
-    m_frontMaskThickness3DU        = DEFAULT_TECH_LAYER_THICKNESS * m_biuTo3Dunits;
-    m_backMaskThickness3DU         = DEFAULT_TECH_LAYER_THICKNESS * m_biuTo3Dunits;
     m_solderPasteLayerThickness3DU = SOLDERPASTE_LAYER_THICKNESS  * m_biuTo3Dunits;
 
     g_BevelThickness3DU = pcbIUScale.mmToIU( ADVANCED_CFG::GetCfg().m_3DRT_BevelHeight_um / 1000.0 )
@@ -387,7 +383,7 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
 
         if( bds.GetStackupDescriptor().GetCount() )
         {
-            int body_thickness = 0;
+            int thickness = 0;
 
             for( BOARD_STACKUP_ITEM* item : bds.GetStackupDescriptor().GetList() )
             {
@@ -395,8 +391,7 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
                 {
                 case BS_ITEM_TYPE_DIELECTRIC:
                     for( int sublayer = 0; sublayer < item->GetSublayersCount(); sublayer++ )
-                        body_thickness += item->GetThickness( sublayer );
-
+                        thickness += item->GetThickness( sublayer );
                     break;
 
                 case BS_ITEM_TYPE_COPPER:
@@ -411,30 +406,16 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
                     else if( item->GetBrdLayerId() == B_Cu )
                         m_backCopperThickness3DU = copper_thickness * m_biuTo3Dunits;
                     else if( item->IsEnabled() )
-                        body_thickness += copper_thickness;
-
+                        thickness += copper_thickness;
+                }
                     break;
-                }
-
-                case BS_ITEM_TYPE_SOLDERMASK:
-                {
-                    // The mask thickness must be > 0 to avoid draw issues (divide by 0 for
-                    // instance).   We use a minimal arbitrary value = 1 micrometer here:
-                    int mask_thickness = std::max( item->GetThickness(),
-                                                   pcbIUScale.mmToIU( 0.001 ) );
-
-                    if( item->GetBrdLayerId() == F_Mask )
-                        m_frontMaskThickness3DU = mask_thickness * m_biuTo3Dunits;
-                    else if( item->GetBrdLayerId() == B_Mask )
-                        m_backMaskThickness3DU = mask_thickness * m_biuTo3Dunits;
-                }
 
                 default:
                     break;
                 }
             }
 
-            m_boardBodyThickness3DU = body_thickness * m_biuTo3Dunits;
+            m_boardBodyThickness3DU = thickness * m_biuTo3Dunits;
         }
     }
 
@@ -484,14 +465,26 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
     const float zpos_copperTop_back  = m_layerZcoordTop[B_Cu];
     const float zpos_copperTop_front = m_layerZcoordTop[F_Cu];
 
-    // Fill not copper layers zpos
+    // Fill not copper layers zpos with a dummy position
+    // (m_layerZcoordTop[B_Cu]with a small margin)
+    // Some important layer position will be set later
     for( int layer_id = 0; layer_id < PCB_LAYER_ID_COUNT; layer_id++ )
     {
         if( IsCopperLayer( (PCB_LAYER_ID)layer_id ) )
             continue;
 
-        float zposBottom = zpos_copperTop_front + 2.0f * zpos_offset;
-        float zposTop = zposBottom + m_frontCopperThickness3DU;
+        m_layerZcoordBottom[(PCB_LAYER_ID)layer_id] = zpos_copperTop_back - 2.0f * zpos_offset;
+        m_layerZcoordTop[(PCB_LAYER_ID) layer_id] =
+                m_layerZcoordBottom[(PCB_LAYER_ID) layer_id] - m_backCopperThickness3DU;
+    }
+
+    // calculate z position for each technical layer
+    // Solder mask and Solder paste have the same Z position
+    for( PCB_LAYER_ID layer_id :
+         { B_Adhes, B_Mask, B_Paste, F_Adhes, F_Mask, F_Paste, B_SilkS, F_SilkS } )
+    {
+        float zposTop = 0.0;
+        float zposBottom = 0.0;
 
         switch( layer_id )
         {
@@ -507,7 +500,7 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
 
         case B_Mask:
             zposBottom = zpos_copperTop_back;
-            zposTop    = zpos_copperTop_back - m_backMaskThickness3DU;
+            zposTop    = zpos_copperTop_back - m_nonCopperLayerThickness3DU;
             break;
 
         case B_Paste:
@@ -517,7 +510,7 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
 
         case F_Mask:
             zposBottom = zpos_copperTop_front;
-            zposTop    = zpos_copperTop_front + m_frontMaskThickness3DU;
+            zposTop    = zpos_copperTop_front + m_nonCopperLayerThickness3DU;
             break;
 
         case F_Paste:
@@ -539,8 +532,8 @@ void BOARD_ADAPTER::InitSettings( REPORTER* aStatusReporter, REPORTER* aWarningR
             break;
         }
 
-        m_layerZcoordTop[(PCB_LAYER_ID)layer_id] = zposTop;
-        m_layerZcoordBottom[(PCB_LAYER_ID)layer_id] = zposBottom;
+        m_layerZcoordTop[layer_id] = zposTop;
+        m_layerZcoordBottom[layer_id] = zposBottom;
     }
 
     m_boardCenter = SFVEC3F( m_boardPos.x * m_biuTo3Dunits, m_boardPos.y * m_biuTo3Dunits, 0.0f );
@@ -852,10 +845,7 @@ std::bitset<LAYER_3D_END> BOARD_ADAPTER::GetVisibleLayers() const
             return ret;
 
         const PCB_PLOT_PARAMS& plotParams = m_board->GetPlotOptions();
-        LSET                   layers = plotParams.GetLayerSelection();
-
-        for( PCB_LAYER_ID commonLayer : plotParams.GetPlotOnAllLayersSequence() )
-            layers.set( commonLayer );
+        LSET layers = plotParams.GetLayerSelection() | plotParams.GetPlotOnAllLayersSelection();
 
         ret.set( LAYER_3D_BOARD,             true );
         ret.set( LAYER_3D_COPPER_TOP,        layers.test( F_Cu ) );
@@ -878,6 +868,26 @@ std::bitset<LAYER_3D_END> BOARD_ADAPTER::GetVisibleLayers() const
     else if( LAYER_PRESET_3D* preset = m_Cfg->FindPreset( m_Cfg->m_CurrentPreset ) )
     {
         ret = preset->layers;
+    }
+    else
+    {
+        ret.set( LAYER_3D_BOARD,             m_Cfg->m_Render.show_board_body );
+        ret.set( LAYER_3D_COPPER_TOP,        m_Cfg->m_Render.show_copper_top );
+        ret.set( LAYER_3D_COPPER_BOTTOM,     m_Cfg->m_Render.show_copper_bottom );
+        ret.set( LAYER_3D_SILKSCREEN_TOP,    m_Cfg->m_Render.show_silkscreen_top );
+        ret.set( LAYER_3D_SILKSCREEN_BOTTOM, m_Cfg->m_Render.show_silkscreen_bottom );
+        ret.set( LAYER_3D_SOLDERMASK_TOP,    m_Cfg->m_Render.show_soldermask_top );
+        ret.set( LAYER_3D_SOLDERMASK_BOTTOM, m_Cfg->m_Render.show_soldermask_bottom );
+        ret.set( LAYER_3D_SOLDERPASTE,       m_Cfg->m_Render.show_solderpaste );
+        ret.set( LAYER_3D_ADHESIVE,          m_Cfg->m_Render.show_adhesive );
+        ret.set( LAYER_3D_USER_COMMENTS,     m_Cfg->m_Render.show_comments );
+        ret.set( LAYER_3D_USER_DRAWINGS,     m_Cfg->m_Render.show_drawings );
+        ret.set( LAYER_3D_USER_ECO1,         m_Cfg->m_Render.show_eco1 );
+        ret.set( LAYER_3D_USER_ECO2,         m_Cfg->m_Render.show_eco2 );
+
+        ret.set( LAYER_FP_REFERENCES,        m_Cfg->m_Render.show_fp_references );
+        ret.set( LAYER_FP_VALUES,            m_Cfg->m_Render.show_fp_values );
+        ret.set( LAYER_FP_TEXT,              m_Cfg->m_Render.show_fp_text );
     }
 
     return ret;

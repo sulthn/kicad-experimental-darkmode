@@ -25,8 +25,8 @@
 
 NLOHMANN_JSON_SERIALIZE_ENUM( JOB_EXPORT_PCB_IPC2581::IPC2581_UNITS,
                               {
-                                      { JOB_EXPORT_PCB_IPC2581::IPC2581_UNITS::INCH, "in" },
-                                      { JOB_EXPORT_PCB_IPC2581::IPC2581_UNITS::MM, "mm" },
+                                      { JOB_EXPORT_PCB_IPC2581::IPC2581_UNITS::INCHES, "in" },
+                                      { JOB_EXPORT_PCB_IPC2581::IPC2581_UNITS::MILLIMETERS, "mm" },
                               } )
 
 NLOHMANN_JSON_SERIALIZE_ENUM( JOB_EXPORT_PCB_IPC2581::IPC2581_VERSION,
@@ -36,18 +36,18 @@ NLOHMANN_JSON_SERIALIZE_ENUM( JOB_EXPORT_PCB_IPC2581::IPC2581_VERSION,
                               } )
 
 JOB_EXPORT_PCB_IPC2581::JOB_EXPORT_PCB_IPC2581() :
-        JOB( "ipc2581", false ),
-        m_filename(),
-        m_drawingSheet(),
-        m_units( IPC2581_UNITS::MM ),
-        m_version( IPC2581_VERSION::C ),
-        m_precision( 6 ),
-        m_compress( false ),
-        m_colInternalId(),
-        m_colMfgPn(),
-        m_colMfg(),
-        m_colDistPn(),
-        m_colDist()
+    JOB( "ipc2581", false ),
+    m_filename(),
+    m_drawingSheet(),
+    m_units( IPC2581_UNITS::MILLIMETERS ),
+    m_version( IPC2581_VERSION::C ),
+    m_precision( 6 ),
+    m_compress( false ),
+    m_colInternalId(),
+    m_colMfgPn(),
+    m_colMfg(),
+    m_colDistPn(),
+    m_colDist()
 {
     m_params.emplace_back( new JOB_PARAM<wxString>( "drawing_sheet", &m_drawingSheet, m_drawingSheet ) );
     m_params.emplace_back( new JOB_PARAM<IPC2581_UNITS>( "units", &m_units, m_units ) );
@@ -69,13 +69,13 @@ JOB_EXPORT_PCB_IPC2581::JOB_EXPORT_PCB_IPC2581() :
 
 wxString JOB_EXPORT_PCB_IPC2581::GetDefaultDescription() const
 {
-    return _( "Export IPC-2581" );
+    return _( "Export IPC2581" );
 }
 
 
 wxString JOB_EXPORT_PCB_IPC2581::GetSettingsDialogTitle() const
 {
-    return _( "Export IPC-2581 Job Settings" );
+    return _( "Export IPC2581 Job Settings" );
 }
 
 
@@ -88,5 +88,5 @@ void JOB_EXPORT_PCB_IPC2581::SetDefaultOutputPath( const wxString& aReferenceNam
     SetConfiguredOutputPath( fn.GetFullName() );
 }
 
-REGISTER_JOB( pcb_export_ipc2581, _HKI( "PCB: Export IPC-2581" ), KIWAY::FACE_PCB,
+REGISTER_JOB( pcb_export_ipc2581, _HKI( "PCB: Export IPC2581" ), KIWAY::FACE_PCB,
               JOB_EXPORT_PCB_IPC2581 );

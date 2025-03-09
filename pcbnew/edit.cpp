@@ -52,8 +52,21 @@
 // Handles the selection of command events.
 void PCB_EDIT_FRAME::Process_Special_Functions( wxCommandEvent& event )
 {
-    switch( event.GetId() )   // Execute command
+    int  id = event.GetId();
+    const PCB_DISPLAY_OPTIONS& displ_opts = GetDisplayOptions();
+
+    switch( id )   // Execute command
     {
+    case 0:
+        break;
+
+    case ID_TOOLBARH_PCB_SELECT_LAYER:
+        SetActiveLayer( ToLAYER_ID( m_SelLayerBox->GetLayerSelection() ) );
+
+        if( displ_opts.m_ContrastModeDisplay != HIGH_CONTRAST_MODE::NORMAL )
+            GetCanvas()->Refresh();
+        break;
+
     case ID_MENU_EXPORT_FOOTPRINTS_TO_LIBRARY:
         ExportFootprintsToLibrary( false );
         break;

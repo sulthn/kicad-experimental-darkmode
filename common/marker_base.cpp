@@ -34,6 +34,7 @@
 #include "marker_base.h"
 #include <core/arraydim.h>
 #include <geometry/shape_line_chain.h>
+#include <render_settings.h>
 #include "dialogs/dialog_display_html_text_base.h"
 
 
@@ -81,6 +82,11 @@ MARKER_BASE::MARKER_BASE( int aScalingFactor, std::shared_ptr<RC_ITEM> aItem, MA
 
     m_shapeBoundingBox.SetOrigin( start);
     m_shapeBoundingBox.SetEnd( end);
+}
+
+
+MARKER_BASE::~MARKER_BASE()
+{
 }
 
 
@@ -138,3 +144,16 @@ BOX2I MARKER_BASE::GetBoundingBoxMarker() const
 }
 
 
+void MARKER_BASE::PrintMarker( const RENDER_SETTINGS* aSettings, const VECTOR2I& aOffset )
+{
+    wxDC* DC = aSettings->GetPrintDC();
+
+    // Build the marker shape polygon in internal units:
+    std::vector<VECTOR2I> shape;
+    shape.reserve( CORNERS_COUNT );
+
+    for( const VECTOR2I& corner : MarkerShapeCorners )
+        shape.emplace_back( corner * MarkerScale() + m_Pos + aOffset );
+
+    GRClosedPoly( DC, CORNERS_COUNT, &shape[0], true, getColor() );
+}

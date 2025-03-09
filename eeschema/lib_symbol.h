@@ -58,9 +58,8 @@ typedef LIB_ITEMS_CONTAINER::ITEM_PTR_VECTOR LIB_ITEMS;
 /* values for member .m_options */
 enum LIBRENTRYOPTIONS
 {
-    ENTRY_NORMAL,     // Libentry is a standard symbol (real or alias)
-    ENTRY_GLOBAL_POWER,      // Libentry is a power symbol
-    ENTRY_LOCAL_POWER // Libentry is a local power symbol
+    ENTRY_NORMAL,   // Libentry is a standard symbol (real or alias)
+    ENTRY_POWER     // Libentry is a power symbol
 };
 
 
@@ -169,7 +168,7 @@ public:
     ///< Gets the Description field text value */
     wxString GetDescription() const override
     {
-        if( GetDescriptionField().GetText().IsEmpty() && IsDerived() )
+        if( GetDescriptionField().GetText().IsEmpty() && IsAlias() )
         {
             if( LIB_SYMBOL_SPTR parent = m_parent.lock() )
                 return parent->GetDescription();
@@ -182,7 +181,7 @@ public:
 
     wxString GetKeyWords() const override
     {
-        if( m_keyWords.IsEmpty() && IsDerived() )
+        if( m_keyWords.IsEmpty() && IsAlias() )
         {
             if( LIB_SYMBOL_SPTR parent = m_parent.lock() )
                 return parent->GetKeyWords();
@@ -204,7 +203,7 @@ public:
      * For symbols derived from other symbols, IsRoot() indicates no derivation.
      */
     bool IsRoot() const override { return m_parent.use_count() == 0; }
-    bool IsDerived() const { return !m_parent.expired() && m_parent.use_count() > 0; }
+    bool IsAlias() const { return !m_parent.expired() && m_parent.use_count() > 0; }
 
     const wxString GetLibraryName() const;
 
@@ -217,7 +216,7 @@ public:
 
     wxArrayString GetFPFilters() const
     {
-        if( m_fpFilters.IsEmpty() && IsDerived() )
+        if( m_fpFilters.IsEmpty() && IsAlias() )
         {
             if( LIB_SYMBOL_SPTR parent = m_parent.lock() )
                 return parent->GetFPFilters();
@@ -267,13 +266,10 @@ public:
         return GetBodyBoundingBox( m_previewUnit, m_previewBodyStyle, true, false );
     }
 
-    bool IsGlobalPower() const override;
-    bool IsLocalPower() const override;
     bool IsPower() const override;
     bool IsNormal() const override;
 
-    void SetGlobalPower();
-    void SetLocalPower();
+    void SetPower();
     void SetNormal();
 
     /**
@@ -296,15 +292,12 @@ public:
     void SetFields( const std::vector<SCH_FIELD>& aFieldsList );
 
     /**
-     * Populate a std::vector with SCH_FIELDs, sorted in ordinal order.
+     * Return a list of fields within this symbol.
      *
-     * @param aList is the vector to populate.
+     * @param aList - List to add fields to
      */
-    void GetFields( std::vector<SCH_FIELD*>& aList, bool aVisibleOnly = false ) const override;
+    void GetFields( std::vector<SCH_FIELD*>& aList, bool aVisibleOnly = false ) override;
 
-    /**
-     * Create a copy of the SCH_FIELDs, sorted in ordinal order.
-     */
     void CopyFields( std::vector<SCH_FIELD>& aList );
 
     /**
@@ -315,40 +308,40 @@ public:
     void AddField( SCH_FIELD& aField ) { AddField( new SCH_FIELD( aField ) ); }
 
     /**
-     * Return the next ordinal for a user field for this symbol
+     * Find a field within this symbol matching \a aFieldName and returns it
+     * or NULL if not found.
+     * @param aFieldName is the name of the field to find.
+     * @param aCaseInsensitive ignore the filed name case if true.
+     *
+     * @return the field if found or NULL if the field was not found.
      */
-    int GetNextFieldOrdinal() const;
+    SCH_FIELD* FindField( const wxString& aFieldName, bool aCaseInsensitive = false );
+
+    const SCH_FIELD* FindField( const wxString& aFieldName,
+                                bool aCaseInsensitive = false ) const;
 
     /**
-     * Find a field within this symbol matching \a aFieldName; return nullptr if not found.
+     * Return pointer to the requested field.
+     *
+     * @param aId - Id of field to return.
+     * @return The field if found, otherwise NULL.
      */
-    SCH_FIELD* GetField( const wxString& aFieldName );
-    const SCH_FIELD* GetField( const wxString& aFieldName ) const;
-
-    SCH_FIELD* FindFieldCaseInsensitive( const wxString& aFieldName );
-
-    const SCH_FIELD* GetField( FIELD_T aFieldType ) const;
-    SCH_FIELD* GetField( FIELD_T aFieldType );
+    SCH_FIELD* GetFieldById( int aId ) const;
 
     /** Return reference to the value field. */
-    SCH_FIELD& GetValueField() { return *GetField( FIELD_T::VALUE ); }
-    const SCH_FIELD& GetValueField() const;
+    SCH_FIELD& GetValueField() const;
 
     /** Return reference to the reference designator field. */
-    SCH_FIELD& GetReferenceField() { return *GetField( FIELD_T::REFERENCE ); }
-    const SCH_FIELD& GetReferenceField() const;
+    SCH_FIELD& GetReferenceField() const;
 
     /** Return reference to the footprint field */
-    SCH_FIELD& GetFootprintField() { return *GetField( FIELD_T::FOOTPRINT ); }
-    const SCH_FIELD& GetFootprintField() const;
+    SCH_FIELD& GetFootprintField() const;
 
     /** Return reference to the datasheet field. */
-    SCH_FIELD& GetDatasheetField() { return *GetField( FIELD_T::DATASHEET ); }
-    const SCH_FIELD& GetDatasheetField() const;
+    SCH_FIELD& GetDatasheetField() const;
 
     /** Return reference to the description field. */
-    SCH_FIELD& GetDescriptionField() {return *GetField( FIELD_T::DESCRIPTION ); }
-    const SCH_FIELD& GetDescriptionField() const;
+    SCH_FIELD& GetDescriptionField() const;
 
     wxString GetPrefix();
 
@@ -381,11 +374,28 @@ public:
     void RunOnChildren( const std::function<void( SCH_ITEM* )>& aFunction ) override;
 
     /**
+     * Order optional field indices.
+     *
+     * It's possible when calling #LIB_SYMBOL::Flatten that there can be gaps and/or duplicate
+     * optional field indices.  This method correctly orders the indices so there are no gaps
+     * and/or duplicate indices.
+     */
+    int UpdateFieldOrdinals();
+
+    int GetNextAvailableFieldId() const;
+
+    /**
      * Resolve any references to system tokens supported by the symbol.
      *
      * @param aDepth a counter to limit recursion and circular references.
      */
     bool ResolveTextVar( wxString* token, int aDepth = 0 ) const;
+
+    void Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed ) override;
+
+    void PrintBackground( const SCH_RENDER_SETTINGS *aSettings, int aUnit, int aBodyStyle,
+                          const VECTOR2I& aOffset, bool aDimmed ) override;
 
     void Plot( PLOTTER* aPlotter, bool aBackground, const SCH_PLOT_OPTS& aPlotOpts,
                int aUnit, int aBodyStyle, const VECTOR2I& aOffset, bool aDimmed ) override;
@@ -412,6 +422,8 @@ public:
     void RemoveDrawItem( SCH_ITEM* aItem );
 
     void RemoveField( SCH_FIELD* aField ) { RemoveDrawItem( aField ); }
+
+    size_t GetFieldCount() const { return m_drawings.size( SCH_FIELD_T ); }
 
     /**
      * Return a list of pin object pointers from the draw item list.

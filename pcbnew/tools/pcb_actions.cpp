@@ -29,7 +29,6 @@
 #include <pcbnew_id.h>
 #include <bitmaps.h>
 #include <layer_ids.h>
-#include <footprint_viewer_frame.h>
 #include <microwave/microwave_tool.h>
 #include <pcb_reference_image.h>
 #include <tool/tool_manager.h>
@@ -107,7 +106,6 @@ TOOL_ACTION PCB_ACTIONS::drawLine( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'L' )
         .LegacyHotkeyName( "Draw Line" )
         .FriendlyName( _( "Draw Lines" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_graphical_segments )
         .Flags( AF_ACTIVATE ) );
 
@@ -117,7 +115,6 @@ TOOL_ACTION PCB_ACTIONS::drawPolygon( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'P' )
         .LegacyHotkeyName( "Draw Graphic Polygon" )
         .FriendlyName( _( "Draw Polygons" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_graphical_polygon )
         .Flags( AF_ACTIVATE )
         .Parameter( ZONE_MODE::GRAPHIC_POLYGON ) );
@@ -126,7 +123,6 @@ TOOL_ACTION PCB_ACTIONS::drawRectangle( TOOL_ACTION_ARGS()
         .Name( "pcbnew.InteractiveDrawing.rectangle" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Rectangles" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_rectangle )
         .Flags( AF_ACTIVATE ) );
 
@@ -136,7 +132,6 @@ TOOL_ACTION PCB_ACTIONS::drawCircle( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'C' )
         .LegacyHotkeyName( "Draw Circle" )
         .FriendlyName( _( "Draw Circles" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_circle )
         .Flags( AF_ACTIVATE ) );
 
@@ -146,7 +141,6 @@ TOOL_ACTION PCB_ACTIONS::drawArc( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'A' )
         .LegacyHotkeyName( "Draw Arc" )
         .FriendlyName( _( "Draw Arcs" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_arc )
         .Flags( AF_ACTIVATE ) );
 
@@ -155,7 +149,6 @@ TOOL_ACTION PCB_ACTIONS::drawBezier( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'B' )
         .FriendlyName( _( "Draw Bezier Curve" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_bezier )
         .Flags( AF_ACTIVATE ) );
 
@@ -165,7 +158,6 @@ TOOL_ACTION PCB_ACTIONS::placeCharacteristics( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Add Board Characteristics" )
         .FriendlyName( _( "Add Board Characteristics" ) )
         .Tooltip( _( "Add a board characteristics table on a graphic layer" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_ACTIVATE ) );
 
 TOOL_ACTION PCB_ACTIONS::placeStackup( TOOL_ACTION_ARGS()
@@ -174,7 +166,6 @@ TOOL_ACTION PCB_ACTIONS::placeStackup( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Add Stackup Table" )
         .FriendlyName( _( "Add Stackup Table" ) )
         .Tooltip( _( "Add a board stackup table on a graphic layer" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_ACTIVATE ) );
 
 TOOL_ACTION PCB_ACTIONS::placeReferenceImage( TOOL_ACTION_ARGS()
@@ -182,7 +173,6 @@ TOOL_ACTION PCB_ACTIONS::placeReferenceImage( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Place Reference Images" ) )
         .Tooltip( _( "Add bitmap images to be used as reference (images will not be included in any output)" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::image )
         .Flags( AF_ACTIVATE )
         .Parameter<PCB_REFERENCE_IMAGE*>( nullptr ) );
@@ -193,7 +183,6 @@ TOOL_ACTION PCB_ACTIONS::placeText( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'T' )
         .LegacyHotkeyName( "Add Text" )
         .FriendlyName( _( "Draw Text" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::text )
         .Flags( AF_ACTIVATE ) );
 
@@ -201,7 +190,6 @@ TOOL_ACTION PCB_ACTIONS::drawTextBox( TOOL_ACTION_ARGS()
         .Name( "pcbnew.InteractiveDrawing.textbox" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Text Boxes" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_textbox )
         .Flags( AF_ACTIVATE ) );
 
@@ -209,7 +197,6 @@ TOOL_ACTION PCB_ACTIONS::drawTable( TOOL_ACTION_ARGS()
         .Name( "pcbnew.InteractiveDrawing.drawTable" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Tables" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::table )
         .Flags( AF_ACTIVATE ) );
 
@@ -255,7 +242,6 @@ TOOL_ACTION PCB_ACTIONS::drawAlignedDimension( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .LegacyHotkeyName( "Add Dimension" )
         .FriendlyName( _( "Draw Aligned Dimensions" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_aligned_dimension )
         .Flags( AF_ACTIVATE ) );
 
@@ -263,7 +249,6 @@ TOOL_ACTION PCB_ACTIONS::drawCenterDimension( TOOL_ACTION_ARGS()
         .Name( "pcbnew.InteractiveDrawing.centerDimension" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Center Dimensions" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_center_dimension )
         .Flags( AF_ACTIVATE ) );
 
@@ -271,7 +256,6 @@ TOOL_ACTION PCB_ACTIONS::drawRadialDimension( TOOL_ACTION_ARGS()
         .Name( "pcbnew.InteractiveDrawing.radialDimension" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Radial Dimensions" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_radial_dimension )
         .Flags( AF_ACTIVATE ) );
 
@@ -280,7 +264,6 @@ TOOL_ACTION PCB_ACTIONS::drawOrthogonalDimension( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'H' )
         .FriendlyName( _( "Draw Orthogonal Dimensions" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_orthogonal_dimension )
         .Flags( AF_ACTIVATE ) );
 
@@ -288,7 +271,6 @@ TOOL_ACTION PCB_ACTIONS::drawLeader( TOOL_ACTION_ARGS()
         .Name( "pcbnew.InteractiveDrawing.leader" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Leaders" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_leader )
         .Flags( AF_ACTIVATE ) );
 
@@ -302,7 +284,6 @@ TOOL_ACTION PCB_ACTIONS::drawZone( TOOL_ACTION_ARGS()
 #endif
         .LegacyHotkeyName( "Add Filled Zone" )
         .FriendlyName( _( "Draw Filled Zones" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_zone )
         .Flags( AF_ACTIVATE )
         .Parameter( ZONE_MODE::ADD ) );
@@ -314,7 +295,6 @@ TOOL_ACTION PCB_ACTIONS::drawVia( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Add Vias" )
         .FriendlyName( _( "Place Vias" ) )
         .Tooltip( _( "Place free-standing vias" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_via )
         .Flags( AF_ACTIVATE ) );
 
@@ -324,7 +304,6 @@ TOOL_ACTION PCB_ACTIONS::drawRuleArea( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_CTRL + MD_SHIFT + 'K' )
         .LegacyHotkeyName( "Add Keepout Area" )
         .FriendlyName( _( "Draw Rule Areas" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_keepout_area )
         .Flags( AF_ACTIVATE )
         .Parameter( ZONE_MODE::ADD ) );
@@ -336,7 +315,6 @@ TOOL_ACTION PCB_ACTIONS::drawZoneCutout( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Add a Zone Cutout" )
         .FriendlyName( _( "Add a Zone Cutout" ) )
         .Tooltip( _( "Add a cutout to an existing zone or rule area" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::add_zone_cutout )
         .Flags(  AF_ACTIVATE )
         .Parameter( ZONE_MODE::CUTOUT ) );
@@ -369,7 +347,6 @@ TOOL_ACTION PCB_ACTIONS::setAnchor( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Place the Footprint Anchor" )
         .FriendlyName( _( "Place the Footprint Anchor" ) )
         .Tooltip( _( "Set the anchor point of the footprint" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::anchor )
         .Flags( AF_ACTIVATE ) );
 
@@ -799,34 +776,6 @@ TOOL_ACTION PCB_ACTIONS::checkFootprint( TOOL_ACTION_ARGS()
         .Tooltip( _( "Show the footprint checker window" ) )
         .Icon( BITMAPS::erc ) );
 
-TOOL_ACTION PCB_ACTIONS::loadFpFromBoard( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.ModuleEditor.loadFootprintFromBoard" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Load footprint from current PCB" ) )
-        .Tooltip( _( "Load footprint from current board" ) )
-        .Icon( BITMAPS::load_module_board ) );
-
-TOOL_ACTION PCB_ACTIONS::saveFpToBoard( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.ModuleEditor.saveFootprintToBoard" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Insert footprint into PCB" ) )
-        .Tooltip( _( "Insert footprint into current board" ) )
-        .Icon( BITMAPS::insert_module_board) );
-
-TOOL_ACTION PCB_ACTIONS::previousFootprint( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.Control.previousFootprint" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Display previous footprint" ) )
-        .Icon( BITMAPS::lib_previous )
-        .Parameter<FPVIEWER_CONSTANTS>( FPVIEWER_CONSTANTS::PREVIOUS_PART ) );
-
-TOOL_ACTION PCB_ACTIONS::nextFootprint( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.Control.nextFootprint" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Display next footprint" ) )
-        .Icon( BITMAPS::lib_next )
-        .Parameter<FPVIEWER_CONSTANTS>( FPVIEWER_CONSTANTS::NEXT_PART ) );
-
 // GLOBAL_EDIT_TOOL
 //
 TOOL_ACTION PCB_ACTIONS::updateFootprint( TOOL_ACTION_ARGS()
@@ -996,7 +945,6 @@ TOOL_ACTION PCB_ACTIONS::placePad( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Add Pad" ) )
         .Tooltip( _( "Add a pad" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::pad )
         .Flags( AF_ACTIVATE ) );
 
@@ -1158,15 +1106,6 @@ TOOL_ACTION PCB_ACTIONS::viaSizeDec( TOOL_ACTION_ARGS()
         .FriendlyName( _( "Decrease Via Size" ) )
         .Tooltip( _( "Change via size to previous pre-defined size" ) ) );
 
-TOOL_ACTION PCB_ACTIONS::autoTrackWidth( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.EditorControl.autoTrackWidth" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Automatically select track width" ) )
-        .Tooltip( _( "When routing from an existing track use its width instead "
-                     "of the current width setting" ) )
-        .Icon( BITMAPS::auto_track_width )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
-
 TOOL_ACTION PCB_ACTIONS::trackViaSizeChanged( TOOL_ACTION_ARGS()
         .Name( "pcbnew.EditorControl.trackViaSizeChanged" )
         .Scope( AS_GLOBAL )
@@ -1196,7 +1135,6 @@ TOOL_ACTION PCB_ACTIONS::placeFootprint( TOOL_ACTION_ARGS()
         .DefaultHotkey( 'A' )
         .LegacyHotkeyName( "Add Footprint" )
         .FriendlyName( _( "Place Footprints" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::module )
         .Flags( AF_ACTIVATE )
         .Parameter<FOOTPRINT*>( nullptr ) );
@@ -1215,11 +1153,6 @@ TOOL_ACTION PCB_ACTIONS::drillResetOrigin( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Reset Drill Origin" )
         .FriendlyName( _( "Reset Drill Origin" ) ) );
 
-TOOL_ACTION PCB_ACTIONS::drillSetOrigin( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.EditorControl.drillSetOrigin" )
-        .Scope( AS_CONTEXT )
-        .Parameter( VECTOR2I() ) );
-
 TOOL_ACTION PCB_ACTIONS::toggleLock( TOOL_ACTION_ARGS()
         .Name( "pcbnew.EditorControl.toggleLock" )
         .Scope( AS_GLOBAL )
@@ -1235,7 +1168,6 @@ TOOL_ACTION PCB_ACTIONS::toggleHV45Mode( TOOL_ACTION_ARGS()
         .DefaultHotkey( MD_SHIFT + ' ' )
         .FriendlyName( _( "Constrain to H, V, 45" ) )
         .Tooltip( _( "Limit actions to horizontal, vertical, or 45 degrees from the starting point" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::hv45mode ) );
 
 TOOL_ACTION PCB_ACTIONS::lock( TOOL_ACTION_ARGS()
@@ -1323,7 +1255,6 @@ TOOL_ACTION PCB_ACTIONS::toggleNetHighlight( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .DefaultHotkey( MD_ALT + '`' )
         .FriendlyName( _( "Toggle Net Highlight" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::net_highlight )
         .Parameter<int>( 0 ) );
 
@@ -1371,7 +1302,6 @@ TOOL_ACTION PCB_ACTIONS::localRatsnestTool( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Local Ratsnest" ) )
         .Tooltip( _( "Toggle ratsnest display of selected item(s)" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::tool_ratsnest )
         .Flags( AF_ACTIVATE ) );
 
@@ -1389,15 +1319,13 @@ TOOL_ACTION PCB_ACTIONS::showPythonConsole( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Scripting Console" ) )
         .Tooltip( _( "Show the Python scripting console" ) )
-        .Icon( BITMAPS::py_script )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE) );
+        .Icon( BITMAPS::py_script ) );
 
 TOOL_ACTION PCB_ACTIONS::showLayersManager( TOOL_ACTION_ARGS()
         .Name( "pcbnew.Control.showLayersManager" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Appearance" ) )
         .Tooltip( _( "Show/hide the appearance manager" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::layers_manager ) );
 
 TOOL_ACTION PCB_ACTIONS::showNetInspector( TOOL_ACTION_ARGS()
@@ -1405,12 +1333,11 @@ TOOL_ACTION PCB_ACTIONS::showNetInspector( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Net Inspector" ) )
         .Tooltip( _( "Show/hide the net inspector" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::tools ) );
 
 TOOL_ACTION PCB_ACTIONS::zonesManager( "pcbnew.Control.zonesManager",
         AS_GLOBAL, 0, "",
-        _( "Zone Manager..." ),
+        _( "Zone Manager" ),
         _( "Show the zone manager dialog" ),
         BITMAPS::show_zone );
 
@@ -1427,7 +1354,6 @@ TOOL_ACTION PCB_ACTIONS::showRatsnest( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Ratsnest" ) )
         .Tooltip( _( "Show lines/arcs representing missing connections on the board" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::general_ratsnest ) );
 
 TOOL_ACTION PCB_ACTIONS::ratsnestLineMode( TOOL_ACTION_ARGS()
@@ -1435,7 +1361,6 @@ TOOL_ACTION PCB_ACTIONS::ratsnestLineMode( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Curved Ratsnest Lines" ) )
         .Tooltip( _( "Show ratsnest with curved lines" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::curved_ratsnest ) );
 
 TOOL_ACTION PCB_ACTIONS::ratsnestModeCycle( TOOL_ACTION_ARGS()
@@ -1457,7 +1382,6 @@ TOOL_ACTION PCB_ACTIONS::trackDisplayMode( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Track Display Mode" )
         .FriendlyName( _( "Sketch Tracks" ) )
         .Tooltip( _( "Show tracks in outline mode" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::showtrack ) );
 
 TOOL_ACTION PCB_ACTIONS::padDisplayMode( TOOL_ACTION_ARGS()
@@ -1465,7 +1389,6 @@ TOOL_ACTION PCB_ACTIONS::padDisplayMode( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Sketch Pads" ) )
         .Tooltip( _( "Show pads in outline mode" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::pad_sketch ) );
 
 TOOL_ACTION PCB_ACTIONS::viaDisplayMode( TOOL_ACTION_ARGS()
@@ -1473,7 +1396,6 @@ TOOL_ACTION PCB_ACTIONS::viaDisplayMode( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Sketch Vias" ) )
         .Tooltip( _( "Show vias in outline mode" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::via_sketch ) );
 
 TOOL_ACTION PCB_ACTIONS::graphicsOutlines( TOOL_ACTION_ARGS()
@@ -1481,7 +1403,6 @@ TOOL_ACTION PCB_ACTIONS::graphicsOutlines( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Sketch Graphic Items" ) )
         .Tooltip( _( "Show graphic items in outline mode" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::show_mod_edge ) );
 
 TOOL_ACTION PCB_ACTIONS::textOutlines( TOOL_ACTION_ARGS()
@@ -1489,14 +1410,12 @@ TOOL_ACTION PCB_ACTIONS::textOutlines( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Sketch Text Items" ) )
         .Tooltip( _( "Show footprint texts in line mode" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::text_sketch ) );
 
 TOOL_ACTION PCB_ACTIONS::showPadNumbers( TOOL_ACTION_ARGS()
         .Name( "pcbnew.Control.showPadNumbers" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Pad Numbers" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::pad_number ) );
 
 TOOL_ACTION PCB_ACTIONS::zoneDisplayFilled( TOOL_ACTION_ARGS()
@@ -1504,7 +1423,6 @@ TOOL_ACTION PCB_ACTIONS::zoneDisplayFilled( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Zone Fills" ) )
         .Tooltip( _( "Show filled areas of zones" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::show_zone ) );
 
 TOOL_ACTION PCB_ACTIONS::zoneDisplayOutline( TOOL_ACTION_ARGS()
@@ -1512,21 +1430,18 @@ TOOL_ACTION PCB_ACTIONS::zoneDisplayOutline( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Zone Outlines" ) )
         .Tooltip( _( "Show only zone boundaries" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::show_zone_disable ) );
 
 TOOL_ACTION PCB_ACTIONS::zoneDisplayFractured( TOOL_ACTION_ARGS()
         .Name( "pcbnew.Control.zoneDisplayOutlines" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Zone Fill Fracture Borders" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::show_zone_outline_only ) );
 
 TOOL_ACTION PCB_ACTIONS::zoneDisplayTriangulated( TOOL_ACTION_ARGS()
         .Name( "pcbnew.Control.zoneDisplayTesselation" )
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Draw Zone Fill Triangulation" ) )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Icon( BITMAPS::show_zone_triangulation ) );
 
 TOOL_ACTION PCB_ACTIONS::zoneDisplayToggle( TOOL_ACTION_ARGS()
@@ -1536,14 +1451,6 @@ TOOL_ACTION PCB_ACTIONS::zoneDisplayToggle( TOOL_ACTION_ARGS()
         .Tooltip( _( "Cycle between showing zone fills and just their outlines" ) )
         .Icon( BITMAPS::show_zone ) );
 
-
-TOOL_ACTION PCB_ACTIONS::fpAutoZoom( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.Control.fpAutoZoom" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Automatic zoom" ) )
-        .Tooltip( _( "Automatic Zoom on footprint change" ) )
-        .Icon( BITMAPS::zoom_auto_fit_in_page )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
 
 // Layer control
 
@@ -2341,7 +2248,6 @@ TOOL_ACTION PCB_ACTIONS::routeSingleTrack( TOOL_ACTION_ARGS()
         .FriendlyName( _( "Route Single Track" ) )
         .Tooltip( _( "Route tracks" ) )
         .Icon( BITMAPS::add_tracks )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_ACTIVATE )
         .Parameter( PNS::PNS_MODE_ROUTE_SINGLE ) );
 
@@ -2354,7 +2260,6 @@ TOOL_ACTION PCB_ACTIONS::routeDiffPair( TOOL_ACTION_ARGS()
         .FriendlyName( _( "Route Differential Pair" ) )
         .Tooltip( _( "Route differential pairs" ) )
         .Icon( BITMAPS::ps_diff_pair )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_ACTIVATE )
         .Parameter( PNS::PNS_MODE_ROUTE_DIFF_PAIR ) );
 
@@ -2420,7 +2325,6 @@ TOOL_ACTION PCB_ACTIONS::tuneSingleTrack( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Tune Single Track (Modern Toolset only)" )
         .FriendlyName( _( "Tune Length of a Single Track" ) )
         .Icon( BITMAPS::ps_tune_length )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_ACTIVATE )
         .Parameter( PNS::PNS_MODE_TUNE_SINGLE ) );
 
@@ -2432,7 +2336,6 @@ TOOL_ACTION PCB_ACTIONS::tuneDiffPair( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Tune Differential Pair Length (Modern Toolset only)" )
         .FriendlyName( _( "Tune Length of a Differential Pair" ) )
         .Icon( BITMAPS::ps_diff_pair_tune_length )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_ACTIVATE )
         .Parameter( PNS::PNS_MODE_TUNE_DIFF_PAIR ) );
 
@@ -2444,7 +2347,6 @@ TOOL_ACTION PCB_ACTIONS::tuneSkew( TOOL_ACTION_ARGS()
         .LegacyHotkeyName( "Tune Differential Pair Skew (Modern Toolset only)" )
         .FriendlyName( _( "Tune Skew of a Differential Pair" ) )
         .Icon( BITMAPS::ps_diff_pair_tune_phase )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE )
         .Flags( AF_ACTIVATE )
         .Parameter( PNS::PNS_MODE_TUNE_DIFF_PAIR_SKEW ) );
 

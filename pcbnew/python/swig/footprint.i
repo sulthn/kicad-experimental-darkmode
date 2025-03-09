@@ -70,25 +70,28 @@
 
     def GetFieldText(self, key):
       """ Returns Field text with a given key if it exists, throws KeyError otherwise. """
-      if self.HasField(key):
-        return self.GetField(key).GetText()
+      if self.HasFieldByName(key):
+        return self.GetFieldByName(key).GetText()
       else:
         raise KeyError("Field not found: " + key)
 
     def GetFieldShownText(self, key):
       """ Returns Field shown text with a given key if it exists, throws KeyError otherwise. """
-      if self.HasField(key):
-        return self.GetField(key).GetShownText(False)
+      if self.HasFieldByName(key):
+        return self.GetFieldByName(key).GetShownText(False)
       else:
         raise KeyError("Field not found: " + key)
 
     def SetField(self, key, value):
-      if self.HasField(key):
-        self.GetField(key).SetText(value)
+      if self.HasFieldByName(key):
+        self.GetFieldByName(key).SetText(value)
       else:
-        field = PCB_FIELD(self, FIELD_T_USER, key)
+        field = PCB_FIELD(self, self.GetNextFieldId(), key)
         field.SetText(value)
-        self.Add(field)
+        self.AddField(field)
+
+    def HasField(self, key):
+      return self.HasFieldByName(key)
 
     def SetFields(self, fields):
       """ Sets footprint fields map. """

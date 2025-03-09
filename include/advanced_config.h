@@ -525,6 +525,24 @@ public:
     bool m_EnableLibDir;
 
     /**
+     * Enable Eeschema printing using Cairo.
+     *
+     * Setting name: "EnableEeschemaPrintCairo"
+     * Valid values: 0 or 1
+     * Default value: 1
+     */
+    bool m_EnableEeschemaPrintCairo;
+
+    /**
+     * Enable Eeschema Export to clipboard using Cairo.
+     *
+     * Setting name: "EnableEeschemaExportClipboardCairo"
+     * Valid values: 0 or 1
+     * Default value: 1
+     */
+    bool m_EnableEeschemaExportClipboardCairo;
+
+    /**
      * Board object selection visibility limit.
      *
      * This ratio is used to determine if an object in a selected object layer stack is
@@ -731,39 +749,6 @@ public:
      * Default value: 25
      */
     int m_NetInspectorBulkUpdateOptimisationThreshold;
-
-    /**
-     * The line width in mils for the exclude from simulation outline.
-     *
-     * Setting name: "ExcludeFromSimulationLineWidth"
-     * Default value: 25
-     */
-    int m_ExcludeFromSimulationLineWidth;
-
-    /**
-     * The interval in milliseconds to refresh the git icons in the project tree.
-     *
-     * Setting name: "GitIconRefreshInterval"
-     * Default value: 10000
-     */
-    int m_GitIconRefreshInterval;
-
-    /**
-     * The interval in milliseconds to refresh the project status by performing
-     * a git fetch on the remote project.  Set to 0 to disable.
-     *
-     * Setting name: "GitProjectStatusRefreshInterval"
-     * Default value: 60000
-     */
-    int m_GitProjectStatusRefreshInterval;
-
-    /**
-     * Enable the UI to configure toolbars.
-     *
-     * Setting name: "ConfigurableToolbars"
-     * Default value: false
-     */
-    bool m_ConfigurableToolbars;
 
     ///@}
 

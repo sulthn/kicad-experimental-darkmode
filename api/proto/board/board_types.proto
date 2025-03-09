@@ -89,42 +89,6 @@ enum BoardLayer
   BL_User_8 = 60;
   BL_User_9 = 61;
   BL_Rescue = 62;
-  BL_User_10 = 63;
-  BL_User_11 = 64;
-  BL_User_12 = 65;
-  BL_User_13 = 66;
-  BL_User_14 = 67;
-  BL_User_15 = 68;
-  BL_User_16 = 69;
-  BL_User_17 = 70;
-  BL_User_18 = 71;
-  BL_User_19 = 72;
-  BL_User_20 = 73;
-  BL_User_21 = 74;
-  BL_User_22 = 75;
-  BL_User_23 = 76;
-  BL_User_24 = 77;
-  BL_User_25 = 78;
-  BL_User_26 = 79;
-  BL_User_27 = 80;
-  BL_User_28 = 81;
-  BL_User_29 = 82;
-  BL_User_30 = 83;
-  BL_User_31 = 84;
-  BL_User_32 = 85;
-  BL_User_33 = 86;
-  BL_User_34 = 87;
-  BL_User_35 = 88;
-  BL_User_36 = 89;
-  BL_User_37 = 90;
-  BL_User_38 = 91;
-  BL_User_39 = 92;
-  BL_User_40 = 93;
-  BL_User_41 = 94;
-  BL_User_42 = 95;
-  BL_User_43 = 96;
-  BL_User_44 = 97;
-  BL_User_45 = 98;
 }
 
 message NetCode
@@ -294,31 +258,15 @@ message PadStackLayer
 
 enum SolderMaskMode
 {
-  SMM_UNKNOWN = 0;
+  SMM_UNKOWN = 0;
   SMM_MASKED = 1;
   SMM_UNMASKED = 2;
   SMM_FROM_DESIGN_RULES = 3;
 }
 
-enum ViaCoveringMode
-{
-  VCM_UNKNOWN = 0;
-  VCM_COVERED = 1;
-  VCM_UNCOVERED = 2;
-  VCM_FROM_DESIGN_RULES = 3;
-}
-
-enum ViaPluggingMode
-{
-  VPM_UNKNOWN = 0;
-  VPM_PLUGGED = 1;
-  VPM_UNPLUGGED = 2;
-  VPM_FROM_DESIGN_RULES = 3;
-}
-
 enum SolderPasteMode
 {
-  SPM_UNKNOWN = 0;
+  SPM_UNKOWN = 0;
   SPM_PASTE = 1;
   SPM_NO_PASTE = 2;
   SPM_FROM_DESIGN_RULES = 3;
@@ -335,9 +283,6 @@ message PadStackOuterLayer
 
   // NOTE: At present, KiCad does not support different solder paste expansion settings for the top and bottom layers
   SolderPasteOverrides solder_paste_settings = 4;
-
-  ViaPluggingMode plugging_mode = 5;
-  ViaCoveringMode covering_mode = 6;
 }
 
 enum DrillShape
@@ -346,22 +291,6 @@ enum DrillShape
   DS_CIRCLE = 1;
   DS_OBLONG = 2;
   DS_UNDEFINED = 3;
-}
-
-enum ViaDrillCappingMode
-{
-  VDCM_UNKNOWN = 0;
-  VDCM_CAPPED = 1;
-  VDCM_UNCAPPED = 2;
-  VDCM_FROM_DESIGN_RULES = 3;
-}
-
-enum ViaDrillFillingMode
-{
-  VDFM_UNKNOWN = 0;
-  VDFM_FILLED = 1;
-  VDFM_UNFILLED = 2;
-  VDFM_FROM_DESIGN_RULES = 3;
 }
 
 message DrillProperties
@@ -377,10 +306,6 @@ message DrillProperties
   kiapi.common.types.Vector2 diameter = 3;
 
   DrillShape shape = 4;
-
-  ViaDrillCappingMode capped = 5;
-
-  ViaDrillFillingMode filled = 6;
 }
 
 // A pad stack definition for a multilayer pad or via.
@@ -647,14 +572,6 @@ message ZoneFilledPolygons
   kiapi.common.types.PolySet shapes = 2;
 }
 
-message ZoneLayerProperties
-{
-  BoardLayer layer = 1;
-
-  kiapi.common.types.Vector2 hatching_offset = 2;
-}
-
-
 message Zone
 {
   kiapi.common.types.KIID id = 1;
@@ -681,8 +598,6 @@ message Zone
   ZoneBorderSettings border = 11;
 
   kiapi.common.types.LockedState locked = 12;
-
-  repeated ZoneLayerProperties layer_properties = 13;
 }
 
 // An aligned dimension is drawn parallel to the line segment between the start and end points
@@ -853,9 +768,6 @@ message Field
   FieldId id = 1;
   string name = 2;
   BoardText text = 3;
-
-  // Since 9.0.1
-  bool visible = 4;
 }
 
 enum FootprintMountingStyle

@@ -670,10 +670,10 @@ public:
     int GetLayerClass( PCB_LAYER_ID aLayer ) const;
 
     void            SetAuxOrigin( const VECTOR2I& aOrigin ) { m_auxOrigin = aOrigin; }
-    const VECTOR2I& GetAuxOrigin() const { return m_auxOrigin; }
+    const VECTOR2I& GetAuxOrigin() { return m_auxOrigin; }
 
     void            SetGridOrigin( const VECTOR2I& aOrigin ) { m_gridOrigin = aOrigin; }
-    const VECTOR2I& GetGridOrigin() const { return m_gridOrigin; }
+    const VECTOR2I& GetGridOrigin() { return m_gridOrigin; }
 
     void SetDefaultMasterPad();
 
@@ -745,22 +745,9 @@ public:
     int        m_SolderPasteMargin;           // Solder paste margin absolute value
     double     m_SolderPasteMarginRatio;      // Solder mask margin ratio value of pad size
                                               // The final margin is the sum of these 2 values
-    bool m_AllowSoldermaskBridgesInFPs;
-
-    bool m_TentViasFront; // The default tenting option if not overridden on an
-    bool m_TentViasBack;  // individual via
-
-    bool m_CoverViasFront; // The default covering option if not overridden on an
-    bool m_CoverViasBack;  // individual via
-
-    bool m_PlugViasFront; // The default plugging option if not overridden on an
-    bool m_PlugViasBack;  // individual via
-
-    bool m_CapVias; // The default capping option if not overridden on an
-                    // individual via
-
-    bool m_FillVias; // The default filling option if not overridden on ana
-                     // individual via
+    bool       m_AllowSoldermaskBridgesInFPs;
+    bool       m_TentViasFront;               // The default tenting option if not overridden on an
+    bool       m_TentViasBack;                // individual via
 
     std::shared_ptr<NET_SETTINGS> m_NetSettings;
 

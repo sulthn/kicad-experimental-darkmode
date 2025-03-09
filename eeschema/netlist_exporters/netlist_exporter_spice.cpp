@@ -61,9 +61,9 @@ std::string NAME_GENERATOR::Generate( const std::string& aProposedName )
 }
 
 
-NETLIST_EXPORTER_SPICE::NETLIST_EXPORTER_SPICE( SCHEMATIC* aSchematic ) :
+NETLIST_EXPORTER_SPICE::NETLIST_EXPORTER_SPICE( SCHEMATIC_IFACE* aSchematic ) :
     NETLIST_EXPORTER_BASE( aSchematic ),
-    m_libMgr( &aSchematic->Prj(), aSchematic )
+    m_libMgr( &aSchematic->Prj() )
 {
 }
 
@@ -184,10 +184,9 @@ bool NETLIST_EXPORTER_SPICE::ReadSchematicAndLibraries( unsigned aNetlistOptions
 
                 for( const SCH_FIELD& field : symbol->GetFields() )
                 {
-                    spiceItem.fields.emplace_back( VECTOR2I(), FIELD_T::USER, symbol,
-                                                   field.GetName() );
+                    spiceItem.fields.emplace_back( VECTOR2I(), -1, symbol, field.GetName() );
 
-                    if( field.GetId() == FIELD_T::REFERENCE )
+                    if( field.GetId() == REFERENCE_FIELD )
                         spiceItem.fields.back().SetText( symbol->GetRef( &sheet ) );
                     else
                         spiceItem.fields.back().SetText( field.GetShownText( &sheet, false ) );
@@ -456,7 +455,7 @@ void NETLIST_EXPORTER_SPICE::readModel( SCH_SHEET_PATH& aSheet, SCH_SYMBOL& aSym
         auto spiceGenerator = static_cast<const SPICE_GENERATOR_IBIS&>( ibisModel->SpiceGenerator() );
 
         wxString    cacheFilepath = cacheFn.GetPath( wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR );
-        std::string modelData = spiceGenerator.IbisDevice( aItem, m_schematic,
+        std::string modelData = spiceGenerator.IbisDevice( aItem, m_schematic->Prj(),
                                                            cacheFilepath, aReporter );
 
         cacheFile.Write( wxString( modelData ) );
@@ -489,7 +488,7 @@ void NETLIST_EXPORTER_SPICE::readPinNetNames( SCH_SYMBOL& aSymbol, SPICE_ITEM& a
 void NETLIST_EXPORTER_SPICE::getNodePattern( SPICE_ITEM&               aItem,
                                              std::vector<std::string>& aModifiers )
 {
-    std::string input = GetFieldValue( &aItem.fields, SIM_NODES_FORMAT_FIELD, true );
+    std::string input = SIM_MODEL::GetFieldValue( &aItem.fields, SIM_NODES_FORMAT_FIELD, true );
 
     if( input == "" )
         return;

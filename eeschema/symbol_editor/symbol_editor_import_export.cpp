@@ -130,11 +130,9 @@ void SYMBOL_EDIT_FRAME::ImportSymbol()
 
     entry->SetName( EscapeString( entry->GetName(), CTX_LIBID ) );
 
-    if( m_libMgr->SymbolNameInUse( entry->GetName(), libName ) )
+    if( m_libMgr->SymbolExists( entry->GetName(), libName ) )
     {
-        msg.Printf( _( "Symbol %s already exists in library '%s'." ),
-                    UnescapeString( symbolName ),
-                    libName );
+        msg.Printf( _( "Symbol %s already exists in library '%s'." ), symbolName, libName );
 
         KIDIALOG errorDlg( this, msg, _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
         errorDlg.SetOKLabel( _( "Overwrite" ) );
@@ -148,5 +146,4 @@ void SYMBOL_EDIT_FRAME::ImportSymbol()
     SyncLibraries( false );
     LoadSymbol( entry->GetName(), libName, 1 );
 }
-
 

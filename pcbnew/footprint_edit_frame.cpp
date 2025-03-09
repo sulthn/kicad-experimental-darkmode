@@ -75,7 +75,6 @@
 #include <widgets/wx_progress_reporters.h>
 #include <wildcards_and_files_ext.h>
 #include <widgets/wx_aui_utils.h>
-#include <toolbars_footprint_editor.h>
 
 #include <wx/filedlg.h>
 #include <wx/hyperlink.h>
@@ -91,6 +90,19 @@ BEGIN_EVENT_TABLE( FOOTPRINT_EDIT_FRAME, PCB_BASE_FRAME )
 
     EVT_TOOL( ID_FPEDIT_SAVE_PNG, FOOTPRINT_EDIT_FRAME::OnSaveFootprintAsPng )
 
+    EVT_TOOL( ID_LOAD_FOOTPRINT_FROM_BOARD, FOOTPRINT_EDIT_FRAME::OnLoadFootprintFromBoard )
+    EVT_TOOL( ID_ADD_FOOTPRINT_TO_BOARD, FOOTPRINT_EDIT_FRAME::OnSaveFootprintToBoard )
+
+    // Horizontal toolbar
+    EVT_COMBOBOX( ID_TOOLBARH_PCB_SELECT_LAYER, FOOTPRINT_EDIT_FRAME::SelectLayer )
+
+    // UI update events.
+    EVT_UPDATE_UI( ID_LOAD_FOOTPRINT_FROM_BOARD,
+                   FOOTPRINT_EDIT_FRAME::OnUpdateLoadFootprintFromBoard )
+    EVT_UPDATE_UI( ID_ADD_FOOTPRINT_TO_BOARD,
+                   FOOTPRINT_EDIT_FRAME::OnUpdateSaveFootprintToBoard )
+    EVT_UPDATE_UI( ID_TOOLBARH_PCB_SELECT_LAYER, FOOTPRINT_EDIT_FRAME::OnUpdateLayerSelectBox )
+
     // Drop files event
     EVT_DROP_FILES( FOOTPRINT_EDIT_FRAME::OnDropFiles )
 
@@ -105,6 +117,7 @@ FOOTPRINT_EDIT_FRAME::FOOTPRINT_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
 {
     m_showBorderAndTitleBlock = false;   // true to show the frame references
     m_aboutTitle = _HKI( "KiCad Footprint Editor" );
+    m_selLayerBox = nullptr;
     m_editorSettings = nullptr;
 
     // Give an icon
@@ -165,12 +178,10 @@ FOOTPRINT_EDIT_FRAME::FOOTPRINT_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     initLibraryTree();
     m_treePane = new FOOTPRINT_TREE_PANE( this );
 
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<FOOTPRINT_EDIT_TOOLBAR_SETTINGS>( "fpedit-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
-    ReCreateLayerBox( false );
-
     ReCreateMenuBar();
+    ReCreateHToolbar();
+    ReCreateVToolbar();
+    ReCreateOptToolbar();
 
     m_selectionFilterPanel = new PANEL_SELECTION_FILTER( this );
     m_appearancePanel = new APPEARANCE_CONTROLS( this, GetCanvas(), true );
@@ -184,24 +195,16 @@ FOOTPRINT_EDIT_FRAME::FOOTPRINT_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     float proportion = GetFootprintEditorSettings()->m_AuiPanels.properties_splitter;
     m_propertiesPanel->SetSplitterProportion( proportion );
 
+    // Must be set after calling LoadSettings() to be sure these parameters are not dependent
+    // on what is read in stored settings.  Enable one internal layer, because footprints
+    // support keepout areas that can be on internal layers only (therefore on the first internal
+    // layer).  This is needed to handle these keepout in internal layers only.
+    GetBoard()->SetCopperLayerCount( 3 );
+    GetBoard()->SetEnabledLayers( GetBoard()->GetEnabledLayers().set( In1_Cu ) );
+    GetBoard()->SetVisibleLayers( GetBoard()->GetEnabledLayers() );
+    GetBoard()->SetLayerName( In1_Cu, _( "Inner layers" ) );
+
     SetActiveLayer( F_SilkS );
-
-    // Fetch a COPY of the config as a lot of these initializations are going to overwrite our
-    // data.
-    int libWidth = 0;
-    FOOTPRINT_EDITOR_SETTINGS::AUI_PANELS aui_cfg;
-
-    if( FOOTPRINT_EDITOR_SETTINGS* cfg = dynamic_cast<FOOTPRINT_EDITOR_SETTINGS*>( GetSettings() ) )
-    {
-        libWidth = cfg->m_LibWidth;
-        aui_cfg = cfg->m_AuiPanels;
-    }
-    else
-    {
-        // keep gcc quiet about uninitalized vars:
-        aui_cfg.appearance_panel_tab = 0;
-        aui_cfg.right_panel_width = -1;
-    }
 
     m_auimgr.SetManagedWindow( this );
 
@@ -214,7 +217,7 @@ FOOTPRINT_EDIT_FRAME::FOOTPRINT_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_auimgr.SetFlags( auiFlags );
 
     // Rows; layers 4 - 6
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( "TopMainToolbar" )
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( "MainToolbar" )
                       .Top().Layer( 6 ) );
 
     m_auimgr.AddPane( m_messagePanel, EDA_PANE().Messages().Name( "MsgPanel" )
@@ -229,10 +232,10 @@ FOOTPRINT_EDIT_FRAME::FOOTPRINT_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
                       .Left().Layer( 3 )
                       .Caption( _( "Properties" ) ).PaneBorder( false )
                       .MinSize( FromDIP( wxSize( 240, 60 ) ) ).BestSize( FromDIP( wxSize( 300, 200 ) ) ) );
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().VToolbar().Name( "LeftToolbar" )
+    m_auimgr.AddPane( m_optionsToolBar, EDA_PANE().VToolbar().Name( "OptToolbar" )
                       .Left().Layer( 2 ) );
 
-    m_auimgr.AddPane( m_tbRight, EDA_PANE().VToolbar().Name( "RightToolbar" )
+    m_auimgr.AddPane( m_drawToolBar, EDA_PANE().VToolbar().Name( "ToolsToolbar" )
                       .Right().Layer(2) );
     m_auimgr.AddPane( m_appearancePanel, EDA_PANE().Name( "LayersManager" )
                       .Right().Layer( 3 )
@@ -261,21 +264,20 @@ FOOTPRINT_EDIT_FRAME::FOOTPRINT_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     FinishAUIInitialization();
 
     // Apply saved visibility stuff at the end
-    wxAuiPaneInfo& treePane = m_auimgr.GetPane( "Footprints" );
-    wxAuiPaneInfo& layersManager = m_auimgr.GetPane( "LayersManager" );
-
-    if( libWidth > 0 )
-        SetAuiPaneSize( m_auimgr, treePane, libWidth, -1 );
-
-    if( aui_cfg.right_panel_width > 0 )
-        SetAuiPaneSize( m_auimgr, layersManager, aui_cfg.right_panel_width, -1 );
-
-    m_appearancePanel->SetTabIndex( aui_cfg.appearance_panel_tab );
-
     if( FOOTPRINT_EDITOR_SETTINGS* cfg = dynamic_cast<FOOTPRINT_EDITOR_SETTINGS*>( GetSettings() ) )
     {
+        wxAuiPaneInfo& treePane = m_auimgr.GetPane( "Footprints" );
+        wxAuiPaneInfo& layersManager = m_auimgr.GetPane( "LayersManager" );
+
+        if( cfg->m_LibWidth > 0 )
+            SetAuiPaneSize( m_auimgr, treePane, cfg->m_LibWidth, -1 );
+
+        if( cfg->m_AuiPanels.right_panel_width > 0 )
+            SetAuiPaneSize( m_auimgr, layersManager, cfg->m_AuiPanels.right_panel_width, -1 );
+
         m_appearancePanel->SetUserLayerPresets( cfg->m_LayerPresets );
         m_appearancePanel->ApplyLayerPreset( cfg->m_ActiveLayerPreset );
+        m_appearancePanel->SetTabIndex( cfg->m_AuiPanels.appearance_panel_tab );
     }
 
     // restore the last footprint from the project, if any, after the library has been init'ed
@@ -536,52 +538,25 @@ void FOOTPRINT_EDIT_FRAME::ReloadFootprint( FOOTPRINT* aFootprint )
     // ("old" footprints can have null uuids that create issues in fp editor)
     aFootprint->FixUuids();
 
-    // Enable one internal layer, because footprints support keepout areas that can be on
-    // internal layers only (therefore on the first internal layer).  This is needed to handle
-    // these keepout in internal layers only.
-    GetBoard()->SetCopperLayerCount( 3 );
-    GetBoard()->SetLayerName( In1_Cu, _( "Inner layers" ) );
-
-    // Don't drop pre-existing user layers
-    LSET enabledLayers = GetBoard()->GetEnabledLayers();
-    enabledLayers.set( In1_Cu );    // we've already done this, but it needs doing again :shrug:
-
-    aFootprint->RunOnDescendants(
-            [&]( BOARD_ITEM* child )
-            {
-                LSET childLayers = child->GetLayerSet() & LSET::UserDefinedLayersMask();
-
-                for( PCB_LAYER_ID layer : childLayers )
-                    enabledLayers.set( layer );
-            } );
-
-    GetBoard()->SetEnabledLayers( enabledLayers );
-
-    // Footprint Editor layer visibility is kept in the view, not the board (because the board
-    // just delegates to the project file, which we don't have).
-    for( PCB_LAYER_ID layer : enabledLayers )
-        GetCanvas()->GetView()->SetLayerVisible( layer, true );
-
     const wxString libName = aFootprint->GetFPID().GetLibNickname();
 
     if( IsCurrentFPFromBoard() )
     {
-        const wxString msg = wxString::Format( _( "Editing %s from board.  Saving will update the "
-                                                  "board only." ),
-                                               aFootprint->GetReference() );
-        const wxString openLibLink = wxString::Format( _( "Open in library %s" ),
-                                                       UnescapeString( libName ) );
+        const wxString msg =
+                wxString::Format( _( "Editing %s from board.  Saving will update the board only." ),
+                                  aFootprint->GetReference() );
+        const wxString openLibLink =
+                wxString::Format( _( "Open in library %s" ), UnescapeString( libName ) );
 
-        const auto openLibraryCopy =
-                [this]( wxHyperlinkEvent& aEvent )
-                {
-                    GetToolManager()->RunAction( PCB_ACTIONS::editLibFpInFpEditor );
-                };
+        const auto openLibraryCopy = [this]( wxHyperlinkEvent& aEvent )
+        {
+            GetToolManager()->RunAction( PCB_ACTIONS::editLibFpInFpEditor );
+        };
 
         if( WX_INFOBAR* infobar = GetInfoBar() )
         {
-            wxHyperlinkCtrl* button = new wxHyperlinkCtrl( infobar, wxID_ANY, openLibLink,
-                                                           wxEmptyString );
+            wxHyperlinkCtrl* button =
+                    new wxHyperlinkCtrl( infobar, wxID_ANY, openLibLink, wxEmptyString );
             button->Bind( wxEVT_COMMAND_HYPERLINK, openLibraryCopy );
 
             infobar->RemoveAllButtons();
@@ -602,11 +577,10 @@ void FOOTPRINT_EDIT_FRAME::ReloadFootprint( FOOTPRINT* aFootprint )
         {
             wxString link = _( "Save as editable copy" );
 
-            const auto saveAsEditableCopy =
-                    [this, aFootprint]( wxHyperlinkEvent& aEvent )
-                    {
-                        SaveFootprintAs( aFootprint );
-                    };
+            const auto saveAsEditableCopy = [this, aFootprint]( wxHyperlinkEvent& aEvent )
+            {
+                SaveFootprintAs( aFootprint );
+            };
 
             wxHyperlinkCtrl* button = new wxHyperlinkCtrl( infobar, wxID_ANY, link, wxEmptyString );
             button->Bind( wxEVT_COMMAND_HYPERLINK, saveAsEditableCopy );
@@ -624,7 +598,6 @@ void FOOTPRINT_EDIT_FRAME::ReloadFootprint( FOOTPRINT* aFootprint )
     }
 
     UpdateMsgPanel();
-    UpdateUserInterface();
 }
 
 
@@ -939,6 +912,42 @@ void FOOTPRINT_EDIT_FRAME::CloseFootprintEditor( wxCommandEvent& Event )
 }
 
 
+void FOOTPRINT_EDIT_FRAME::OnUpdateLoadFootprintFromBoard( wxUpdateUIEvent& aEvent )
+{
+    PCB_EDIT_FRAME* frame = (PCB_EDIT_FRAME*) Kiway().Player( FRAME_PCB_EDITOR, false );
+
+    aEvent.Enable( frame != nullptr );
+}
+
+
+void FOOTPRINT_EDIT_FRAME::OnUpdateSaveFootprintToBoard( wxUpdateUIEvent& aEvent )
+{
+    PCB_EDIT_FRAME* frame = (PCB_EDIT_FRAME*) Kiway().Player( FRAME_PCB_EDITOR, false );
+
+    FOOTPRINT* editorFootprint = GetBoard()->GetFirstFootprint();
+    bool       canInsert = frame && editorFootprint && editorFootprint->GetLink() == niluuid;
+
+    // If the source was deleted, the footprint can inserted but not updated in the board.
+    if( frame && editorFootprint && editorFootprint->GetLink() != niluuid )
+    {
+        BOARD*  mainpcb = frame->GetBoard();
+        canInsert = true;
+
+        // search if the source footprint was not deleted:
+        for( FOOTPRINT* candidate : mainpcb->Footprints() )
+        {
+            if( editorFootprint->GetLink() == candidate->m_Uuid )
+            {
+                canInsert = false;
+                break;
+            }
+        }
+    }
+
+    aEvent.Enable( canInsert );
+}
+
+
 void FOOTPRINT_EDIT_FRAME::ShowChangedLanguage()
 {
     // call my base class
@@ -1229,50 +1238,11 @@ void FOOTPRINT_EDIT_FRAME::setupUIConditions()
                 return IsCurrentFPFromBoard();
             };
 
-    auto pcbFrameExistsCond =
-            [this]( const SELECTION& )
-            {
-                PCB_EDIT_FRAME* frame = dynamic_cast<PCB_EDIT_FRAME*>( Kiway().Player( FRAME_PCB_EDITOR, false ) );
-
-                return ( frame != nullptr );
-            };
-
-    auto boardFootprintExistsCond =
-            [this]( const SELECTION& )
-            {
-                PCB_EDIT_FRAME* frame = dynamic_cast<PCB_EDIT_FRAME*>( Kiway().Player( FRAME_PCB_EDITOR, false ) );
-
-                FOOTPRINT* editorFootprint = GetBoard()->GetFirstFootprint();
-                bool       canInsert = frame && editorFootprint && editorFootprint->GetLink() == niluuid;
-
-                // If the source was deleted, the footprint can inserted but not updated in the board.
-                if( frame && editorFootprint && editorFootprint->GetLink() != niluuid )
-                {
-                    BOARD*  mainpcb = frame->GetBoard();
-                    canInsert = true;
-
-                    // search if the source footprint was not deleted:
-                    for( FOOTPRINT* candidate : mainpcb->Footprints() )
-                    {
-                        if( editorFootprint->GetLink() == candidate->m_Uuid )
-                        {
-                            canInsert = false;
-                            break;
-                        }
-                    }
-                }
-
-                return canInsert;
-            };
-
     // clang-format off
     mgr->SetConditions( ACTIONS::saveAs,                 ENABLE( footprintTargettedCond ) );
     mgr->SetConditions( ACTIONS::revert,                 ENABLE( cond.ContentModified() ) );
     mgr->SetConditions( ACTIONS::save,                   ENABLE( SELECTION_CONDITIONS::ShowAlways ) );
     mgr->SetConditions( PCB_ACTIONS::editLibFpInFpEditor,ENABLE( footprintFromBoardCond ) );
-
-    mgr->SetConditions( PCB_ACTIONS::saveFpToBoard,      ENABLE( boardFootprintExistsCond ) );
-    mgr->SetConditions( PCB_ACTIONS::loadFpFromBoard,    ENABLE( pcbFrameExistsCond ) );
 
     mgr->SetConditions( ACTIONS::undo,                   ENABLE( cond.UndoAvailable() ) );
     mgr->SetConditions( ACTIONS::redo,                   ENABLE( cond.RedoAvailable() ) );
@@ -1280,8 +1250,8 @@ void FOOTPRINT_EDIT_FRAME::setupUIConditions()
     mgr->SetConditions( ACTIONS::toggleGrid,             CHECK( cond.GridVisible() ) );
     mgr->SetConditions( ACTIONS::toggleGridOverrides,    CHECK( cond.GridOverrides() ) );
     mgr->SetConditions( ACTIONS::toggleCursorStyle,      CHECK( cond.FullscreenCursor() ) );
-    mgr->SetConditions( ACTIONS::millimetersUnits,       CHECK( cond.Units( EDA_UNITS::MM ) ) );
-    mgr->SetConditions( ACTIONS::inchesUnits,            CHECK( cond.Units( EDA_UNITS::INCH ) ) );
+    mgr->SetConditions( ACTIONS::millimetersUnits,       CHECK( cond.Units( EDA_UNITS::MILLIMETRES ) ) );
+    mgr->SetConditions( ACTIONS::inchesUnits,            CHECK( cond.Units( EDA_UNITS::INCHES ) ) );
     mgr->SetConditions( ACTIONS::milsUnits,              CHECK( cond.Units( EDA_UNITS::MILS ) ) );
 
     mgr->SetConditions( ACTIONS::cut,                    ENABLE( cond.HasItems() ) );
@@ -1351,7 +1321,7 @@ void FOOTPRINT_EDIT_FRAME::setupUIConditions()
 
     mgr->SetConditions( ACTIONS::showLibraryTree,           CHECK( libraryTreeCond ) );
     mgr->SetConditions( PCB_ACTIONS::showLayersManager,     CHECK( layerManagerCond ) );
-    mgr->SetConditions( ACTIONS::showProperties,            CHECK( propertiesCond ) );
+    mgr->SetConditions( PCB_ACTIONS::showProperties,        CHECK( propertiesCond ) );
 
     mgr->SetConditions( ACTIONS::print,                     ENABLE( haveFootprintCond ) );
     mgr->SetConditions( PCB_ACTIONS::exportFootprint,       ENABLE( haveFootprintCond ) );
@@ -1406,7 +1376,7 @@ void FOOTPRINT_EDIT_FRAME::setupUIConditions()
     CURRENT_EDIT_TOOL( PCB_ACTIONS::drawRadialDimension );
     CURRENT_EDIT_TOOL( PCB_ACTIONS::drawLeader );
     CURRENT_EDIT_TOOL( PCB_ACTIONS::setAnchor );
-    CURRENT_EDIT_TOOL( ACTIONS::gridSetOrigin );
+    CURRENT_EDIT_TOOL( PCB_ACTIONS::gridSetOrigin );
 
 #undef CURRENT_EDIT_TOOL
 #undef ENABLE

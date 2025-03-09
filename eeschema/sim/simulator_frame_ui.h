@@ -88,21 +88,6 @@ public:
     void SetUserDefinedSignals( const std::map<int, wxString>& aSignals );
 
     /**
-     * Creates a column at the end of m_signalsGrid named "Cursor n" ( n = m_customCursorsCnt ),
-     * increases m_customCursorsCnt,
-     * emplaces a vector to m_cursorFormatsDyn,
-     * and update widgets
-     */
-    void CreateNewCursor();
-
-    /**
-     * Deletes last m_signalsGrid "Cursor n" column,
-     * removes vector's m_cursorFormatsDyn last entry,
-     * reduces m_customCursorsCnt by one, and update widgets
-     */
-    void DeleteCursor();
-
-    /**
      * Add a new trace to the current plot.
      *
      * @param aName is the device/net name.
@@ -116,12 +101,12 @@ public:
      */
     SPICE_VALUE_FORMAT GetCursorFormat( int aCursorId, int aValueCol ) const
     {
-        return m_cursorFormatsDyn[aCursorId][aValueCol];
+        return m_cursorFormats[ aCursorId ][ aValueCol ];
     }
 
     void SetCursorFormat( int aCursorId, int aValueCol, const SPICE_VALUE_FORMAT& aFormat )
     {
-        m_cursorFormatsDyn[ aCursorId ][ aValueCol ] = aFormat;
+        m_cursorFormats[ aCursorId ][ aValueCol ] = aFormat;
 
         wxCommandEvent dummy;
         onPlotCursorUpdate( dummy );
@@ -176,11 +161,6 @@ public:
      */
     const SPICE_CIRCUIT_MODEL* GetExporter() const;
 
-    bool IsConsoleShown();
-    void ToggleConsole();
-    bool IsSidePanelShown();
-    void ToggleSimulationSidePanel();
-
     bool DarkModePlots() const { return m_darkMode; }
     void ToggleDarkModePlots();
 
@@ -211,12 +191,10 @@ public:
      */
     void ApplyPreferences( const SIM_PREFERENCES& aPrefs );
 
-    /**
-     * Adjust the sash dimension of splitter windows after reading
-     * the config settings
-     * must be called after the config settings are read, and once the
-     * frame is initialized (end of the Ctor)
-     */
+    // adjust the sash dimension of splitter windows after reading
+    // the config settings
+    // must be called after the config settings are read, and once the
+    // frame is initialized (end of the Ctor)
     void SetSubWindowsSashSize();
 
     /**
@@ -272,18 +250,6 @@ private:
                       std::vector<double>* aDataX = nullptr, bool aClearData = false );
 
     /**
-     * A common toggler for the two main wxSplitterWindow s
-     */
-    void TogglePanel( wxPanel* aPanel, wxSplitterWindow* aSplitterWindow, int& aSashPosition );
-
-    /**
-     * Init handler for custom cursors
-     *
-     * Called once in class's body
-     */
-    void CustomCursorsInit();
-
-    /**
      * Rebuild the list of signals available from the netlist.
      *
      * Note: this is not the filtered list.  See rebuildSignalsGrid() for that.
@@ -304,16 +270,6 @@ private:
      * Update the cursor values (in the grid) and graphics (in the plot window).
      */
     void updatePlotCursors();
-
-    /**
-     * Updates m_signalsGrid cursor widget, column rendering and attributes
-     *
-     * @param t is the type of the enum that holds m_signalsGrid column indexing
-     * @param u a cursor "ID". Applies a 2 integer offset against the enum indexing
-     * @param r is a wxGrid widget's row
-     */
-    template <typename T, typename U, typename R>
-    void signalsGridCursorUpdate( T t, U u, R r );
 
     /**
      * Apply user-defined signals to the SPICE session.
@@ -364,8 +320,6 @@ private:
     bool loadLegacyWorkbook( const wxString & aPath );
     bool loadJsonWorkbook( const wxString & aPath );
 
-    void SaveCursorToWorkbook( nlohmann::json& aTraceJs, TRACE* aTrace, int aCursorId );
-
     void onPlotCursorUpdate( wxCommandEvent& aEvent );
 
 public:
@@ -381,12 +335,9 @@ private:
 
     ///< SPICE expressions need quoted versions of the netnames since KiCad allows '-' and '/'
     ///< in netnames.
-    std::vector<wxString>        m_netnames;
+    std::map<wxString, wxString> m_quotedNetnames;
 
     SPICE_VALUE_FORMAT           m_cursorFormats[3][2];
-
-    // Holds cursor formating for m_cursorsGrid, includes m_cursorFormats[3][2], TODO: merge.
-    std::vector<std::vector<SPICE_VALUE_FORMAT>> m_cursorFormatsDyn;
 
     // Variables for temporary storage:
     int                          m_splitterLeftRightSashPosition;
@@ -398,9 +349,6 @@ private:
     unsigned int                 m_plotNumber;
     wxTimer                      m_refreshTimer;
     SIM_PREFERENCES              m_preferences;
-
-    // Count all available cursors in m_signalsGrid
-    int                          m_customCursorsCnt; // Defaults to 2 + 1
 };
 
 #endif // SIMULATOR_FRAME_UI_H

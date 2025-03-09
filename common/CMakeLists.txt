@@ -72,7 +72,6 @@ set( KICOMMON_SRCS
     jobs/job_export_pcb_gerber.cpp
     jobs/job_export_pcb_gerbers.cpp
     jobs/job_export_pcb_ipc2581.cpp
-    jobs/job_export_pcb_ipcd356.cpp
     jobs/job_export_pcb_odb.cpp
     jobs/job_export_pcb_pdf.cpp
     jobs/job_export_pcb_plot.cpp
@@ -117,9 +116,6 @@ set( KICOMMON_SRCS
     project/project_archiver.cpp
     project/project_file.cpp
     project/project_local_settings.cpp
-
-    # This is basically a settings object, but for the toolbar
-    tool/ui/toolbar_configuration.cpp
 
     dialogs/dialog_migrate_settings.cpp
     dialogs/dialog_migrate_settings_base.cpp
@@ -408,15 +404,10 @@ set( COMMON_DLG_SRCS
     dialogs/panel_plugin_settings.cpp
     dialogs/panel_plugin_settings_base.cpp
     dialogs/panel_setup_netclasses.cpp
-    dialogs/panel_printer_list.cpp
-    dialogs/panel_printer_list_base.cpp
-
     dialogs/panel_setup_netclasses_base.cpp
     dialogs/panel_setup_severities.cpp
     dialogs/panel_text_variables.cpp
     dialogs/panel_text_variables_base.cpp
-    dialogs/panel_toolbar_customization.cpp
-    dialogs/panel_toolbar_customization_base.cpp
     )
 
 if( KICAD_USE_SENTRY )

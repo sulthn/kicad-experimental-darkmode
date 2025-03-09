@@ -1275,14 +1275,6 @@ bool PCB_EDIT_FRAME::importFile( const wxString& aFileName, int aFileType,
     case PCB_IO_MGR::EASYEDAPRO:
         return OpenProjectFiles( std::vector<wxString>( 1, aFileName ),
                                  KICTL_NONKICAD_ONLY | KICTL_IMPORT_LIB );
-        break;
-
-    case PCB_IO_MGR::ALTIUM_DESIGNER:
-    case PCB_IO_MGR::ALTIUM_CIRCUIT_MAKER:
-    case PCB_IO_MGR::ALTIUM_CIRCUIT_STUDIO:
-    case PCB_IO_MGR::SOLIDWORKS_PCB:
-        return OpenProjectFiles( std::vector<wxString>( 1, aFileName ),
-                                 KICTL_NONKICAD_ONLY );
 
     default: break;
     }
@@ -1307,7 +1299,7 @@ void PCB_EDIT_FRAME::GenIPC2581File( wxCommandEvent& event )
 
     if( pcbFileName.GetName().empty() )
     {
-        DisplayError( this, _( "The board must be saved before generating IPC-2581 file." ) );
+        DisplayError( this, _( "The board must be saved before generating IPC2581 file." ) );
         return;
     }
 
@@ -1323,7 +1315,7 @@ void PCB_EDIT_FRAME::GenIPC2581File( wxCommandEvent& event )
     wxString   tempFile = wxFileName::CreateTempFileName( wxS( "pcbnew_ipc" ) );
     wxString   upperTxt;
     wxString   lowerTxt;
-    WX_PROGRESS_REPORTER reporter( this, _( "Generating IPC-2581 file" ), 5 );
+    WX_PROGRESS_REPORTER reporter( this, _( "Generating IPC2581 file" ), 5 );
     std::map<std::string, UTF8> props;
 
     props["units"] = dlg.GetUnitsString();
@@ -1347,10 +1339,8 @@ void PCB_EDIT_FRAME::GenIPC2581File( wxCommandEvent& event )
                 }
                 catch( const IO_ERROR& ioe )
                 {
-                    DisplayError( this,
-                                  wxString::Format( _( "Error generating IPC-2581 file '%s'.\n%s" ),
-                                                    pcbFileName.GetFullPath(),
-                                                    ioe.What() ) );
+                    DisplayError( this, wxString::Format( _( "Error generating IPC2581 file '%s'.\n%s" ),
+                                                          pcbFileName.GetFullPath(), ioe.What() ) );
 
                     lowerTxt.Printf( _( "Failed to create temporary file '%s'." ), tempFile );
 
@@ -1382,7 +1372,7 @@ void PCB_EDIT_FRAME::GenIPC2581File( wxCommandEvent& event )
     }
     catch( const std::exception& e )
     {
-        wxLogError( "Exception in IPC-2581 generation: %s", e.what() );
+        wxLogError( "Exception in IPC2581 generation: %s", e.what() );
         GetScreen()->SetContentModified( false );
         return;
     }
@@ -1413,7 +1403,7 @@ void PCB_EDIT_FRAME::GenIPC2581File( wxCommandEvent& event )
     // If save succeeded, replace the original with what we just wrote
     if( !wxRenameFile( tempFile, pcbFileName.GetFullPath() ) )
     {
-        DisplayError( this, wxString::Format( _( "Error generating IPC-2581 file '%s'.\n"
+        DisplayError( this, wxString::Format( _( "Error generating IPC2581 file '%s'.\n"
                                                  "Failed to rename temporary file '%s." ),
                                               pcbFileName.GetFullPath(),
                                               tempFile ) );
@@ -1442,8 +1432,8 @@ void PCB_EDIT_FRAME::GenODBPPFiles( wxCommandEvent& event )
     job.m_compressionMode = static_cast<JOB_EXPORT_PCB_ODB::ODB_COMPRESSION>( dlg.GetCompressFormat() );
 
     job.m_precision = dlg.GetPrecision();
-    job.m_units = dlg.GetUnitsString() == "mm" ? JOB_EXPORT_PCB_ODB::ODB_UNITS::MM
-                                               : JOB_EXPORT_PCB_ODB::ODB_UNITS::INCH;
+    job.m_units = dlg.GetUnitsString() == "mm" ? JOB_EXPORT_PCB_ODB::ODB_UNITS::MILLIMETERS
+                                               : JOB_EXPORT_PCB_ODB::ODB_UNITS::INCHES;
 
     WX_PROGRESS_REPORTER progressReporter( this, _( "Generating ODB++ output files" ), 3, false );
     WX_STRING_REPORTER reporter;

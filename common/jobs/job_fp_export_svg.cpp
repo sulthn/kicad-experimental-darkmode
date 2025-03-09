@@ -22,13 +22,13 @@
 
 
 JOB_FP_EXPORT_SVG::JOB_FP_EXPORT_SVG() :
-        JOB_EXPORT_PCB_PLOT( JOB_EXPORT_PCB_PLOT::PLOT_FORMAT::SVG, "fpsvg", true ),
+    JOB( "fpsvg", true ),
     m_libraryPath(),
-    m_footprint()
+    m_footprint(),
+    m_blackAndWhite( false ),
+    m_sketchPadsOnFabLayers( false ),
+    m_hideDNPFPsOnFabLayers( false ),
+    m_sketchDNPFPsOnFabLayers( true ),
+    m_crossoutDNPFPsOnFabLayers( true )
 {
-    m_blackAndWhite = false;
-    m_sketchPadsOnFabLayers = false;
-    m_hideDNPFPsOnFabLayers = false;
-    m_sketchDNPFPsOnFabLayers = true;
-    m_crossoutDNPFPsOnFabLayers = true;
 }

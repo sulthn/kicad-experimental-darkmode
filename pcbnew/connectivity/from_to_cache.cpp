@@ -144,7 +144,9 @@ int FROM_TO_CACHE::cacheFromToPaths( const wxString& aFrom, const wxString& aTo 
         wxString fromName = path.from->GetParentFootprint()->GetReference()
                                 + wxT( "-" ) + path.from->GetNumber();
 
-        auto padCandidates = connectivity->GetConnectedItems( path.from, EXCLUDE_ZONES );
+        auto padCandidates = connectivity->GetConnectedItems( path.from,
+                                                              { PCB_PAD_T, PCB_ARC_T, PCB_VIA_T,
+                                                                PCB_TRACE_T } );
         PAD* toPad = nullptr;
 
         for( BOARD_CONNECTED_ITEM* pitem : padCandidates )

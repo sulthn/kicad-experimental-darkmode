@@ -28,17 +28,8 @@ class wxAuiNotebook;
 class JOBSET;
 class KICAD_MANAGER_FRAME;
 class PANEL_JOBSET;
-class PANEL_DESTINATION;
-struct JOBSET_DESTINATION;
-
-enum COL_ORDER
-{
-    COL_NUMBER,
-    COL_SOURCE,
-    COL_DESCR,
-
-    COL_COUNT // keep as last
-};
+class PANEL_JOBSET_OUTPUT;
+struct JOBSET_OUTPUT;
 
 class JOBS_GRID_TRICKS : public GRID_TRICKS
 {
@@ -73,7 +64,7 @@ public:
 
     ~PANEL_JOBSET();
 
-    void RemoveDestination( PANEL_DESTINATION* aPanel );
+    void RemoveOutput( PANEL_JOBSET_OUTPUT* aPanel );
 
     void EnsurePcbSchFramesOpen();
 
@@ -85,24 +76,24 @@ public:
     bool OpenJobOptionsForListItem( size_t aItemIndex );
     void OnJobButtonDelete( wxCommandEvent& aEvent ) override;
 
-    std::vector<PANEL_DESTINATION*> GetDestinationPanels();
+    std::vector<PANEL_JOBSET_OUTPUT*> GetOutputPanels();
 
 protected:
     virtual void OnSizeGrid( wxSizeEvent& aEvent ) override;
     virtual void OnAddJobClick( wxCommandEvent& aEvent ) override;
-    virtual void OnAddDestinationClick( wxCommandEvent& aEvent ) override;
+    virtual void OnAddOutputClick( wxCommandEvent& aEvent ) override;
     virtual void OnSaveButtonClick( wxCommandEvent& aEvent ) override;
     virtual void OnJobButtonUp( wxCommandEvent& aEvent ) override;
     virtual void OnJobButtonDown( wxCommandEvent& aEvent ) override;
-    virtual void OnGenerateAllDestinationsClick( wxCommandEvent& event ) override;
+    virtual void OnGenerateAllOutputsClick( wxCommandEvent& event ) override;
     virtual void OnGridCellChange( wxGridEvent& aEvent ) override;
 
     bool GetCanClose() override;
 
 private:
     void rebuildJobList();
-    void buildDestinationList();
-    void addDestinationPanel( JOBSET_DESTINATION* aDestination );
+    void buildOutputList();
+    void addJobOutputPanel( JOBSET_OUTPUT* aOutput );
 
 private:
     wxAuiNotebook*          m_parentBook;

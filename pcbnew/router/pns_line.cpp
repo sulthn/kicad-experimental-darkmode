@@ -35,11 +35,11 @@
 
 namespace PNS {
 
-LINE::LINE( const LINE& aOther ) :
-        LINK_HOLDER( aOther ),
-        m_line( aOther.m_line ),
-        m_width( aOther.m_width ),
-        m_snapThreshhold( aOther.m_snapThreshhold )
+LINE::LINE( const LINE& aOther )
+        : LINK_HOLDER( aOther ),
+          m_line( aOther.m_line ),
+          m_width( aOther.m_width ),
+          m_snapThreshhold( aOther.m_snapThreshhold )
 {
     m_net = aOther.m_net;
     m_movable = aOther.m_movable;
@@ -78,9 +78,6 @@ LINE::~LINE()
 
 LINE& LINE::operator=( const LINE& aOther )
 {
-    m_parent = aOther.m_parent;
-    m_sourceItem = aOther.m_sourceItem;
-
     m_line = aOther.m_line;
     m_width = aOther.m_width;
     m_net = aOther.m_net;
@@ -105,7 +102,6 @@ LINE& LINE::operator=( const LINE& aOther )
 
     m_marker = aOther.m_marker;
     m_rank = aOther.m_rank;
-    m_routable = aOther.m_routable;
     m_owner = aOther.m_owner;
     m_snapThreshhold = aOther.m_snapThreshhold;
     m_blockingObstacle = aOther.m_blockingObstacle;

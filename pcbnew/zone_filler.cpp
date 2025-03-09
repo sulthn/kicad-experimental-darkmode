@@ -50,8 +50,6 @@
 #include <thread_pool.h>
 #include <math/util.h>      // for KiROUND
 #include "zone_filler.h"
-#include "project.h"
-#include "project/project_local_settings.h"
 
 // Helper classes for connect_nearby_polys
 class RESULTS
@@ -287,81 +285,78 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
 
     LSET boardCuMask = m_board->GetEnabledLayers() & LSET::AllCuMask();
 
-    auto findHighestPriorityZone =
-            [&]( const BOX2I& bbox, PCB_LAYER_ID itemLayer, int netcode,
-                 const std::function<bool( const ZONE* )>& testFn ) -> ZONE*
+    auto findHighestPriorityZone = [&]( const BOX2I& aBBox, const PCB_LAYER_ID aItemLayer,
+                                        const int                                aNetcode,
+                                        const std::function<bool( const ZONE* )> aTestFn ) -> ZONE*
+    {
+        unsigned highestPriority = 0;
+        ZONE*    highestPriorityZone = nullptr;
+
+        for( ZONE* zone : m_board->Zones() )
+        {
+            // Rule areas are not filled
+            if( zone->GetIsRuleArea() )
+                continue;
+
+            if( zone->GetAssignedPriority() < highestPriority )
+                continue;
+
+            if( !zone->IsOnLayer( aItemLayer ) )
+                continue;
+
+            // Degenerate zones will cause trouble; skip them
+            if( zone->GetNumCorners() <= 2 )
+                continue;
+
+            if( !zone->GetBoundingBox().Intersects( aBBox ) )
+                continue;
+
+            if( !aTestFn( zone ) )
+                continue;
+
+            // Prefer highest priority and matching netcode
+            if( zone->GetAssignedPriority() > highestPriority || zone->GetNetCode() == aNetcode )
             {
-                unsigned highestPriority = 0;
-                ZONE*    highestPriorityZone = nullptr;
+                highestPriority = zone->GetAssignedPriority();
+                highestPriorityZone = zone;
+            }
+        }
 
-                for( ZONE* zone : m_board->Zones() )
-                {
-                    // Rule areas are not filled
-                    if( zone->GetIsRuleArea() )
-                        continue;
+        return highestPriorityZone;
+    };
 
-                    if( zone->GetAssignedPriority() < highestPriority )
-                        continue;
+    auto isInPourKeepoutArea = [&]( const BOX2I& aBBox, const PCB_LAYER_ID aItemLayer,
+                                    const VECTOR2I aTestPoint ) -> bool
+    {
+        for( ZONE* zone : m_board->Zones() )
+        {
+            if( !zone->GetIsRuleArea() )
+                continue;
 
-                    if( !zone->IsOnLayer( itemLayer ) )
-                        continue;
+            if( !zone->HasKeepoutParametersSet() )
+                continue;
 
-                    // Degenerate zones will cause trouble; skip them
-                    if( zone->GetNumCorners() <= 2 )
-                        continue;
+            if( !zone->GetDoNotAllowCopperPour() )
+                continue;
 
-                    if( !zone->GetBoundingBox().Intersects( bbox ) )
-                        continue;
+            if( !zone->IsOnLayer( aItemLayer ) )
+                continue;
 
-                    if( !testFn( zone ) )
-                        continue;
+            // Degenerate zones will cause trouble; skip them
+            if( zone->GetNumCorners() <= 2 )
+                continue;
 
-                    // Prefer highest priority and matching netcode
-                    if( zone->GetAssignedPriority() > highestPriority
-                            || zone->GetNetCode() == netcode )
-                    {
-                        highestPriority = zone->GetAssignedPriority();
-                        highestPriorityZone = zone;
-                    }
-                }
+            if( !zone->GetBoundingBox().Intersects( aBBox ) )
+                continue;
 
-                return highestPriorityZone;
-            };
+            if( zone->Outline()->Contains( aTestPoint ) )
+                return true;
+        }
 
-    auto isInPourKeepoutArea =
-            [&]( const BOX2I& bbox, PCB_LAYER_ID itemLayer, const VECTOR2I& testPoint ) -> bool
-            {
-                for( ZONE* zone : m_board->Zones() )
-                {
-                    if( !zone->GetIsRuleArea() )
-                        continue;
-
-                    if( !zone->HasKeepoutParametersSet() )
-                        continue;
-
-                    if( !zone->GetDoNotAllowCopperPour() )
-                        continue;
-
-                    if( !zone->IsOnLayer( itemLayer ) )
-                        continue;
-
-                    // Degenerate zones will cause trouble; skip them
-                    if( zone->GetNumCorners() <= 2 )
-                        continue;
-
-                    if( !zone->GetBoundingBox().Intersects( bbox ) )
-                        continue;
-
-                    if( zone->Outline()->Contains( testPoint ) )
-                        return true;
-                }
-
-                return false;
-            };
+        return false;
+    };
 
     // Determine state of conditional via flashing
-    // This is now done completely deterministically prior to filling due to the pathological
-    // case presented in https://gitlab.com/kicad/code/kicad/-/issues/12964.
     for( PCB_TRACK* track : m_board->Tracks() )
     {
         if( track->Type() == PCB_VIA_T )
@@ -375,16 +370,15 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
 
             BOX2I    bbox = via->GetBoundingBox();
             VECTOR2I center = via->GetPosition();
-            int      holeRadius = via->GetDrillValue() / 2 + 1;
-            int      netcode = via->GetNetCode();
+            int      testRadius = via->GetDrillValue() / 2 + 1;
+            unsigned netcode = via->GetNetCode();
             LSET     layers = via->GetLayerSet() & boardCuMask;
 
             // Checking if the via hole touches the zone outline
-            auto viaTestFn =
-                    [&]( const ZONE* aZone ) -> bool
-                    {
-                        return aZone->Outline()->Contains( center, -1, holeRadius );
-                    };
+            auto viaTestFn = [&]( const ZONE* aZone ) -> bool
+            {
+                return aZone->Outline()->Contains( center, -1, testRadius );
+            };
 
             for( PCB_LAYER_ID layer : layers.Seq() )
             {
@@ -420,14 +414,13 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
 
             BOX2I    bbox = pad->GetBoundingBox();
             VECTOR2I center = pad->GetPosition();
-            int      netcode = pad->GetNetCode();
+            unsigned netcode = pad->GetNetCode();
             LSET     layers = pad->GetLayerSet() & boardCuMask;
 
-            auto padTestFn =
-                    [&]( const ZONE* aZone ) -> bool
-                    {
-                        return aZone->Outline()->Contains( center );
-                    };
+            auto padTestFn = [&]( const ZONE* aZone ) -> bool
+            {
+                return aZone->Outline()->Contains( center );
+            };
 
             for( PCB_LAYER_ID layer : layers.Seq() )
             {
@@ -880,24 +873,6 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
 
                 if( oldFillHashes[ { zone, layer } ] != zone->GetHashValue( layer ) )
                     outOfDate = true;
-            }
-        }
-
-        if( ( m_board->GetProject()
-              && m_board->GetProject()->GetLocalSettings().m_PrototypeZoneFill ) )
-        {
-            KIDIALOG dlg( aParent, _( "Prototype zone fill enabled. Disable setting and refill?" ),
-                          _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
-            dlg.SetOKCancelLabels( _( "Disable and refill" ), _( "Continue without Refill" ) );
-            dlg.DoNotShowCheckbox( __FILE__, __LINE__ );
-
-            if( dlg.ShowModal() == wxID_OK )
-            {
-                m_board->GetProject()->GetLocalSettings().m_PrototypeZoneFill = false;
-            }
-            else if( !outOfDate )
-            {
-                return false;
             }
         }
 
@@ -1832,9 +1807,7 @@ bool ZONE_FILLER::fillCopperZone( const ZONE* aZone, PCB_LAYER_ID aLayer, PCB_LA
      * Process the hatch pattern (note that we do this while deflated)
      */
 
-    if( aZone->GetFillMode() == ZONE_FILL_MODE::HATCH_PATTERN
-        && ( !m_board->GetProject()
-             || !m_board->GetProject()->GetLocalSettings().m_PrototypeZoneFill ) )
+    if( aZone->GetFillMode() == ZONE_FILL_MODE::HATCH_PATTERN )
     {
         if( !addHatchFillTypeOnZone( aZone, aLayer, aDebugLayer, aFillPolys ) )
             return false;
@@ -2401,53 +2374,31 @@ bool ZONE_FILLER::addHatchFillTypeOnZone( const ZONE* aZone, PCB_LAYER_ID aLayer
     // Build holes
     SHAPE_POLY_SET holes;
 
-    VECTOR2I offset_opt = VECTOR2I();
-    bool     zone_has_offset = false;
-
-    if( aZone->LayerProperties().contains( aLayer ) )
+    for( int xx = 0; ; xx++ )
     {
-        zone_has_offset = aZone->HatchingOffset( aLayer ).has_value();
+        int xpos = xx * gridsize;
 
-        offset_opt = aZone->HatchingOffset( aLayer ).value_or( VECTOR2I( 0, 0 ) );
-    }
+        if( xpos > bbox.GetWidth() )
+            break;
 
-    if( !zone_has_offset )
-    {
-        if( m_board->GetDesignSettings().GetDefaultZoneSettings().m_layerProperties.contains(
-                    aLayer ) )
+        for( int yy = 0; ; yy++ )
         {
-            const ZONE_LAYER_PROPERTIES& properties =
-                    m_board->GetDesignSettings().GetDefaultZoneSettings().m_layerProperties.at(
-                            aLayer );
+            int ypos = yy * gridsize;
 
-            offset_opt = properties.hatching_offset.value_or( VECTOR2I( 0, 0 ) );
-        }
-    }
+            if( ypos > bbox.GetHeight() )
+                break;
 
-
-    int x_offset = bbox.GetX() - ( bbox.GetX() ) % gridsize - gridsize;
-    int y_offset = bbox.GetY() - ( bbox.GetY() ) % gridsize - gridsize;
-
-
-    for( int xx = x_offset; xx <= bbox.GetRight(); xx += gridsize )
-    {
-        for( int yy = y_offset; yy <= bbox.GetBottom(); yy += gridsize )
-        {
             // Generate hole
             SHAPE_LINE_CHAIN hole( hole_base );
-            hole.Move( VECTOR2I( xx, yy ) );
-
-            if( !aZone->GetHatchOrientation().IsZero() )
-            {
-                hole.Rotate( aZone->GetHatchOrientation() );
-            }
-
-            hole.Move( VECTOR2I( offset_opt.x % gridsize, offset_opt.y % gridsize ) );
-
+            hole.Move( VECTOR2I( xpos, ypos ) );
             holes.AddOutline( hole );
         }
     }
 
+    holes.Move( bbox.GetPosition() );
+
+    if( !aZone->GetHatchOrientation().IsZero() )
+        holes.Rotate( aZone->GetHatchOrientation() );
 
     DUMP_POLYS_TO_COPPER_LAYER( holes, In10_Cu, wxT( "hatch-holes" ) );
 

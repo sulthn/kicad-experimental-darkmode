@@ -80,7 +80,6 @@ typedef std::vector<std::tuple<wxString, wxString, wxString>> STRING_TUPLE_LIST;
 
 
 struct BACKGROUND_JOB;
-class DIALOG_PCM;
 
 
 /**
@@ -327,7 +326,7 @@ public:
      *
      * @param aDialog parent dialog for progress window
      */
-    void SetDialogWindow( DIALOG_PCM* aDialog ) { m_dialog = aDialog; };
+    void SetDialogWindow( wxWindow* aDialog ) { m_dialog = aDialog; };
 
     /**
      * @brief Runs a background update thread that checks for new package versions
@@ -393,7 +392,7 @@ private:
     ///< Returns current UTC timestamp
     time_t getCurrentTimestamp() const;
 
-    DIALOG_PCM*                                  m_dialog;
+    wxWindow*                                    m_dialog;
     std::unique_ptr<JSON_SCHEMA_VALIDATOR>       m_schema_validator;
     wxString                                     m_3rdparty_path;
     wxString                                     m_cache_path;

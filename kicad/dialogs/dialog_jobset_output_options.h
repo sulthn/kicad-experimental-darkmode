@@ -1,6 +1,7 @@
 /*
  * This program source code file is part of KiCad, a free EDA CAD application.
  *
+ * Copyright (C) 2024 Mark Roszko <mark.roszko@gmail.com>
  * Copyright The KiCad Developers, see AUTHORS.txt for contributors.
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -17,31 +18,28 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef TOOLBARS_PL_EDITOR_H_
-#define TOOLBARS_PL_EDITOR_H_
+#pragma once
 
-#include <tool/action_toolbar.h>
-#include <tool/ui/toolbar_configuration.h>
+#include "dialog_jobset_output_options_base.h"
 
-class PL_EDITOR_ACTION_TOOLBAR_CONTROLS : public ACTION_TOOLBAR_CONTROLS
+class JOBSET;
+struct JOBSET_OUTPUT;
+
+class DIALOG_JOBSET_OUTPUT_OPTIONS : public DIALOG_JOBSET_OUTPUT_OPTIONS_BASE
 {
 public:
-    static ACTION_TOOLBAR_CONTROL originSelector;
-    static ACTION_TOOLBAR_CONTROL pageSelect;
+    DIALOG_JOBSET_OUTPUT_OPTIONS( wxWindow* aParent, JOBSET* aJobsFile, JOBSET_OUTPUT* aOutput );
+
+private:
+    virtual void onOutputPathBrowseClicked(wxCommandEvent& event) override;
+
+    bool TransferDataFromWindow() override;
+    bool TransferDataToWindow() override;
+
+private:
+    JOBSET*                 m_jobsFile;
+    JOBSET_OUTPUT*          m_output;
+    std::map<int, wxString> m_onlyMap;
 };
 
-/**
- * Toolbar configuration for the page layout editor frame.
- */
-class PL_EDITOR_TOOLBAR_SETTINGS : public TOOLBAR_SETTINGS
-{
-public:
-    PL_EDITOR_TOOLBAR_SETTINGS() : TOOLBAR_SETTINGS( "pl_editor-toolbars" )
-    {}
 
-    ~PL_EDITOR_TOOLBAR_SETTINGS() {}
-
-    std::optional<TOOLBAR_CONFIGURATION> DefaultToolbarConfig( TOOLBAR_LOC aToolbar ) override;
-};
-
-#endif /* TOOLBARS_PL_EDITOR_H_ */

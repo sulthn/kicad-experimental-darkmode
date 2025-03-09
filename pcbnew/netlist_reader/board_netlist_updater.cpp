@@ -467,9 +467,9 @@ bool BOARD_NETLIST_UPDATER::updateFootprintParameters( FOOTPRINT* aPcbFootprint,
 
     // Remove the ref/value/footprint fields that are individually handled
     nlohmann::ordered_map<wxString, wxString> compFields = aNetlistComponent->GetFields();
-    compFields.erase( GetCanonicalFieldName( FIELD_T::REFERENCE ) );
-    compFields.erase( GetCanonicalFieldName( FIELD_T::VALUE ) );
-    compFields.erase( GetCanonicalFieldName( FIELD_T::FOOTPRINT ) );
+    compFields.erase( GetCanonicalFieldName( REFERENCE_FIELD ) );
+    compFields.erase( GetCanonicalFieldName( VALUE_FIELD ) );
+    compFields.erase( GetCanonicalFieldName( FOOTPRINT_FIELD ) );
 
     // Remove any component class fields - these are not editable in the pcb editor
     compFields.erase( wxT( "Component Class" ) );
@@ -520,14 +520,14 @@ bool BOARD_NETLIST_UPDATER::updateFootprintParameters( FOOTPRINT* aPcbFootprint,
             // Add or change field value
             for( auto& [name, value] : compFields )
             {
-                if( aPcbFootprint->HasField( name ) )
+                if( aPcbFootprint->HasFieldByName( name ) )
                 {
-                    aPcbFootprint->GetField( name )->SetText( value );
+                    aPcbFootprint->GetFieldByName( name )->SetText( value );
                 }
                 else
                 {
-                    PCB_FIELD* newField = new PCB_FIELD( aPcbFootprint, FIELD_T::USER );
-                    aPcbFootprint->Add( newField );
+                    int        idx = aPcbFootprint->GetNextFieldId();
+                    PCB_FIELD* newField = aPcbFootprint->AddField( PCB_FIELD( aPcbFootprint, idx ) );
 
                     newField->SetName( name );
                     newField->SetText( value );
@@ -562,12 +562,10 @@ bool BOARD_NETLIST_UPDATER::updateFootprintParameters( FOOTPRINT* aPcbFootprint,
                         m_reporter->Report( msg, RPT_SEVERITY_ACTION );
                     }
 
-                    aPcbFootprint->Remove( field );
+                    aPcbFootprint->RemoveField( field->GetCanonicalName() );
 
                     if( m_frame )
                         m_frame->GetCanvas()->GetView()->Remove( field );
-
-                    delete field;
                 }
             }
         }
@@ -1283,9 +1281,6 @@ bool BOARD_NETLIST_UPDATER::UpdateNetlist( NETLIST& aNetlist )
 
                 if( m_replaceFootprints && component->GetFPID() != footprint->GetFPID() )
                     tmp = replaceFootprint( aNetlist, footprint, component );
-
-                if( !tmp )
-                    tmp = footprint;
 
                 if( tmp )
                 {

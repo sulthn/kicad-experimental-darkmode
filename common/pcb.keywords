@@ -82,7 +82,6 @@ connect_pads
 copperpour
 copper_finish
 crossbar
-cross_hatch
 curve_points
 curved_edges
 custom
@@ -171,7 +170,6 @@ hatch
 hatch_thickness
 hatch_gap
 hatch_orientation
-hatch_position
 hatch_smoothing_level
 hatch_smoothing_value
 hatch_border_algorithm
@@ -290,7 +288,6 @@ rect_delta
 reference
 remove_unused_layers
 render_cache
-reverse_hatch
 right
 rotate
 roundrect
@@ -334,10 +331,6 @@ teardrop
 teardrops
 tedit
 tenting
-covering
-plugging
-filling
-capping
 text_frame
 text_position_mode
 thermal_width
@@ -399,5 +392,4 @@ zone_clearance
 zone_connect
 zone_layer_connections
 zone_type
-zone_defaults
 zones

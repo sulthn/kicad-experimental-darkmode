@@ -132,7 +132,7 @@ if( APPLE )
     )
 endif()
 
-if( WIN32 )
+if( MSVC )
 add_dependencies( kiplatform
     version_header
     )

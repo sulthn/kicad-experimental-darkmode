@@ -511,6 +511,12 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
 
             for( SCH_SCREEN* screen = schematic.GetFirst(); screen; screen = schematic.GetNext() )
                 screen->MigrateSimModels();
+
+            if( schematic.GetFirst()->GetFileFormatVersionAtLoad() < SEXPR_SCHEMATIC_FILE_VERSION )
+            {
+                // Allow the schematic to be saved to new file format without making any edits.
+                OnModify();
+            }
         }
 
         // After the schematic is successfully loaded, we load the drawing sheet.
@@ -572,7 +578,7 @@ bool SCH_EDIT_FRAME::OpenProjectFiles( const std::vector<wxString>& aFileSet, in
 
     TestDanglingEnds();
 
-    UpdateHierarchyNavigator( false, true );
+    UpdateHierarchyNavigator( false );
 
     wxCommandEvent changedEvt( EDA_EVT_SCHEMATIC_CHANGED );
     ProcessEventLocally( changedEvt );
@@ -1027,10 +1033,6 @@ bool SCH_EDIT_FRAME::SaveProject( bool aSaveAs )
         // File doesn't exist yet; true if we just imported something
         updateFileHistory = true;
     }
-    else if( screens.GetFirst()->GetFileFormatVersionAtLoad() < SEXPR_SCHEMATIC_FILE_VERSION )
-    {
-        // Allow the user to save un-edited files in new format
-    }
     else if( !IsContentModified() )
     {
         return true;
@@ -1328,8 +1330,7 @@ bool SCH_EDIT_FRAME::importFile( const wxString& aFileName, int aFileType,
     case SCH_IO_MGR::SCH_EASYEDAPRO:
     {
         // We insist on caller sending us an absolute path, if it does not, we say it's a bug.
-        // Unless we are passing the files in aproperties, in which case aFileName can be empty.
-        wxCHECK_MSG( aFileName.IsEmpty() || filename.IsAbsolute(), false,
+        wxCHECK_MSG( filename.IsAbsolute(), false,
                      wxS( "Import schematic: path is not absolute!" ) );
 
         try
@@ -1423,7 +1424,7 @@ bool SCH_EDIT_FRAME::importFile( const wxString& aFileName, int aFileType,
         SetSheetNumberAndCount();
         SyncView();
 
-        UpdateHierarchyNavigator( false, true );
+        UpdateHierarchyNavigator();
 
         wxCommandEvent e( EDA_EVT_SCHEMATIC_CHANGED );
         ProcessEventLocally( e );

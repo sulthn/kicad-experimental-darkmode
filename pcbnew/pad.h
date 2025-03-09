@@ -456,15 +456,13 @@ public:
     std::optional<int> GetLocalSolderMaskMargin() const { return m_padStack.SolderMaskMargin(); }
     void               SetLocalSolderMaskMargin( std::optional<int> aMargin )
     {
-        m_padStack.SolderMaskMargin( F_Mask ) = aMargin;
-        m_padStack.SolderMaskMargin( B_Mask ) = aMargin;
+        m_padStack.SolderMaskMargin() = aMargin;
     }
 
     std::optional<int> GetLocalSolderPasteMargin() const { return m_padStack.SolderPasteMargin(); }
     void               SetLocalSolderPasteMargin( std::optional<int> aMargin )
     {
-        m_padStack.SolderPasteMargin( F_Paste ) = aMargin;
-        m_padStack.SolderPasteMargin( B_Paste ) = aMargin;
+        m_padStack.SolderPasteMargin() = aMargin;
     }
 
     std::optional<double> GetLocalSolderPasteMarginRatio() const
@@ -473,8 +471,7 @@ public:
     }
     void SetLocalSolderPasteMarginRatio( std::optional<double> aRatio )
     {
-        m_padStack.SolderPasteMarginRatio( F_Paste ) = aRatio;
-        m_padStack.SolderPasteMarginRatio( B_Paste ) = aRatio;
+        m_padStack.SolderPasteMarginRatio() = aRatio;
     }
 
     void SetLocalZoneConnection( ZONE_CONNECTION aType ) { m_padStack.ZoneConnection() = aType; }
@@ -958,6 +955,6 @@ private:
 
     int         m_lengthPadToDie;   // Length net from pad to die, inside the package
 
-    mutable std::mutex                          m_zoneLayerOverridesMutex;
+    std::mutex                                  m_zoneLayerOverridesMutex;
     std::map<PCB_LAYER_ID, ZONE_LAYER_OVERRIDE> m_zoneLayerOverrides;
 };

@@ -50,10 +50,10 @@ enum class ALTIUM_UNIT
 {
     UNKNOWN = 0,
 
-    INCH    = 1,
-    MILS    = 2,
-    MM      = 3,
-    CM      = 4
+    INCHES      = 1,
+    MILS        = 2,
+    MILLIMETERS = 3,
+    CENTIMETER  = 4
 };
 
 enum class ALTIUM_CLASS_KIND
@@ -409,8 +409,6 @@ struct ACOMPONENT6
     bool         locked;
     bool         nameon;
     bool         commenton;
-    wxString     sourceUniqueID;
-    wxString     sourceHierachicalPath;
     wxString     sourcedesignator;
     wxString     sourcefootprintlibrary;
     wxString     pattern;

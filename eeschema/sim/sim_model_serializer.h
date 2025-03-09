@@ -119,6 +119,9 @@ namespace SIM_MODEL_SERIALIZER_GRAMMAR
 class SIM_MODEL_SERIALIZER
 {
 public:
+    static constexpr auto REFERENCE_FIELD = "Reference";
+    static constexpr auto VALUE_FIELD = "Value";
+
     virtual ~SIM_MODEL_SERIALIZER() = default;
     SIM_MODEL_SERIALIZER( SIM_MODEL& aModel ) : m_model( aModel ) {}
 

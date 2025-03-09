@@ -42,7 +42,6 @@
 #include <sch_sheet_pin.h>
 #include <sch_text.h>
 #include <schematic.h>
-#include <symbol.h>
 #include <connection_graph.h>
 #include <project/project_file.h>
 #include <project/net_settings.h>
@@ -152,17 +151,8 @@ bool CONNECTION_SUBGRAPH::ResolveDrivers( bool aCheckMultipleDrivers )
                 SCH_PIN* pa = static_cast<SCH_PIN*>( a );
                 SCH_PIN* pb = static_cast<SCH_PIN*>( b );
 
-                bool aPower = pa->GetLibPin()->GetParentSymbol()->IsGlobalPower();
-                bool bPower = pb->GetLibPin()->GetParentSymbol()->IsGlobalPower();
-
-                if( aPower && !bPower )
-                    return true;
-                else if( bPower && !aPower )
-                    return false;
-
-                // Secondary check for local power pin
-                aPower = pa->GetLibPin()->GetParentSymbol()->IsLocalPower();
-                bPower = pb->GetLibPin()->GetParentSymbol()->IsLocalPower();
+                bool aPower = pa->GetLibPin()->GetParentSymbol()->IsPower();
+                bool bPower = pb->GetLibPin()->GetParentSymbol()->IsPower();
 
                 if( aPower && !bPower )
                     return true;
@@ -227,7 +217,7 @@ bool CONNECTION_SUBGRAPH::ResolveDrivers( bool aCheckMultipleDrivers )
         m_strong_driver = true;
 
     // Power pins are 5, global labels are 6
-    m_local_driver = ( highest_priority < PRIORITY::GLOBAL_POWER_PIN );
+    m_local_driver = ( highest_priority < PRIORITY::POWER_PIN );
 
     if( !candidates.empty() )
     {
@@ -432,7 +422,6 @@ const wxString& CONNECTION_SUBGRAPH::GetNameForDriver( SCH_ITEM* aItem ) const
     if( aItem->HasCachedDriverName() )
         return aItem->GetCachedDriverName();
 
-    std::lock_guard lock( m_driver_name_cache_mutex );
     auto it = m_driver_name_cache.find( aItem );
 
     if( it != m_driver_name_cache.end() )
@@ -586,9 +575,7 @@ CONNECTION_SUBGRAPH::PRIORITY CONNECTION_SUBGRAPH::GetDriverPriority( SCH_ITEM* 
         const SCH_SYMBOL* sym = static_cast<SCH_SYMBOL*>( sch_pin->GetParentSymbol() );
 
         if( sch_pin->IsGlobalPower() )
-            return PRIORITY::GLOBAL_POWER_PIN;
-        else if( sch_pin->IsLocalPower() )
-            return PRIORITY::LOCAL_POWER_PIN;
+            return PRIORITY::POWER_PIN;
         else if( !sym || sym->GetExcludedFromBoard()
                || sym->GetLibSymbolRef()->GetReferenceField().GetText().StartsWith( '#' ) )
             return PRIORITY::NONE;
@@ -1582,26 +1569,13 @@ void CONNECTION_GRAPH::collectAllDriverValues()
             case SCH_PIN_T:
             {
                 SCH_PIN* pin = static_cast<SCH_PIN*>( driver );
-                if( pin->IsGlobalPower() )
-                {
-                    m_global_label_cache[name].push_back( subgraph );
-                }
-                else if( pin->IsLocalPower() )
-                {
-                    m_local_label_cache[std::make_pair( sheet, name )].push_back( subgraph );
-                }
-                else
-                {
-                    UNITS_PROVIDER unitsProvider( schIUScale, EDA_UNITS::MM );
-                    wxLogTrace( ConnTrace, wxS( "Unexpected normal pin %s" ),
-                                driver->GetItemDescription( &unitsProvider, true ) );
-                }
-
+                wxASSERT( pin->IsGlobalPower() );
+                m_global_label_cache[name].push_back( subgraph );
                 break;
             }
             default:
             {
-                UNITS_PROVIDER unitsProvider( schIUScale, EDA_UNITS::MM );
+                UNITS_PROVIDER unitsProvider( schIUScale, EDA_UNITS::MILLIMETRES );
 
                 wxLogTrace( ConnTrace, wxS( "Unexpected strong driver %s" ),
                             driver->GetItemDescription( &unitsProvider, true ) );
@@ -1688,7 +1662,7 @@ void CONNECTION_GRAPH::generateGlobalPowerPinSubGraphs()
         SCH_PIN*       pin   = it.second;
 
         if( !pin->ConnectedItems( sheet ).empty()
-          && !pin->GetLibPin()->GetParentSymbol()->IsGlobalPower() )
+          && !pin->GetLibPin()->GetParentSymbol()->IsPower() )
         {
             // ERC will warn about this: user has wired up an invisible pin
             continue;
@@ -1703,7 +1677,7 @@ void CONNECTION_GRAPH::generateGlobalPowerPinSubGraphs()
         // Proper modern power symbols get their net name from the value field
         // in the symbol, but we support legacy non-power symbols with global
         // power connections based on invisible, power-in, pin's names.
-        if( pin->GetLibPin()->GetParentSymbol()->IsGlobalPower() )
+        if( pin->GetLibPin()->GetParentSymbol()->IsPower() )
             connection->SetName( pin->GetParentSymbol()->GetValue( true, &sheet, false ) );
         else
             connection->SetName( pin->GetShownName() );
@@ -1871,7 +1845,7 @@ void CONNECTION_GRAPH::processSubGraphs()
                     }
                     else
                     {
-                        UNITS_PROVIDER unitsProvider( schIUScale, EDA_UNITS::MM );
+                        UNITS_PROVIDER unitsProvider( schIUScale, EDA_UNITS::MILLIMETRES );
 
                         wxLogTrace( ConnTrace,
                                     wxS( "%ld (%s) weakly driven by unique sheet pin %s, "
@@ -2026,7 +2000,7 @@ void CONNECTION_GRAPH::processSubGraphs()
                         {
                             auto pin = static_cast<SCH_PIN*>( driver );
 
-                            if( pin->IsPower()
+                            if( pin->IsGlobalPower()
                                 && pin->GetDefaultNetName( sheet ) == test_name )
                             {
                                 match = true;
@@ -2209,7 +2183,7 @@ void CONNECTION_GRAPH::buildConnectionGraph( std::function<void( SCH_ITEM* )>* a
                     continue;
 
                 bool secondary_is_global = CONNECTION_SUBGRAPH::GetDriverPriority( driver )
-                                           >= CONNECTION_SUBGRAPH::PRIORITY::GLOBAL_POWER_PIN;
+                                           >= CONNECTION_SUBGRAPH::PRIORITY::POWER_PIN;
 
                 for( CONNECTION_SUBGRAPH* candidate : global_subgraphs )
                 {
@@ -2748,7 +2722,7 @@ void CONNECTION_GRAPH::propagateToNeighbors( CONNECTION_SUBGRAPH* aSubgraph, boo
 
                 // Take whichever name is higher priority
                 if( CONNECTION_SUBGRAPH::GetDriverPriority( neighbor->m_driver )
-                    >= CONNECTION_SUBGRAPH::PRIORITY::GLOBAL_POWER_PIN )
+                    >= CONNECTION_SUBGRAPH::PRIORITY::POWER_PIN )
                 {
                     member->Clone( *neighbor_conn );
                     stale_bus_members.insert( member );
@@ -2814,7 +2788,7 @@ void CONNECTION_GRAPH::propagateToNeighbors( CONNECTION_SUBGRAPH* aSubgraph, boo
     wxString bestName     = aSubgraph->m_driver_connection->Name();
 
     // Check if a subsheet has a higher-priority connection to the same net
-    if( highest < CONNECTION_SUBGRAPH::PRIORITY::GLOBAL_POWER_PIN )
+    if( highest < CONNECTION_SUBGRAPH::PRIORITY::POWER_PIN )
     {
         for( CONNECTION_SUBGRAPH* subgraph : visited )
         {
@@ -2836,7 +2810,7 @@ void CONNECTION_GRAPH::propagateToNeighbors( CONNECTION_SUBGRAPH* aSubgraph, boo
             // d) matches our priority, is a strong driver, and has a shorter path
             // e) matches our strength and is at least as short, and is alphabetically lower
 
-            if( ( priority >= CONNECTION_SUBGRAPH::PRIORITY::GLOBAL_POWER_PIN ) ||
+            if( ( priority >= CONNECTION_SUBGRAPH::PRIORITY::POWER_PIN ) ||
                 ( !bestIsStrong && candidateStrong ) ||
                 ( priority > highest && candidateStrong ) ||
                 ( priority == highest && candidateStrong && shorterPath ) ||
@@ -2920,7 +2894,7 @@ std::shared_ptr<SCH_CONNECTION> CONNECTION_GRAPH::getDefaultConnection( SCH_ITEM
     {
         SCH_PIN* pin = static_cast<SCH_PIN*>( aItem );
 
-        if( pin->IsPower() )
+        if( pin->IsGlobalPower() )
             c = std::make_shared<SCH_CONNECTION>( aItem, aSubgraph->m_sheet );
 
         break;
@@ -3290,7 +3264,7 @@ bool CONNECTION_GRAPH::ercCheckMultipleDrivers( const CONNECTION_SUBGRAPH* aSubg
                     || driver->Type() == SCH_HIER_LABEL_T
                     || driver->Type() == SCH_LABEL_T
                     || ( driver->Type() == SCH_PIN_T
-                         && static_cast<SCH_PIN*>( driver )->IsPower() ) )
+                         && static_cast<SCH_PIN*>( driver )->IsGlobalPower() ) )
             {
                 const wxString& primaryName   = aSubgraph->GetNameForDriver( aSubgraph->m_driver );
                 const wxString& secondaryName = aSubgraph->GetNameForDriver( driver );
@@ -3527,7 +3501,7 @@ bool CONNECTION_GRAPH::ercCheckBusToBusEntryConflicts( const CONNECTION_SUBGRAPH
     // Don't report warnings if this bus member has been overridden by a higher priority power pin
     // or global label
     if( conflict && CONNECTION_SUBGRAPH::GetDriverPriority( aSubgraph->m_driver )
-                       >= CONNECTION_SUBGRAPH::PRIORITY::GLOBAL_POWER_PIN )
+                       >= CONNECTION_SUBGRAPH::PRIORITY::POWER_PIN )
     {
         conflict = false;
     }
@@ -3640,16 +3614,6 @@ bool CONNECTION_GRAPH::ercCheckNoConnects( const CONNECTION_SUBGRAPH* aSubgraph 
                 return true;
         }
 
-        for( SCH_ITEM* item : screen->Items().Overlapping( SCH_SYMBOL_T, noConnectPos ) )
-        {
-            SCH_SYMBOL* symbol = static_cast<SCH_SYMBOL*>( item );
-
-            const SCH_PIN* test_pin = symbol->GetPin( noConnectPos );
-
-            if( test_pin && test_pin->GetType() == ELECTRICAL_PINTYPE::PT_NC )
-                return true;
-        }
-
         if( unique_pins.size() > 1 && settings.IsTestEnabled( ERCE_NOCONNECT_CONNECTED ) )
         {
             std::shared_ptr<ERC_ITEM> ercItem = ERC_ITEM::Create( ERCE_NOCONNECT_CONNECTED );
@@ -3742,7 +3706,7 @@ bool CONNECTION_GRAPH::ercCheckNoConnects( const CONNECTION_SUBGRAPH* aSubgraph 
             // Or else we may fail walking connected components to a power symbol pin since we
             // reject starting at a power symbol
             if( test_pin->GetType() == ELECTRICAL_PINTYPE::PT_POWER_IN
-                && !test_pin->IsPower() )
+                && !test_pin->IsGlobalPower() )
             {
                 pin = test_pin;
                 break;
@@ -3754,7 +3718,7 @@ bool CONNECTION_GRAPH::ercCheckNoConnects( const CONNECTION_SUBGRAPH* aSubgraph 
         // We want to throw unconnected errors for power symbols even if they are connected to other
         // net items by name, because usually failing to connect them graphically is a mistake
         if( pin && !has_other_connections
-                && !pin->IsPower()
+                && !pin->IsGlobalPower()
                 && !pin->GetLibPin()->GetParentSymbol()->IsPower() )
         {
             wxString name = pin->Connection( &sheet )->Name();

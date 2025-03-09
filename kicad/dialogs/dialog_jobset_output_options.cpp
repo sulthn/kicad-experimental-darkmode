@@ -18,7 +18,7 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "dialog_destination.h"
+#include "dialog_jobset_output_options.h"
 #include "dialog_copyfiles_job_settings.h"
 #include <wx/aui/auibook.h>
 #include <jobs/jobset.h>
@@ -39,42 +39,41 @@
 #include <confirm.h>
 
 
-extern KICOMMON_API
-std::map<JOBSET_DESTINATION_T, JOBSET_DESTINATION_T_INFO> JobsetDestinationTypeInfos;
+extern KICOMMON_API std::map<JOBSET_OUTPUT_TYPE, JOBSET_OUTPUT_TYPE_INFO> JobsetOutputTypeInfos;
 
 
-DIALOG_DESTINATION::DIALOG_DESTINATION( wxWindow* aParent, JOBSET* aJobsFile,
-                                        JOBSET_DESTINATION* aDestination ) :
-        DIALOG_DESTINATION_BASE( aParent ),
+DIALOG_JOBSET_OUTPUT_OPTIONS::DIALOG_JOBSET_OUTPUT_OPTIONS( wxWindow* aParent, JOBSET* aJobsFile,
+                                                            JOBSET_OUTPUT* aOutput ) :
+        DIALOG_JOBSET_OUTPUT_OPTIONS_BASE( aParent ),
         m_jobsFile( aJobsFile ),
-        m_destination( aDestination )
+        m_output( aOutput )
 {
     // prevent someone from failing to add the type info in the future
-    wxASSERT( JobsetDestinationTypeInfos.contains( m_destination->m_type ) );
+    wxASSERT( JobsetOutputTypeInfos.contains( m_output->m_type ) );
 
-    SetTitle( wxString::Format( _( "%s Destination" ),
-                                m_destination->m_outputHandler->GetDefaultDescription() ) );
+    SetTitle( wxString::Format( _( "%s Output Options" ),
+                                m_output->m_outputHandler->GetDefaultDescription() ) );
 
-    if( m_destination->m_type != JOBSET_DESTINATION_T::ARCHIVE )
+    if( m_output->m_type != JOBSET_OUTPUT_TYPE::ARCHIVE )
     {
         m_textArchiveFormat->Hide();
         m_choiceArchiveformat->Hide();
     }
 
-    m_textCtrlOutputPath->SetValue( m_destination->m_outputHandler->GetOutputPath() );
+    m_textCtrlOutputPath->SetValue( m_output->m_outputHandler->GetOutputPath() );
     m_buttonOutputPath->SetBitmap( KiBitmapBundle( BITMAPS::small_folder ) );
-    m_textCtrlDescription->SetValue( m_destination->GetDescription() );
+    m_textCtrlDescription->SetValue( m_output->GetDescription() );
 
     SetupStandardButtons();
 }
 
 
-void DIALOG_DESTINATION::onOutputPathBrowseClicked(wxCommandEvent& event)
+void DIALOG_JOBSET_OUTPUT_OPTIONS::onOutputPathBrowseClicked(wxCommandEvent& event)
 {
     bool isFolder = false;
     wxString fileWildcard = "";
-    isFolder = JobsetDestinationTypeInfos[m_destination->m_type].outputPathIsFolder;
-    fileWildcard = JobsetDestinationTypeInfos[m_destination->m_type].fileWildcard;
+    isFolder = JobsetOutputTypeInfos[m_output->m_type].outputPathIsFolder;
+    fileWildcard = JobsetOutputTypeInfos[m_output->m_type].fileWildcard;
 
     if( isFolder )
     {
@@ -109,7 +108,7 @@ void DIALOG_DESTINATION::onOutputPathBrowseClicked(wxCommandEvent& event)
 
 }
 
-bool DIALOG_DESTINATION::TransferDataFromWindow()
+bool DIALOG_JOBSET_OUTPUT_OPTIONS::TransferDataFromWindow()
 {
     wxString outputPath = m_textCtrlOutputPath->GetValue().Trim().Trim( false );
 
@@ -123,34 +122,34 @@ bool DIALOG_DESTINATION::TransferDataFromWindow()
     m_includeJobs->GetCheckedItems( selectedItems );
 
     // Update the only job map
-    m_destination->m_only.clear();
+    m_output->m_only.clear();
 
     if( selectedItems.size() < m_includeJobs->GetCount() )
     {
         for( int i : selectedItems )
         {
             if( m_onlyMap.contains( i ) )
-                m_destination->m_only.emplace_back( m_onlyMap[i] );
+                m_output->m_only.emplace_back( m_onlyMap[i] );
         }
     }
 
-    m_destination->m_outputHandler->SetOutputPath( outputPath );
+    m_output->m_outputHandler->SetOutputPath( outputPath );
 
-    if( m_destination->m_type == JOBSET_DESTINATION_T::ARCHIVE )
+    if( m_output->m_type == JOBSET_OUTPUT_TYPE::ARCHIVE )
     {
         JOBS_OUTPUT_ARCHIVE* archive =
-                static_cast<JOBS_OUTPUT_ARCHIVE*>( m_destination->m_outputHandler );
+                static_cast<JOBS_OUTPUT_ARCHIVE*>( m_output->m_outputHandler );
 
         archive->SetFormat( JOBS_OUTPUT_ARCHIVE::FORMAT::ZIP );
     }
 
-    m_destination->SetDescription( m_textCtrlDescription->GetValue() );
+    m_output->SetDescription( m_textCtrlDescription->GetValue() );
 
     return true;
 }
 
 
-bool DIALOG_DESTINATION::TransferDataToWindow()
+bool DIALOG_JOBSET_OUTPUT_OPTIONS::TransferDataToWindow()
 {
     wxArrayString    arrayStr;
     std::vector<int> selectedList;
@@ -161,7 +160,7 @@ bool DIALOG_DESTINATION::TransferDataToWindow()
                                         (int) arrayStr.size() + 1,
                                         job.GetDescription() ) );
 
-        auto it = std::find_if( m_destination->m_only.begin(), m_destination->m_only.end(),
+        auto it = std::find_if( m_output->m_only.begin(), m_output->m_only.end(),
                                 [&]( const wxString& only )
                                 {
                                     if( only == job.m_id )
@@ -170,7 +169,7 @@ bool DIALOG_DESTINATION::TransferDataToWindow()
                                     return false;
                                 } );
 
-        if( it != m_destination->m_only.end() )
+        if( it != m_output->m_only.end() )
             selectedList.emplace_back( arrayStr.size() - 1 );
 
         m_onlyMap.emplace( arrayStr.size() - 1, job.m_id );

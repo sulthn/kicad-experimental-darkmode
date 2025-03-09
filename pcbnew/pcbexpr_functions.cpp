@@ -223,9 +223,7 @@ static bool testFootprintSelector( FOOTPRINT* aFp, const wxString& aSelector )
     {
         wxString name = aSelector.Mid( 8, aSelector.Length() - 9 );
 
-        const COMPONENT_CLASS* compClass = aFp->GetComponentClass();
-
-        if( compClass && compClass->ContainsClassName( name ) )
+        if( aFp->GetComponentClass()->ContainsClassName( name ) )
             return true;
     }
     else if( aFp->GetReference().Matches( aSelector ) )
@@ -1188,7 +1186,7 @@ static void getFieldFunc( LIBEVAL::CONTEXT* aCtx, void* self )
                 {
                     FOOTPRINT* fp = static_cast<FOOTPRINT*>( item );
 
-                    PCB_FIELD* field = fp->GetField( arg->AsString() );
+                    PCB_FIELD* field = fp->GetFieldByName( arg->AsString() );
 
                     if( field )
                         return field->GetText();

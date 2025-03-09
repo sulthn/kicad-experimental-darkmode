@@ -266,9 +266,9 @@ wxString BITMAP2CMP_PANEL::formatOutputSize( double aSize )
 {
     wxString text;
 
-    if( getUnitFromSelection() == EDA_UNITS::MM )
+    if( getUnitFromSelection() == EDA_UNITS::MILLIMETRES )
         text.Printf( wxS( "%.1f" ), aSize );
-    else if( getUnitFromSelection() == EDA_UNITS::INCH )
+    else if( getUnitFromSelection() == EDA_UNITS::INCHES )
         text.Printf( wxS( "%.2f" ), aSize );
     else
         text.Printf( wxT( "%d" ), KiROUND( aSize ) );
@@ -295,10 +295,10 @@ EDA_UNITS BITMAP2CMP_PANEL::getUnitFromSelection()
     // return the EDA_UNITS from the m_PixelUnit choice
     switch( m_PixelUnit->GetSelection() )
     {
-    case 1:  return EDA_UNITS::INCH;
+    case 1:  return EDA_UNITS::INCHES;
     case 2:  return EDA_UNITS::UNSCALED;
     case 0:
-    default: return EDA_UNITS::MM;
+    default: return EDA_UNITS::MILLIMETRES;
     }
 }
 

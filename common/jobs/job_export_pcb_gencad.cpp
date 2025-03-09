@@ -19,8 +19,7 @@
  */
 
 #include <jobs/job_export_pcb_gencad.h>
-#include <jobs/job_registry.h>
-#include <i18n_utility.h>
+#include <wx/translation.h>
 
 
 JOB_EXPORT_PCB_GENCAD::JOB_EXPORT_PCB_GENCAD() :
@@ -31,22 +30,6 @@ JOB_EXPORT_PCB_GENCAD::JOB_EXPORT_PCB_GENCAD() :
     m_useDrillOrigin( false ),
     m_useUniquePins( false )
 {
-    m_params.emplace_back(
-            new JOB_PARAM<bool>( "flip_bottom_pads", &m_flipBottomPads, m_flipBottomPads ) );
-    m_params.emplace_back( new JOB_PARAM<bool>( "use_individual_shapes", &m_useIndividualShapes,
-                                                m_useIndividualShapes ) );
-    m_params.emplace_back( new JOB_PARAM<bool>( "store_origin_coords", &m_storeOriginCoords,
-                                                m_storeOriginCoords ) );
-    m_params.emplace_back(
-            new JOB_PARAM<bool>( "use_drill_origin", &m_useDrillOrigin, m_useDrillOrigin ) );
-    m_params.emplace_back(
-            new JOB_PARAM<bool>( "use_unique_pins", &m_useUniquePins, m_useUniquePins ) );
-}
-
-
-wxString JOB_EXPORT_PCB_GENCAD::GetDefaultDescription() const
-{
-    return _( "Export GenCAD File" );
 }
 
 
@@ -54,7 +37,3 @@ wxString JOB_EXPORT_PCB_GENCAD::GetSettingsDialogTitle() const
 {
     return _( "Export GenCAD Job Settings" );
 }
-
-
-REGISTER_JOB( pcb_export_gencad, _HKI( "PCB: Export GenCAD" ), KIWAY::FACE_PCB,
-              JOB_EXPORT_PCB_GENCAD );

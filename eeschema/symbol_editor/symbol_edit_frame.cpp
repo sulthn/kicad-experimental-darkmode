@@ -47,7 +47,6 @@
 #include <sch_view.h>
 #include <settings/settings_manager.h>
 #include <symbol_lib_table.h>
-#include <toolbars_symbol_editor.h>
 #include <tool/action_manager.h>
 #include <tool/action_toolbar.h>
 #include <tool/common_control.h>
@@ -180,10 +179,9 @@ SYMBOL_EDIT_FRAME::SYMBOL_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     setupUIConditions();
 
     ReCreateMenuBar();
-
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<SYMBOL_EDIT_TOOLBAR_SETTINGS>( "symbol_editor-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
+    ReCreateHToolbar();
+    ReCreateVToolbar();
+    ReCreateOptToolbar();
 
     UpdateTitle();
     UpdateSymbolMsgPanelInfo();
@@ -199,7 +197,7 @@ SYMBOL_EDIT_FRAME::SYMBOL_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     CreateInfoBar();
 
     // Rows; layers 4 - 6
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( "TopMainToolbar" )
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( "MainToolbar" )
                       .Top().Layer( 6 ) );
 
     m_auimgr.AddPane( m_messagePanel, EDA_PANE().Messages().Name( "MsgPanel" )
@@ -225,10 +223,10 @@ SYMBOL_EDIT_FRAME::SYMBOL_EDIT_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     propertiesPaneInfo.Show( m_settings->m_AuiPanels.show_properties );
     updateSelectionFilterVisbility();
 
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().VToolbar().Name( "LeftToolbar" )
+    m_auimgr.AddPane( m_optionsToolBar, EDA_PANE().VToolbar().Name( "OptToolbar" )
                       .Left().Layer( 2 ) );
 
-    m_auimgr.AddPane( m_tbRight, EDA_PANE().VToolbar().Name( "RightToolbar" )
+    m_auimgr.AddPane( m_drawToolBar, EDA_PANE().VToolbar().Name( "ToolsToolbar" )
                       .Right().Layer( 2 ) );
 
     // Center
@@ -487,8 +485,8 @@ void SYMBOL_EDIT_FRAME::setupUIConditions()
     mgr->SetConditions( ACTIONS::toggleGrid,          CHECK( cond.GridVisible() ) );
     mgr->SetConditions( ACTIONS::toggleGridOverrides, CHECK( cond.GridOverrides() ) );
     mgr->SetConditions( ACTIONS::toggleCursorStyle,   CHECK( cond.FullscreenCursor() ) );
-    mgr->SetConditions( ACTIONS::millimetersUnits,    CHECK( cond.Units( EDA_UNITS::MM ) ) );
-    mgr->SetConditions( ACTIONS::inchesUnits,         CHECK( cond.Units( EDA_UNITS::INCH ) ) );
+    mgr->SetConditions( ACTIONS::millimetersUnits,    CHECK( cond.Units( EDA_UNITS::MILLIMETRES ) ) );
+    mgr->SetConditions( ACTIONS::inchesUnits,         CHECK( cond.Units( EDA_UNITS::INCHES ) ) );
     mgr->SetConditions( ACTIONS::milsUnits,           CHECK( cond.Units( EDA_UNITS::MILS ) ) );
 
     mgr->SetConditions( ACTIONS::cut,                 ENABLE( isEditableCond ) );
@@ -724,32 +722,6 @@ void SYMBOL_EDIT_FRAME::RebuildSymbolUnitsList()
         m_unit = 1;
 
     m_unitSelectBox->SetSelection(( m_unit > 0 ) ? m_unit - 1 : 0 );
-}
-
-
-void SYMBOL_EDIT_FRAME::ToggleProperties()
-{
-    if( !m_propertiesPanel )
-        return;
-
-    bool show = !m_propertiesPanel->IsShownOnScreen();
-
-    wxAuiPaneInfo& propertiesPaneInfo = m_auimgr.GetPane( PropertiesPaneName() );
-    propertiesPaneInfo.Show( show );
-    updateSelectionFilterVisbility();
-
-    if( show )
-    {
-        SetAuiPaneSize( m_auimgr, propertiesPaneInfo,
-                        m_settings->m_AuiPanels.properties_panel_width, -1 );
-    }
-    else
-    {
-        m_settings->m_AuiPanels.properties_panel_width = m_propertiesPanel->GetSize().x;
-    }
-
-    m_auimgr.Update();
-    Refresh();
 }
 
 
@@ -1190,7 +1162,7 @@ LIB_SYMBOL* SYMBOL_EDIT_FRAME::getTargetSymbol() const
         LIB_ID libId = GetTreeLIBID();
 
         if( libId.IsValid() )
-            return m_libMgr->GetSymbol( libId.GetLibItemName(), libId.GetLibNickname() );
+            return m_libMgr->GetAlias( libId.GetLibItemName(), libId.GetLibNickname() );
     }
 
     return m_symbol;
@@ -1765,10 +1737,11 @@ void SYMBOL_EDIT_FRAME::LoadSymbolFromSchematic( SCH_SYMBOL* aSymbol )
 
     std::vector<SCH_FIELD> fullSetOfFields;
 
-    for( const SCH_FIELD& field : aSymbol->GetFields() )
+    for( int i = 0; i < (int) aSymbol->GetFields().size(); ++i )
     {
-        VECTOR2I  pos = field.GetPosition() - aSymbol->GetPosition();
-        SCH_FIELD libField( symbol.get(), field.GetId() );
+        const SCH_FIELD& field = aSymbol->GetFields()[i];
+        VECTOR2I         pos = field.GetPosition() - aSymbol->GetPosition();
+        SCH_FIELD        libField( symbol.get(), field.GetId() );
 
         libField = field;
 
@@ -1810,7 +1783,7 @@ void SYMBOL_EDIT_FRAME::LoadSymbolFromSchematic( SCH_SYMBOL* aSymbol )
 
     m_isSymbolFromSchematic = true;
     m_schematicSymbolUUID = aSymbol->m_Uuid;
-    m_reference = symbol->GetReferenceField().GetText();
+    m_reference = symbol->GetFieldById( REFERENCE_FIELD )->GetText();
     m_unit = std::max( 1, aSymbol->GetUnit() );
     m_bodyStyle = std::max( 1, aSymbol->GetBodyStyle() );
 
@@ -1828,7 +1801,7 @@ void SYMBOL_EDIT_FRAME::LoadSymbolFromSchematic( SCH_SYMBOL* aSymbol )
     setSymWatcher( nullptr );
 
     ReCreateMenuBar();
-    RecreateToolbars();
+    ReCreateHToolbar();
 
     if( IsLibraryTreeShown() )
         ToggleLibraryTree();

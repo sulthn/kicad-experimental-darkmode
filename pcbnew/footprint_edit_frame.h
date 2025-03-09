@@ -115,6 +115,15 @@ public:
     void HardRedraw() override;
 
     /**
+     * Create the main horizontal toolbar for the footprint editor.
+     */
+    void ReCreateHToolbar() override;
+
+    void ReCreateVToolbar() override;
+    void ReCreateOptToolbar() override;
+    void UpdateToolbarControlSizes() override;
+
+    /**
      * Re create the layer Box by clearing the old list, and building a new one from the new
      * layers names and layer colors..
      *
@@ -123,6 +132,10 @@ public:
      *                            are not modified).
      */
     void ReCreateLayerBox( bool aForceResizeToolbar = true );
+
+    void OnUpdateLayerSelectBox( wxUpdateUIEvent& aEvent );
+
+    void SelectLayer( wxCommandEvent& event );
 
     // The Tool Framework initialization, for GAL mode
     void setupTools();
@@ -144,8 +157,18 @@ public:
      */
     bool SaveLibraryAs( const wxString& aLibraryPath );
 
+    void OnUpdateLoadFootprintFromBoard( wxUpdateUIEvent& aEvent );
+    void OnUpdateSaveFootprintToBoard( wxUpdateUIEvent& aEvent );
+
     ///< @copydoc PCB_BASE_EDIT_FRAME::OnEditItemRequest()
     void OnEditItemRequest( BOARD_ITEM* aItem ) override;
+
+    /**
+     * Called from the main toolbar to load a footprint from board mainly to edit it.
+     */
+    void OnLoadFootprintFromBoard( wxCommandEvent& event );
+
+    void OnSaveFootprintToBoard( wxCommandEvent& event );
 
     void LoadFootprintFromLibrary( LIB_ID aFPID );
 
@@ -337,6 +360,7 @@ protected:
     void centerItemIdleHandler( wxIdleEvent& aEvent );
 
 protected:
+    PCB_LAYER_BOX_SELECTOR*     m_selLayerBox;  // a combo box to display and select active layer
     FOOTPRINT_EDITOR_SETTINGS*  m_editorSettings;
 
 private:

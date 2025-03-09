@@ -55,13 +55,13 @@ struct KICOMMON_API JOBSET_JOB
 };
 
 
-enum class KICOMMON_API JOBSET_DESTINATION_T
+enum class KICOMMON_API JOBSET_OUTPUT_TYPE
 {
     FOLDER,
     ARCHIVE
 };
 
-struct KICOMMON_API JOBSET_DESTINATION_T_INFO
+struct KICOMMON_API JOBSET_OUTPUT_TYPE_INFO
 {
     wxString    name;
     BITMAPS     bitmap;
@@ -69,22 +69,21 @@ struct KICOMMON_API JOBSET_DESTINATION_T_INFO
     wxString    fileWildcard;
 };
 
-extern KICOMMON_API
-std::map<JOBSET_DESTINATION_T, JOBSET_DESTINATION_T_INFO> JobsetDestinationTypeInfos;
+extern KICOMMON_API std::map<JOBSET_OUTPUT_TYPE, JOBSET_OUTPUT_TYPE_INFO> JobsetOutputTypeInfos;
 
 
-struct KICOMMON_API JOBSET_DESTINATION
+struct KICOMMON_API JOBSET_OUTPUT
 {
-    JOBSET_DESTINATION();
+    JOBSET_OUTPUT();
 
-    JOBSET_DESTINATION( const wxString& id, JOBSET_DESTINATION_T type );
+    JOBSET_OUTPUT( const wxString& id, JOBSET_OUTPUT_TYPE type );
 
-    ~JOBSET_DESTINATION();
+    ~JOBSET_OUTPUT();
 
     void                  InitOutputHandler();
 
     wxString              m_id;
-    JOBSET_DESTINATION_T  m_type;
+    JOBSET_OUTPUT_TYPE    m_type;
     wxString              m_description;
     JOBS_OUTPUT_HANDLER*  m_outputHandler;
     std::vector<wxString> m_only;
@@ -97,7 +96,7 @@ struct KICOMMON_API JOBSET_DESTINATION
     std::unordered_map<wxString, std::optional<bool>> m_lastRunSuccessMap;
     std::unordered_map<wxString, REPORTER*>           m_lastRunReporters;
 
-    bool operator==( const JOBSET_DESTINATION& rhs ) const;
+    bool operator==( const JOBSET_OUTPUT& rhs ) const;
 
 };
 
@@ -114,11 +113,11 @@ public:
         return m_jobs;
     }
 
-    std::vector<JOBSET_JOB> GetJobsForDestination( JOBSET_DESTINATION* aDestination );
+    std::vector<JOBSET_JOB> GetJobsForOutput( JOBSET_OUTPUT* aOutput );
 
-    std::vector<JOBSET_DESTINATION>& GetDestinations() { return m_destinations; }
+    std::vector<JOBSET_OUTPUT>& GetOutputs() { return m_outputs; }
 
-    JOBSET_DESTINATION* GetDestination( wxString& aDestination );
+    JOBSET_OUTPUT* GetOutput( wxString& aOutput );
 
     bool SaveToFile( const wxString& aDirectory = "", bool aForce = false ) override;
 
@@ -128,9 +127,9 @@ public:
     wxString GetFullName() const { return m_fileNameWithoutPath; }
 
     void AddNewJob( wxString aType, JOB* aJob );
-    JOBSET_DESTINATION* AddNewDestination( JOBSET_DESTINATION_T aType );
+    JOBSET_OUTPUT* AddNewJobOutput( JOBSET_OUTPUT_TYPE aType );
 
-    void RemoveDestination( JOBSET_DESTINATION* aDestination );
+    void RemoveOutput( JOBSET_OUTPUT* aOutput );
     void MoveJobUp( size_t aJobIdx );
     void MoveJobDown( size_t aJobIdx );
     void RemoveJob( size_t aJobIdx );
@@ -139,26 +138,25 @@ protected:
     wxString getFileExt() const override;
 
 private:
-    std::vector<JOBSET_JOB>         m_jobs;
-    std::vector<JOBSET_DESTINATION> m_destinations;
+    std::vector<JOBSET_JOB> m_jobs;
+    std::vector<JOBSET_OUTPUT> m_outputs;
 
-    bool                            m_dirty;
-    wxString                        m_fileNameWithoutPath;
+    bool m_dirty;
+    wxString m_fileNameWithoutPath;
 };
-
 
 KICOMMON_API void to_json( nlohmann::json& j, const JOBSET_JOB& f );
 KICOMMON_API void from_json( const nlohmann::json& j, JOBSET_JOB& f );
 
-KICOMMON_API void to_json( nlohmann::json& j, const JOBSET_DESTINATION& f );
-KICOMMON_API void from_json( const nlohmann::json& j, JOBSET_DESTINATION& f );
+KICOMMON_API void to_json( nlohmann::json& j, const JOBSET_OUTPUT& f );
+KICOMMON_API void from_json( const nlohmann::json& j, JOBSET_OUTPUT& f );
 
 #if defined( __MINGW32__ )
 template class KICOMMON_API PARAM_LIST<struct JOBSET_JOB>;
-template class KICOMMON_API PARAM_LIST<struct JOBSET_DESTINATION>;
+template class KICOMMON_API PARAM_LIST<struct JOBSET_OUTPUT>;
 #else
 extern template class APIVISIBLE PARAM_LIST<JOBSET_JOB>;
-extern template class APIVISIBLE PARAM_LIST<JOBSET_DESTINATION>;
+extern template class APIVISIBLE PARAM_LIST<JOBSET_OUTPUT>;
 #endif
 
 #endif

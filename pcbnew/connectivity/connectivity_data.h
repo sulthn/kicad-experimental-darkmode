@@ -247,10 +247,9 @@ public:
      * @param aItem is the reference item to find other connected items.
      * @param aTypes allows one to filter by item types.
      */
-#define IGNORE_NETS 0x0001
-#define EXCLUDE_ZONES 0x0002
-    const std::vector<BOARD_CONNECTED_ITEM*> GetConnectedItems( const BOARD_CONNECTED_ITEM* aItem,
-                                                                int aFlags = 0 ) const;
+    const std::vector<BOARD_CONNECTED_ITEM*>
+    GetConnectedItems( const BOARD_CONNECTED_ITEM* aItem, const std::vector<KICAD_T>& aTypes,
+                       bool aIgnoreNetcodes = false ) const;
 
     /**
      * Function GetNetItems()

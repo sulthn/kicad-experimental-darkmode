@@ -201,9 +201,7 @@ public:
     IMPORTED_POLYGON( const std::vector<VECTOR2D>& aVertices, const IMPORTED_STROKE& aStroke,
                       bool aFilled, const COLOR4D& aFillColor ) :
             m_vertices( aVertices ),
-            m_stroke( aStroke ),
-            m_filled( aFilled ),
-            m_fillColor( aFillColor )
+            m_stroke( aStroke ), m_filled( aFilled ), m_fillColor( aFillColor )
     {
     }
 

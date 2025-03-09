@@ -72,7 +72,7 @@
 using namespace PCB_KEYS_T;
 
 
-FP_CACHE_ENTRY::FP_CACHE_ENTRY( FOOTPRINT* aFootprint, const WX_FILENAME& aFileName ) :
+FP_CACHE_ITEM::FP_CACHE_ITEM( FOOTPRINT* aFootprint, const WX_FILENAME& aFileName ) :
         m_filename( aFileName ),
         m_footprint( aFootprint )
 { }
@@ -106,7 +106,7 @@ void FP_CACHE::Save( FOOTPRINT* aFootprintFilter )
 
     for( auto it = m_footprints.begin(); it != m_footprints.end(); ++it )
     {
-        FP_CACHE_ENTRY*             fpCacheEntry = it->second;
+        FP_CACHE_ITEM*              fpCacheEntry = it->second;
         std::unique_ptr<FOOTPRINT>& footprint = fpCacheEntry->GetFootprint();
 
         if( aFootprintFilter && footprint.get() != aFootprintFilter )
@@ -212,7 +212,7 @@ void FP_CACHE::Load()
                     THROW_IO_ERROR( wxEmptyString );   // caught locally, just below...
 
                 footprint->SetFPID( LIB_ID( wxEmptyString, fpName ) );
-                m_footprints.insert( fpName, new FP_CACHE_ENTRY( footprint, fn ) );
+                m_footprints.insert( fpName, new FP_CACHE_ITEM( footprint, fn ) );
             }
             catch( const IO_ERROR& ioe )
             {
@@ -235,7 +235,7 @@ void FP_CACHE::Load()
 
 void FP_CACHE::Remove( const wxString& aFootprintName )
 {
-    auto it = m_footprints.find( aFootprintName );
+    FP_CACHE_FOOTPRINT_MAP::const_iterator it = m_footprints.find( aFootprintName );
 
     if( it == m_footprints.end() )
     {
@@ -265,7 +265,9 @@ void FP_CACHE::SetPath( const wxString& aPath )
 
 
     for( const auto& footprint : GetFootprints() )
+    {
         footprint.second->SetFilePath( aPath );
+    }
 }
 
 
@@ -587,36 +589,15 @@ void PCB_IO_KICAD_SEXPR::formatSetup( const BOARD* aBoard ) const
     KICAD_FORMAT::FormatBool( m_out, "allow_soldermask_bridges_in_footprints",
                               dsnSettings.m_AllowSoldermaskBridgesInFPs );
 
-    m_out->Print( 0, " (tenting " );
-    KICAD_FORMAT::FormatBool( m_out, "front", dsnSettings.m_TentViasFront );
-    KICAD_FORMAT::FormatBool( m_out, "back", dsnSettings.m_TentViasBack );
-    m_out->Print( 0, ")" );
-
-    m_out->Print( 0, " (covering " );
-    KICAD_FORMAT::FormatBool( m_out, "front", dsnSettings.m_CoverViasFront );
-    KICAD_FORMAT::FormatBool( m_out, "back", dsnSettings.m_CoverViasBack );
-    m_out->Print( 0, ")" );
-
-    m_out->Print( 0, " (plugging " );
-    KICAD_FORMAT::FormatBool( m_out, "front", dsnSettings.m_PlugViasFront );
-    KICAD_FORMAT::FormatBool( m_out, "back", dsnSettings.m_PlugViasBack );
-    m_out->Print( 0, ")" );
-
-    KICAD_FORMAT::FormatBool( m_out, "capping", dsnSettings.m_CapVias );
-
-    KICAD_FORMAT::FormatBool( m_out, "filling", dsnSettings.m_FillVias );
-
-    if( !dsnSettings.GetDefaultZoneSettings().m_layerProperties.empty() )
+    if( dsnSettings.m_TentViasFront || dsnSettings.m_TentViasBack )
     {
-        m_out->Print( 0, " (zone_defaults" );
-
-        for( const auto& [layer, properties] :
-             dsnSettings.GetDefaultZoneSettings().m_layerProperties )
-        {
-            format( properties, 0, layer );
-        }
-
-        m_out->Print( 0, ")\n" );
+        m_out->Print( "(tenting %s %s)",
+                      dsnSettings.m_TentViasFront ? "front" : "",
+                      dsnSettings.m_TentViasBack ? "back" : "" );
+    }
+    else
+    {
+        m_out->Print( "(tenting none)" );
     }
 
     VECTOR2I origin = dsnSettings.GetAuxOrigin();
@@ -1037,28 +1018,7 @@ void PCB_IO_KICAD_SEXPR::format( const PCB_SHAPE* aShape ) const
         || ( aShape->GetShape() == SHAPE_T::RECTANGLE )
         || ( aShape->GetShape() == SHAPE_T::CIRCLE ) )
     {
-        switch( aShape->GetFillMode() )
-        {
-        case FILL_T::HATCH:
-            m_out->Print( "(fill hatch)" );
-            break;
-
-        case FILL_T::REVERSE_HATCH:
-            m_out->Print( "(fill reverse_hatch)" );
-            break;
-
-        case FILL_T::CROSS_HATCH:
-            m_out->Print( "(fill cross_hatch)" );
-            break;
-
-        case FILL_T::FILLED_SHAPE:
-            KICAD_FORMAT::FormatBool( m_out, "fill", true );
-            break;
-
-        default:
-            KICAD_FORMAT::FormatBool( m_out, "fill", false );
-            break;
-        }
+        KICAD_FORMAT::FormatBool( m_out, "fill", aShape->IsFilled() );
     }
 
     if( aShape->IsLocked() )
@@ -1827,7 +1787,7 @@ void PCB_IO_KICAD_SEXPR::format( const PAD* aPad ) const
                     || ( primitive->GetShape() == SHAPE_T::RECTANGLE )
                     || ( primitive->GetShape() == SHAPE_T::CIRCLE ) )
                 {
-                    KICAD_FORMAT::FormatBool( m_out, "fill", primitive->IsSolidFill() );
+                    KICAD_FORMAT::FormatBool( m_out, "fill", primitive->IsFilled() );
                 }
 
                 m_out->Print( ")" );
@@ -1857,12 +1817,7 @@ void PCB_IO_KICAD_SEXPR::format( const PAD* aPad ) const
     if( !isDefaultTeardropParameters( aPad->GetTeardropParams() ) )
         formatTeardropParameters( aPad->GetTeardropParams() );
 
-    m_out->Print( 0, " (tenting " );
-    KICAD_FORMAT::FormatOptBool( m_out, "front",
-                                 aPad->Padstack().FrontOuterLayers().has_solder_mask );
-    KICAD_FORMAT::FormatOptBool( m_out, "back",
-                                 aPad->Padstack().BackOuterLayers().has_solder_mask );
-    m_out->Print( 0, ")" );
+    formatTenting( aPad->Padstack() );
 
     KICAD_FORMAT::FormatUuid( m_out, aPad->m_Uuid );
 
@@ -1980,13 +1935,34 @@ void PCB_IO_KICAD_SEXPR::format( const PAD* aPad ) const
 }
 
 
+void PCB_IO_KICAD_SEXPR::formatTenting( const PADSTACK& aPadstack ) const
+{
+    std::optional<bool> front = aPadstack.FrontOuterLayers().has_solder_mask;
+    std::optional<bool> back = aPadstack.BackOuterLayers().has_solder_mask;
+
+    if( front.has_value() || back.has_value() )
+    {
+        if( front.value_or( false ) || back.value_or( false ) )
+        {
+            m_out->Print( "(tenting %s %s)",
+                          front.value_or( false ) ? "front" : "",
+                          back.value_or( false ) ? "back" : "" );
+        }
+        else
+        {
+            m_out->Print( "(tenting none)" );
+        }
+    }
+}
+
+
 void PCB_IO_KICAD_SEXPR::format( const PCB_TEXT* aText ) const
 {
-    FOOTPRINT*       parentFP = aText->GetParentFootprint();
-    std::string      prefix;
-    std::string      type;
-    VECTOR2I         pos = aText->GetTextPos();
-    const PCB_FIELD* field = dynamic_cast<const PCB_FIELD*>( aText );
+    FOOTPRINT*  parentFP = aText->GetParentFootprint();
+    std::string prefix;
+    std::string type;
+    VECTOR2I    pos = aText->GetTextPos();
+    bool        isField = dynamic_cast<const PCB_FIELD*>( aText ) != nullptr;
 
     // Always format dimension text as gr_text
     if( dynamic_cast<const PCB_DIMENSION_BASE*>( aText ) )
@@ -2005,7 +1981,7 @@ void PCB_IO_KICAD_SEXPR::format( const PCB_TEXT* aText ) const
         prefix = "gr";
     }
 
-    if( !field )
+    if( !isField )
     {
         m_out->Print( "(%s_text %s %s",
                       prefix.c_str(),
@@ -2025,21 +2001,23 @@ void PCB_IO_KICAD_SEXPR::format( const PCB_TEXT* aText ) const
 
     formatLayer( aText->GetLayer(), aText->IsKnockout() );
 
-    if( field && !field->IsVisible() )
+    if( parentFP && !aText->IsVisible() )
         KICAD_FORMAT::FormatBool( m_out, "hide", true );
 
     KICAD_FORMAT::FormatUuid( m_out, aText->m_Uuid );
 
+    int ctl_flags = m_ctl | CTL_OMIT_HIDE;
+
     // Currently, texts have no specific color and no hyperlink.
     // so ensure they are never written in kicad_pcb file
-    int ctl_flags = CTL_OMIT_COLOR | CTL_OMIT_HYPERLINK;
+    ctl_flags |= CTL_OMIT_COLOR | CTL_OMIT_HYPERLINK;
 
     aText->EDA_TEXT::Format( m_out, ctl_flags );
 
     if( aText->GetFont() && aText->GetFont()->IsOutline() )
         formatRenderCache( aText );
 
-    if( !field )
+    if( !isField )
         m_out->Print( ")" );
 }
 
@@ -2099,14 +2077,13 @@ void PCB_IO_KICAD_SEXPR::format( const PCB_TEXTBOX* aTextBox ) const
 
     KICAD_FORMAT::FormatUuid( m_out, aTextBox->m_Uuid );
 
-    aTextBox->EDA_TEXT::Format( m_out, 0 );
+    // PCB_TEXTBOXes are never hidden, so always omit "hide" attribute
+    aTextBox->EDA_TEXT::Format( m_out, m_ctl | CTL_OMIT_HIDE );
 
     if( aTextBox->Type() != PCB_TABLECELL_T )
     {
         KICAD_FORMAT::FormatBool( m_out, "border", aTextBox->IsBorderEnabled() );
         aTextBox->GetStroke().Format( m_out, pcbIUScale );
-
-        KICAD_FORMAT::FormatBool( m_out, "knockout", aTextBox->IsKnockout() );
     }
 
     if( aTextBox->GetFont() && aTextBox->GetFont()->IsOutline() )
@@ -2384,24 +2361,7 @@ void PCB_IO_KICAD_SEXPR::format( const PCB_TRACK* aTrack ) const
 
         const PADSTACK& padstack = via->Padstack();
 
-        m_out->Print( 0, " (tenting " );
-        KICAD_FORMAT::FormatOptBool( m_out, "front", padstack.FrontOuterLayers().has_solder_mask );
-        KICAD_FORMAT::FormatOptBool( m_out, "back", padstack.BackOuterLayers().has_solder_mask );
-        m_out->Print( 0, ")" );
-
-        KICAD_FORMAT::FormatOptBool( m_out, "capping", padstack.Drill().is_capped );
-
-        m_out->Print( 0, " (covering " );
-        KICAD_FORMAT::FormatOptBool( m_out, "front", padstack.FrontOuterLayers().has_covering );
-        KICAD_FORMAT::FormatOptBool( m_out, "back", padstack.BackOuterLayers().has_covering );
-        m_out->Print( 0, ")" );
-
-        m_out->Print( 0, " (plugging " );
-        KICAD_FORMAT::FormatOptBool( m_out, "front", padstack.FrontOuterLayers().has_plugging );
-        KICAD_FORMAT::FormatOptBool( m_out, "back", padstack.BackOuterLayers().has_plugging );
-        m_out->Print( 0, ")" );
-
-        KICAD_FORMAT::FormatOptBool( m_out, "filling", padstack.Drill().is_filled );
+        formatTenting( padstack );
 
         if( padstack.Mode() != PADSTACK::MODE::NORMAL )
         {
@@ -2671,11 +2631,6 @@ void PCB_IO_KICAD_SEXPR::format( const ZONE* aZone ) const
 
     m_out->Print( ")" );
 
-    for( const auto& [layer, properties] : aZone->LayerProperties() )
-    {
-        format( properties, 0, layer );
-    }
-
     if( aZone->GetNumCorners() )
     {
         SHAPE_POLY_SET::POLYGON poly = aZone->Outline()->Polygon(0);
@@ -2712,26 +2667,6 @@ void PCB_IO_KICAD_SEXPR::format( const ZONE* aZone ) const
 }
 
 
-void PCB_IO_KICAD_SEXPR::format( const ZONE_LAYER_PROPERTIES& aZoneLayerProperties, int aNestLevel,
-                                 PCB_LAYER_ID aLayer ) const
-{
-    // Do not store the layer properties if no value is actually set.
-    if( !aZoneLayerProperties.hatching_offset.has_value() )
-        return;
-
-    m_out->Print( aNestLevel, "(property\n" );
-    m_out->Print( aNestLevel, "(layer %s)\n", m_out->Quotew( LSET::Name( aLayer ) ).c_str() );
-
-    if( aZoneLayerProperties.hatching_offset.has_value() )
-    {
-        m_out->Print( aNestLevel, "(hatch_position (xy %s))",
-                      formatInternalUnits( aZoneLayerProperties.hatching_offset.value() ).c_str() );
-    }
-
-    m_out->Print( aNestLevel, ")\n" );
-}
-
-
 PCB_IO_KICAD_SEXPR::PCB_IO_KICAD_SEXPR( int aControlFlags ) : PCB_IO( wxS( "KiCad" ) ),
     m_cache( nullptr ),
     m_ctl( aControlFlags ),
@@ -2750,8 +2685,7 @@ PCB_IO_KICAD_SEXPR::~PCB_IO_KICAD_SEXPR()
 
 
 BOARD* PCB_IO_KICAD_SEXPR::LoadBoard( const wxString& aFileName, BOARD* aAppendToMe,
-                                      const std::map<std::string, UTF8>* aProperties,
-                                      PROJECT* aProject )
+                              const std::map<std::string, UTF8>* aProperties, PROJECT* aProject )
 {
     FILE_LINE_READER reader( aFileName );
 
@@ -2782,15 +2716,13 @@ BOARD* PCB_IO_KICAD_SEXPR::LoadBoard( const wxString& aFileName, BOARD* aAppendT
 }
 
 
-BOARD* PCB_IO_KICAD_SEXPR::DoLoad( LINE_READER& aReader, BOARD* aAppendToMe,
-                                   const std::map<std::string, UTF8>* aProperties,
-                                   PROGRESS_REPORTER* aProgressReporter, unsigned aLineCount)
+BOARD* PCB_IO_KICAD_SEXPR::DoLoad( LINE_READER& aReader, BOARD* aAppendToMe, const std::map<std::string, UTF8>* aProperties,
+                           PROGRESS_REPORTER* aProgressReporter, unsigned aLineCount)
 {
     init( aProperties );
 
-    PCB_IO_KICAD_SEXPR_PARSER parser( &aReader, aAppendToMe, m_queryUserCallback,
-                                      aProgressReporter, aLineCount );
-    BOARD* board;
+    PCB_IO_KICAD_SEXPR_PARSER parser( &aReader, aAppendToMe, m_queryUserCallback, aProgressReporter, aLineCount );
+    BOARD*     board;
 
     try
     {
@@ -2842,9 +2774,8 @@ void PCB_IO_KICAD_SEXPR::validateCache( const wxString& aLibraryPath, bool check
 }
 
 
-void PCB_IO_KICAD_SEXPR::FootprintEnumerate( wxArrayString& aFootprintNames,
-                                             const wxString& aLibPath, bool aBestEfforts,
-                                             const std::map<std::string, UTF8>* aProperties )
+void PCB_IO_KICAD_SEXPR::FootprintEnumerate( wxArrayString& aFootprintNames, const wxString& aLibPath,
+                                     bool aBestEfforts, const std::map<std::string, UTF8>* aProperties )
 {
     LOCALE_IO toggle;     // toggles on, then off, the C locale.
     wxDir     dir( aLibPath );
@@ -2873,9 +2804,9 @@ void PCB_IO_KICAD_SEXPR::FootprintEnumerate( wxArrayString& aFootprintNames,
 
 
 const FOOTPRINT* PCB_IO_KICAD_SEXPR::getFootprint( const wxString& aLibraryPath,
-                                                   const wxString& aFootprintName,
-                                                   const std::map<std::string, UTF8>* aProperties,
-                                                   bool checkModified )
+                                           const wxString& aFootprintName,
+                                           const std::map<std::string, UTF8>* aProperties,
+                                           bool checkModified )
 {
     LOCALE_IO   toggle;     // toggles on, then off, the C locale.
 
@@ -2890,9 +2821,10 @@ const FOOTPRINT* PCB_IO_KICAD_SEXPR::getFootprint( const wxString& aLibraryPath,
         // do nothing with the error
     }
 
-    auto it = m_cache->GetFootprints().find( aFootprintName );
+    FP_CACHE_FOOTPRINT_MAP& footprints = m_cache->GetFootprints();
+    auto                    it = footprints.find( aFootprintName );
 
-    if( it == m_cache->GetFootprints().end() )
+    if( it == footprints.end() )
         return nullptr;
 
     return it->second->GetFootprint().get();
@@ -2900,16 +2832,15 @@ const FOOTPRINT* PCB_IO_KICAD_SEXPR::getFootprint( const wxString& aLibraryPath,
 
 
 const FOOTPRINT* PCB_IO_KICAD_SEXPR::GetEnumeratedFootprint( const wxString& aLibraryPath,
-                                                             const wxString& aFootprintName,
-                                                             const std::map<std::string, UTF8>* aProperties )
+                                                     const wxString& aFootprintName,
+                                                     const std::map<std::string, UTF8>* aProperties )
 {
     return getFootprint( aLibraryPath, aFootprintName, aProperties, false );
 }
 
 
-bool PCB_IO_KICAD_SEXPR::FootprintExists( const wxString& aLibraryPath,
-                                          const wxString& aFootprintName,
-                                          const std::map<std::string, UTF8>* aProperties )
+bool PCB_IO_KICAD_SEXPR::FootprintExists( const wxString& aLibraryPath, const wxString& aFootprintName,
+                                  const std::map<std::string, UTF8>* aProperties )
 {
     // Note: checking the cache sounds like a good idea, but won't catch files which differ
     // only in case.
@@ -2924,9 +2855,8 @@ bool PCB_IO_KICAD_SEXPR::FootprintExists( const wxString& aLibraryPath,
 }
 
 
-FOOTPRINT* PCB_IO_KICAD_SEXPR::ImportFootprint( const wxString& aFootprintPath,
-                                                wxString& aFootprintNameOut,
-                                                const std::map<std::string, UTF8>* aProperties )
+FOOTPRINT* PCB_IO_KICAD_SEXPR::ImportFootprint( const wxString& aFootprintPath, wxString& aFootprintNameOut,
+                                        const std::map<std::string, UTF8>* aProperties )
 {
     wxString fcontents;
     wxFFile  f( aFootprintPath );
@@ -2945,9 +2875,9 @@ FOOTPRINT* PCB_IO_KICAD_SEXPR::ImportFootprint( const wxString& aFootprintPath,
 
 
 FOOTPRINT* PCB_IO_KICAD_SEXPR::FootprintLoad( const wxString& aLibraryPath,
-                                              const wxString& aFootprintName,
-                                              bool  aKeepUUID,
-                                              const std::map<std::string, UTF8>* aProperties )
+                                      const wxString& aFootprintName,
+                                      bool  aKeepUUID,
+                                      const std::map<std::string, UTF8>* aProperties )
 {
     fontconfig::FONTCONFIG::SetReporter( nullptr );
 
@@ -2971,7 +2901,7 @@ FOOTPRINT* PCB_IO_KICAD_SEXPR::FootprintLoad( const wxString& aLibraryPath,
 
 
 void PCB_IO_KICAD_SEXPR::FootprintSave( const wxString& aLibraryPath, const FOOTPRINT* aFootprint,
-                                        const std::map<std::string, UTF8>* aProperties )
+                                const std::map<std::string, UTF8>* aProperties )
 {
     LOCALE_IO   toggle;     // toggles on, then off, the C locale.
 
@@ -3008,6 +2938,7 @@ void PCB_IO_KICAD_SEXPR::FootprintSave( const wxString& aLibraryPath, const FOOT
 
     wxString footprintName = aFootprint->GetFPID().GetLibItemName();
 
+    FP_CACHE_FOOTPRINT_MAP& footprints = m_cache->GetFootprints();
     wxString fpName = aFootprint->GetFPID().GetLibItemName().wx_str();
     ReplaceIllegalFileNameChars( fpName, '_' );
 
@@ -3031,12 +2962,12 @@ void PCB_IO_KICAD_SEXPR::FootprintSave( const wxString& aLibraryPath, const FOOT
 
     wxString fullPath = fn.GetFullPath();
     wxString fullName = fn.GetFullName();
-    auto     it = m_cache->GetFootprints().find( footprintName );
+    FP_CACHE_FOOTPRINT_MAP::const_iterator it = footprints.find( footprintName );
 
-    if( it != m_cache->GetFootprints().end() )
+    if( it != footprints.end() )
     {
         wxLogTrace( traceKicadPcbPlugin, wxT( "Removing footprint file '%s'." ), fullPath );
-        m_cache->GetFootprints().erase( footprintName );
+        footprints.erase( footprintName );
         wxRemoveFile( fullPath );
     }
 
@@ -3061,16 +2992,14 @@ void PCB_IO_KICAD_SEXPR::FootprintSave( const wxString& aLibraryPath, const FOOT
     footprint->SetParentGroup( nullptr );
 
     wxLogTrace( traceKicadPcbPlugin, wxT( "Creating s-expr footprint file '%s'." ), fullPath );
-    m_cache->GetFootprints().insert( footprintName,
-                                     new FP_CACHE_ENTRY( footprint,
-                                                         WX_FILENAME( fn.GetPath(), fullName ) ) );
+    footprints.insert( footprintName,
+                       new FP_CACHE_ITEM( footprint, WX_FILENAME( fn.GetPath(), fullName ) ) );
     m_cache->Save( footprint );
 }
 
 
-void PCB_IO_KICAD_SEXPR::FootprintDelete( const wxString& aLibraryPath,
-                                          const wxString& aFootprintName,
-                                          const std::map<std::string, UTF8>* aProperties )
+void PCB_IO_KICAD_SEXPR::FootprintDelete( const wxString& aLibraryPath, const wxString& aFootprintName,
+                                  const std::map<std::string, UTF8>* aProperties )
 {
     LOCALE_IO   toggle;     // toggles on, then off, the C locale.
 
@@ -3095,8 +3024,7 @@ long long PCB_IO_KICAD_SEXPR::GetLibraryTimestamp( const wxString& aLibraryPath 
 }
 
 
-void PCB_IO_KICAD_SEXPR::CreateLibrary( const wxString& aLibraryPath,
-                                        const std::map<std::string, UTF8>* aProperties )
+void PCB_IO_KICAD_SEXPR::CreateLibrary( const wxString& aLibraryPath, const std::map<std::string, UTF8>* aProperties )
 {
     if( wxDir::Exists( aLibraryPath ) )
     {
@@ -3114,8 +3042,7 @@ void PCB_IO_KICAD_SEXPR::CreateLibrary( const wxString& aLibraryPath,
 }
 
 
-bool PCB_IO_KICAD_SEXPR::DeleteLibrary( const wxString& aLibraryPath,
-                                        const std::map<std::string, UTF8>* aProperties )
+bool PCB_IO_KICAD_SEXPR::DeleteLibrary( const wxString& aLibraryPath, const std::map<std::string, UTF8>* aProperties )
 {
     wxFileName fn;
     fn.SetPath( aLibraryPath );

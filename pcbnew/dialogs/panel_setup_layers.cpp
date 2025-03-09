@@ -55,7 +55,6 @@ static void mandatoryLayerCbSetup( wxCheckBox& aCheckBox )
     aCheckBox.Show();
     aCheckBox.Disable();
     aCheckBox.SetValue( true );
-    aCheckBox.SetToolTip( _( "This layer is required and cannot be disabled" ) );
 }
 
 
@@ -463,7 +462,7 @@ void PANEL_SETUP_LAYERS::initialize_layers_controls()
     }
 
     Thaw();
-    m_LayersListPanel->FitInside(); // Updates virtual size to fit subwindows, also auto-layouts.
+    m_LayersListPanel->Layout();
 }
 
 

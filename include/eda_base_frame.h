@@ -33,16 +33,14 @@
 #define  EDA_BASE_FRAME_H_
 
 
-#include <map>
-#include <optional>
 #include <vector>
+#include <map>
 
 #include <wx/aui/aui.h>
 #include <layer_ids.h>
 #include <frame_type.h>
 #include <hotkeys_basic.h>
 #include <kiway_holder.h>
-#include <tool/action_toolbar.h>
 #include <tool/tools_holder.h>
 #include <widgets/ui_common.h>
 #include <widgets/wx_infobar.h>
@@ -88,7 +86,6 @@ struct WINDOW_SETTINGS;
 struct WINDOW_STATE;
 class ACTION_MENU;
 class TOOL_INTERACTIVE;
-class TOOLBAR_SETTINGS;
 
 #define DEFAULT_MAX_UNDO_ITEMS 0
 #define ABS_MAX_UNDO_ITEMS (INT_MAX / 2)
@@ -436,35 +433,6 @@ public:
      */
     virtual wxString GetCurrentFileName() const { return wxEmptyString; }
 
-    virtual void RecreateToolbars();
-
-    /**
-     * Update toolbars if desired toolbar icon changed.
-     */
-    void OnToolbarSizeChanged();
-
-    /**
-     * Update the sizes of any controls in the toolbars of the frame.
-     */
-    virtual void UpdateToolbarControlSizes();
-
-    /**
-     * Register a creation factory for toolbar controls that are present in this frame.
-     *
-     * The factory function takes a single argument of type `ACTION_TOOLBAR*`, which is the toolbar
-     * to add the controls to.
-     *
-     * @param aControlDesc is the control descriptor
-     * @param aControlFactory A functor that creates the custom controls and then adds them to the toolbar
-     */
-    void RegisterCustomToolbarControlFactory( const ACTION_TOOLBAR_CONTROL& aControlDesc,
-                                              const ACTION_TOOLBAR_CONTROL_FACTORY& aControlFactory );
-
-    /**
-     *
-     */
-    ACTION_TOOLBAR_CONTROL_FACTORY* GetCustomToolbarControlFactory( const std::string& aName );
-
     /**
      * Recreate the menu bar.
      *
@@ -648,8 +616,6 @@ protected:
 
     virtual void doReCreateMenuBar() {}
 
-    virtual void configureToolbars();
-
     /**
      * Handle the auto save timer event.
      */
@@ -829,17 +795,6 @@ private:
      * Associate file extensions with action to execute.
      */
     std::map<const wxString, TOOL_ACTION*> m_acceptedExts;
-
-    // Toolbar Settings - this is not owned by the frame
-    TOOLBAR_SETTINGS*    m_toolbarSettings;
-
-    // Toolbar UI elements
-    ACTION_TOOLBAR*      m_tbTopMain;
-    ACTION_TOOLBAR*      m_tbTopAux;  // Additional tools under main toolbar
-    ACTION_TOOLBAR*      m_tbRight;       // Drawing tools (typically on right edge of window)
-    ACTION_TOOLBAR*      m_tbLeft;    // Options (typically on left edge of window)
-
-    std::map<std::string, ACTION_TOOLBAR_CONTROL_FACTORY> m_toolbarControlFactories;
 };
 
 

@@ -57,20 +57,7 @@ enum class FILL_T : int
     NO_FILL = 1,
     FILLED_SHAPE,               ///< Fill with object color.
     FILLED_WITH_BG_BODYCOLOR,   //< Fill with background body color.
-    FILLED_WITH_COLOR,          //< Fill with a separate color.
-    HATCH,
-    REVERSE_HATCH,
-    CROSS_HATCH
-};
-
-
-enum UI_FILL_MODE
-{
-    NONE = 0,
-    SOLID,
-    HATCH,
-    REVERSE_HATCH,
-    CROSS_HATCH
+    FILLED_WITH_COLOR           //< Fill with a separate color.
 };
 
 
@@ -82,7 +69,6 @@ struct ARC_MID
     VECTOR2I end;
     VECTOR2I center;
 };
-
 
 class EDA_SHAPE : public SERIALIZABLE
 {
@@ -109,28 +95,14 @@ public:
     virtual bool IsProxyItem() const { return m_proxyItem; }
     virtual void SetIsProxyItem( bool aIsProxy = true ) { m_proxyItem = aIsProxy; }
 
-    bool IsAnyFill() const
+    bool IsFilled() const
     {
         return GetFillMode() != FILL_T::NO_FILL;
     }
 
-    bool IsSolidFill() const
-    {
-        return    GetFillMode() == FILL_T::FILLED_SHAPE
-               || GetFillMode() == FILL_T::FILLED_WITH_COLOR
-               || GetFillMode() == FILL_T::FILLED_WITH_BG_BODYCOLOR;
-    }
-
-    bool IsHatchedFill() const
-    {
-        return    GetFillMode() == FILL_T::HATCH
-               || GetFillMode() == FILL_T::REVERSE_HATCH
-               || GetFillMode() == FILL_T::CROSS_HATCH;
-    }
-
     virtual bool IsFilledForHitTesting() const
     {
-        return IsSolidFill();
+        return IsFilled();
     }
 
     virtual void SetFilled( bool aFlag )
@@ -138,25 +110,17 @@ public:
         setFilled( aFlag );
     }
 
-    void SetFillMode( FILL_T aFill );
+    void SetFillMode( FILL_T aFill )           { m_fill = aFill; }
     FILL_T GetFillMode() const                 { return m_fill; }
-
-    void SetFillModeProp( UI_FILL_MODE );
-    UI_FILL_MODE GetFillModeProp() const;
-
-    void SetHatchingDirty()                    { m_hatchingDirty = true; }
-    const SHAPE_POLY_SET& GetHatching() const;
 
     bool IsClosed() const;
 
     COLOR4D GetFillColor() const               { return m_fillColor; }
     void SetFillColor( const COLOR4D& aColor ) { m_fillColor = aColor; }
 
-    void SetWidth( int aWidth );
+    void SetWidth( int aWidth )                { m_stroke.SetWidth( aWidth ); }
     virtual int GetWidth() const               { return m_stroke.GetWidth(); }
     virtual int GetEffectiveWidth() const      { return GetWidth(); }
-    virtual int GetHatchLineWidth() const      { return GetEffectiveWidth(); }
-    virtual int GetHatchLineSpacing() const    { return GetHatchLineWidth() * 10; }
 
     void       SetLineStyle( const LINE_STYLE aStyle );
     LINE_STYLE GetLineStyle() const;
@@ -178,35 +142,30 @@ public:
     {
         m_start = aStart;
         m_endsSwapped = false;
-        m_hatchingDirty = true;
     }
 
     void SetStartY( int y )
     {
         m_start.y = y;
         m_endsSwapped = false;
-        m_hatchingDirty = true;
     }
 
     void SetStartX( int x )
     {
         m_start.x = x;
         m_endsSwapped = false;
-        m_hatchingDirty = true;
     }
 
     void SetCenterY( int y )
     {
         m_end.y += y - m_start.y;
         m_start.y = y;
-        m_hatchingDirty = true;
     }
 
     void SetCenterX( int x )
     {
         m_end.x += x - m_start.x;
         m_start.x = x;
-        m_hatchingDirty = true;
     }
 
     /**
@@ -220,27 +179,23 @@ public:
     {
         m_end = aEnd;
         m_endsSwapped = false;
-        m_hatchingDirty = true;
     }
 
     void SetEndY( int aY )
     {
         m_end.y = aY;
         m_endsSwapped = false;
-        m_hatchingDirty = true;
     }
 
     void SetEndX( int aX )
     {
         m_end.x = aX;
         m_endsSwapped = false;
-        m_hatchingDirty = true;
     }
 
     void SetRadius( int aX )
     {
         m_end = m_start + VECTOR2I( aX, 0 );
-        m_hatchingDirty = true;
     }
 
     virtual VECTOR2I GetTopLeft() const { return GetStart(); }
@@ -415,8 +370,7 @@ public:
      *                        visualization
      */
     void TransformShapeToPolygon( SHAPE_POLY_SET& aBuffer, int aClearance, int aError,
-                                  ERROR_LOC aErrorLoc, bool ignoreLineWidth = false,
-                                  bool includeFill = false ) const;
+                                  ERROR_LOC aErrorLoc, bool ignoreLineWidth = false ) const;
 
     int Compare( const EDA_SHAPE* aOther ) const;
 
@@ -461,8 +415,6 @@ protected:
     void endEdit( bool aClosed = true );
     void setEditState( int aState ) { m_editState = aState; }
 
-    virtual void updateHatching() const;
-
     /**
      * Make a set of #SHAPE objects representing the #EDA_SHAPE.
      *
@@ -477,40 +429,36 @@ protected:
     std::vector<SHAPE*> makeEffectiveShapes( bool aEdgeOnly, bool aLineChainOnly = false ) const;
 
 protected:
-    bool                   m_endsSwapped;  // true if start/end were swapped e.g. SetArcAngleAndEnd
-    SHAPE_T                m_shape;        // Shape: line, Circle, Arc
-    STROKE_PARAMS          m_stroke;       // Line style, width, etc.
-    FILL_T                 m_fill;
-    COLOR4D                m_fillColor;
+    bool                  m_endsSwapped;  // true if start/end were swapped e.g. SetArcAngleAndEnd
+    SHAPE_T               m_shape;        // Shape: line, Circle, Arc
+    STROKE_PARAMS         m_stroke;       // Line style, width, etc.
+    FILL_T                m_fill;
+    COLOR4D               m_fillColor;
 
-    mutable SHAPE_POLY_SET m_hatching;
-    mutable bool           m_hatchingDirty;
+    long long int         m_rectangleHeight;
+    long long int         m_rectangleWidth;
 
-    long long int          m_rectangleHeight;
-    long long int          m_rectangleWidth;
+    double                m_segmentLength;
+    EDA_ANGLE             m_segmentAngle;
 
-    double                 m_segmentLength;
-    EDA_ANGLE              m_segmentAngle;
+    VECTOR2I              m_start;             // Line start point or Circle center
+    VECTOR2I              m_end;               // Line end point or Circle 3 o'clock point
 
-    VECTOR2I               m_start;             // Line start point or Circle center
-    VECTOR2I               m_end;               // Line end point or Circle 3 o'clock point
+    VECTOR2I              m_arcCenter;         // Used only for Arcs: arc end point
+    ARC_MID               m_arcMidData;        // Used to store originating data
 
-    VECTOR2I               m_arcCenter;         // Used only for Arcs: arc end point
-    ARC_MID                m_arcMidData;        // Used to store originating data
+    VECTOR2I              m_bezierC1;          // Bezier Control Point 1
+    VECTOR2I              m_bezierC2;          // Bezier Control Point 2
 
-    VECTOR2I               m_bezierC1;          // Bezier Control Point 1
-    VECTOR2I               m_bezierC2;          // Bezier Control Point 2
+    std::vector<VECTOR2I> m_bezierPoints;
+    SHAPE_POLY_SET        m_poly;              // Stores the S_POLYGON shape
 
-    std::vector<VECTOR2I>  m_bezierPoints;
-    SHAPE_POLY_SET         m_poly;              // Stores the S_POLYGON shape
-
-    int                    m_editState;
-    bool                   m_proxyItem;         // A shape storing proxy information (ie: a pad
-                                                //   number box, thermal spoke template, etc.)
+    int                   m_editState;
+    bool                  m_proxyItem;         // A shape storing proxy information (ie: a pad
+                                               //   number box, thermal spoke template, etc.)
 };
 
 #ifndef SWIG
 DECLARE_ENUM_TO_WXANY( SHAPE_T );
 DECLARE_ENUM_TO_WXANY( LINE_STYLE );
-DECLARE_ENUM_TO_WXANY( UI_FILL_MODE );
 #endif

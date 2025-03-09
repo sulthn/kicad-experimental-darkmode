@@ -210,11 +210,15 @@ public:
 
     void EraseMsgBox();
 
-    // Toolbar-related functions
     virtual void ReCreateHToolbar() { };
     virtual void ReCreateVToolbar() { };
-    virtual void ReCreateLeftToolbar() { };
+    virtual void ReCreateOptToolbar() { };
     virtual void ReCreateAuxiliaryToolbar() { }
+
+    /**
+     * Update the sizes of any controls in the toolbars of the frame.
+     */
+    virtual void UpdateToolbarControlSizes() { }
 
     /*
      * These 4 functions provide a basic way to show/hide grid and /get/set grid color.
@@ -425,6 +429,13 @@ public:
     virtual EDA_ITEM* GetItem( const KIID& aId ) const { return nullptr; }
 
     /**
+     * Print the page pointed by current screen, set by the calling print function.
+     *
+     * @param aDC wxDC given by the calling print function
+     */
+    virtual void PrintPage( const RENDER_SETTINGS* aSettings );
+
+    /**
      * Use to start up the GAL drawing canvas.
      */
     virtual void ActivateGalCanvas();
@@ -469,6 +480,16 @@ public:
     virtual const BOX2I GetDocumentExtents( bool aIncludeAllVisible = true ) const;
 
     /**
+     * Rebuild all toolbars and update the checked state of check tools.
+     */
+    void RecreateToolbars();
+
+    /**
+     * Update toolbars if desired toolbar icon changed.
+     */
+    void OnToolbarSizeChanged();
+
+    /**
      * Redraw the menus and what not in current language.
      */
     void ShowChangedLanguage() override;
@@ -509,18 +530,9 @@ public:
     static std::vector<const PLUGIN_ACTION*> GetOrderedPluginActions( PLUGIN_ACTION_SCOPE aScope,
         APP_SETTINGS_BASE* aCfg );
 
-    /**
-     * Append actions from API plugins to the given toolbar.
-     *
-     * @param aToolbar is the toolbar to add the plugins to
-     */
-    virtual void AddApiPluginTools( ACTION_TOOLBAR* aToolbar );
-
     DECLARE_EVENT_TABLE()
 
 protected:
-    void configureToolbars() override;
-
     virtual void SetScreen( BASE_SCREEN* aScreen )  { m_currentScreen = aScreen; }
 
     void unitsChangeRefresh() override;
@@ -555,6 +567,12 @@ protected:
     virtual void handleActivateEvent( wxActivateEvent& aEvent );
     void onActivate( wxActivateEvent& aEvent );
 
+    /**
+     * Append actions from API plugins to the main toolbar
+     */
+    virtual void addApiPluginTools();
+
+
     wxSocketServer*             m_socketServer;
 
     ///< Prevents opening same file multiple times.
@@ -572,6 +590,11 @@ protected:
 
     wxChoice*            m_gridSelectBox;
     wxChoice*            m_zoomSelectBox;
+
+    ACTION_TOOLBAR*      m_mainToolBar;
+    ACTION_TOOLBAR*      m_auxiliaryToolBar;  // Additional tools under main toolbar
+    ACTION_TOOLBAR*      m_drawToolBar;       // Drawing tools (typically on right edge of window)
+    ACTION_TOOLBAR*      m_optionsToolBar;    // Options (typically on left edge of window)
 
     std::unique_ptr<EDA_SEARCH_DATA> m_findReplaceData;
     wxArrayString        m_findStringHistoryList;

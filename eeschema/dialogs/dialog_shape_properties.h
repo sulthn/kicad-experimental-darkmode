@@ -48,7 +48,7 @@ public:
 private:
     void onBorderChecked( wxCommandEvent& aEvent) override;
     void onBorderSwatch( wxCommandEvent& aEvent );
-    void onFillChoice( wxCommandEvent& event ) override;
+    void onFillChecked( wxCommandEvent& aEvent ) override;
     void onFillRadioButton(wxCommandEvent &aEvent) override;
     void onCustomColorSwatch( wxCommandEvent& aEvent );
 

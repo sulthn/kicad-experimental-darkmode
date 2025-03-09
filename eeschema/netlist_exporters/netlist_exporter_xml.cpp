@@ -145,16 +145,16 @@ void NETLIST_EXPORTER_XML::addSymbolFields( XNODE* aNode, SCH_SYMBOL* aSymbol,
 
                 // Datasheet
                 candidate = m_resolveTextVars
-                                ? symbol2->GetField( FIELD_T::DATASHEET )->GetShownText( &sheet, false )
-                                : symbol2->GetField( FIELD_T::DATASHEET )->GetText();
+                                ? symbol2->GetField( DATASHEET_FIELD )->GetShownText( &sheet, false )
+                                : symbol2->GetField( DATASHEET_FIELD )->GetText();
 
                 if( !candidate.IsEmpty() && ( unit < minUnit || datasheet.IsEmpty() ) )
                     datasheet = candidate;
 
                 // Description
                 candidate = m_resolveTextVars
-                                ? symbol2->GetField( FIELD_T::DESCRIPTION )->GetShownText( &sheet, false )
-                                : symbol2->GetField( FIELD_T::DESCRIPTION )->GetText();
+                                ? symbol2->GetField( DESCRIPTION_FIELD )->GetShownText( &sheet, false )
+                                : symbol2->GetField( DESCRIPTION_FIELD )->GetText();
 
                 if( !candidate.IsEmpty() && ( unit < minUnit || description.IsEmpty() ) )
                     description = candidate;
@@ -183,8 +183,8 @@ void NETLIST_EXPORTER_XML::addSymbolFields( XNODE* aNode, SCH_SYMBOL* aSymbol,
         value = aSymbol->GetValue( m_resolveTextVars, &aSheet, false );
         footprint = aSymbol->GetFootprintFieldText( m_resolveTextVars, &aSheet, false );
 
-        SCH_FIELD* datasheetField = aSymbol->GetField( FIELD_T::DATASHEET );
-        SCH_FIELD* descriptionField = aSymbol->GetField( FIELD_T::DESCRIPTION );
+        SCH_FIELD* datasheetField = aSymbol->GetField( DATASHEET_FIELD );
+        SCH_FIELD* descriptionField = aSymbol->GetField( DESCRIPTION_FIELD );
 
         // Datasheet
         if( m_resolveTextVars )
@@ -210,9 +210,9 @@ void NETLIST_EXPORTER_XML::addSymbolFields( XNODE* aNode, SCH_SYMBOL* aSymbol,
         }
     }
 
-    fields[GetCanonicalFieldName( FIELD_T::FOOTPRINT )] = footprint;
-    fields[GetCanonicalFieldName( FIELD_T::DATASHEET )] = datasheet;
-    fields[GetCanonicalFieldName( FIELD_T::DESCRIPTION )] = description;
+    fields[GetCanonicalFieldName( FOOTPRINT_FIELD )] = footprint;
+    fields[GetCanonicalFieldName( DATASHEET_FIELD )] = datasheet;
+    fields[GetCanonicalFieldName( DESCRIPTION_FIELD )] = description;
 
     // Do not output field values blank in netlist:
     if( value.size() )

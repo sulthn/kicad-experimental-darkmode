@@ -33,55 +33,34 @@
 #include <memory>
 #include <pgm_base.h>
 #include <settings/common_settings.h>
-#include <trace_helpers.h>
 #include <tool/action_toolbar.h>
 #include <tool/actions.h>
 #include <tool/tool_action.h>
 #include <tool/tool_event.h>
 #include <tool/tool_interactive.h>
 #include <tool/tool_manager.h>
-#include <tool/ui/toolbar_configuration.h>
 #include <widgets/bitmap_button.h>
 #include <widgets/wx_aui_art_providers.h>
-
-#include <wx/log.h>
 #include <wx/popupwin.h>
 #include <wx/renderer.h>
 #include <wx/sizer.h>
 #include <wx/dcclient.h>
 #include <wx/settings.h>
 
-// Needed to handle adding the plugins to the toolbar
-// TODO (ISM): This should be better abstracted away from the toolbars
-#include <python_scripting.h>
-#include <api/api_plugin_manager.h>
 
-
-ACTION_GROUP::ACTION_GROUP( const std::string_view& aName )
-{
-    m_name = aName;
-    m_id   = ACTION_MANAGER::MakeActionId( m_name );
-}
-
-
-ACTION_GROUP::ACTION_GROUP( const std::string_view& aName,
+ACTION_GROUP::ACTION_GROUP( const std::string& aName,
                             const std::vector<const TOOL_ACTION*>& aActions )
-{
-    m_name = aName;
-    m_id   = ACTION_MANAGER::MakeActionId( m_name );
-
-    SetActions( aActions );
-}
-
-
-void ACTION_GROUP::SetActions( const std::vector<const TOOL_ACTION*>& aActions )
 {
     wxASSERT_MSG( aActions.size() > 0, wxS( "Action groups must have at least one action" ) );
 
     // The default action is just the first action in the vector
     m_actions       = aActions;
     m_defaultAction = m_actions[0];
+
+    m_name = aName;
+    m_id   = ACTION_MANAGER::MakeActionId( m_name );
 }
+
 
 int ACTION_GROUP::GetUIId() const
 {
@@ -258,111 +237,6 @@ ACTION_TOOLBAR::~ACTION_TOOLBAR()
 }
 
 
-void ACTION_TOOLBAR::ApplyConfiguration( const TOOLBAR_CONFIGURATION& aConfig )
-{
-    wxASSERT( GetParent() );
-
-    // Remove existing tools
-    ClearToolbar();
-
-    std::vector<TOOLBAR_ITEM> items = aConfig.GetToolbarItems();
-
-    // Add all the items to the toolbar
-    for( auto& item : items )
-    {
-        switch( item.m_Type )
-        {
-        case TOOLBAR_ITEM_TYPE::SEPARATOR:
-            AddScaledSeparator( GetParent() );
-            break;
-
-        case TOOLBAR_ITEM_TYPE::SPACER:
-            AddSpacer( item.m_Size );
-            break;
-
-        case TOOLBAR_ITEM_TYPE::TB_GROUP:
-            {
-            // Add a group of items to the toolbar
-            std::vector<const TOOL_ACTION*> tools;
-
-            for( auto& groupItem : item.m_GroupItems )
-            {
-                switch( groupItem.m_Type )
-                {
-                case TOOLBAR_ITEM_TYPE::SEPARATOR:
-                case TOOLBAR_ITEM_TYPE::SPACER:
-                case TOOLBAR_ITEM_TYPE::TB_GROUP:
-                case TOOLBAR_ITEM_TYPE::CONTROL:
-                    wxASSERT_MSG( false, "Unsupported group item type" );
-                    continue;
-
-                case TOOLBAR_ITEM_TYPE::TOOL:
-                    TOOL_ACTION* grpAction = m_toolManager->GetActionManager()->FindAction( groupItem.m_ActionName );
-
-                    if( !grpAction )
-                    {
-                        wxASSERT_MSG( false, wxString::Format( "Unable to find group tool %s", groupItem.m_ActionName ) );
-                        continue;
-                    }
-
-                    tools.push_back( grpAction );
-                }
-            }
-
-            AddGroup( std::make_unique<ACTION_GROUP>( item.m_GroupName.ToStdString(), tools ) );
-            break;
-            }
-
-        case TOOLBAR_ITEM_TYPE::CONTROL:
-            {
-            // Add a custom control to the toolbar
-            EDA_BASE_FRAME* frame = static_cast<EDA_BASE_FRAME*>( GetParent() );
-            ACTION_TOOLBAR_CONTROL_FACTORY* factory = frame->GetCustomToolbarControlFactory( item.m_ControlName );
-
-            if( !factory )
-            {
-                wxASSERT_MSG( false, wxString::Format( "Unable to find control factory for %s", item.m_ControlName ) );
-                continue;
-            }
-
-            // The factory functions are responsible for adding the controls to the toolbar themselves
-            (*factory)( this );
-            break;
-            }
-
-        case TOOLBAR_ITEM_TYPE::TOOL:
-            {
-            TOOL_ACTION* action = m_toolManager->GetActionManager()->FindAction( item.m_ActionName );
-
-            if( !action )
-            {
-                wxASSERT_MSG( false, wxString::Format( "Unable to find toolbar tool %s", item.m_ActionName ) );
-                continue;
-            }
-
-            Add( *action );
-            break;
-            }
-        }
-    }
-
-    // Apply the configuration
-    KiRealize();
-}
-
-
-void ACTION_TOOLBAR::Add( const TOOL_ACTION& aAction )
-{
-    wxASSERT_MSG( !aAction.CheckToolbarState( TOOLBAR_STATE::HIDDEN ),
-                  wxString::Format( "Attempting to add hidden action %s to the toolbar", aAction.GetName() ) );
-
-    bool isToggleEntry = aAction.CheckToolbarState( TOOLBAR_STATE::TOGGLE );
-    bool isCancellable = aAction.CheckToolbarState( TOOLBAR_STATE::CANCEL );
-
-    Add( aAction, isToggleEntry, isCancellable );
-}
-
-
 void ACTION_TOOLBAR::Add( const TOOL_ACTION& aAction, bool aIsToggleEntry, bool aIsCancellable )
 {
     wxASSERT( GetParent() );
@@ -413,14 +287,6 @@ void ACTION_TOOLBAR::AddScaledSeparator( wxWindow* aWindow )
 }
 
 
-void ACTION_TOOLBAR::Add( wxControl* aControl, const wxString& aLabel )
-{
-    wxASSERT( aControl );
-    m_controlIDs.push_back( aControl->GetId() );
-    AddControl( aControl, aLabel );
-}
-
-
 void ACTION_TOOLBAR::AddToolContextMenu( const TOOL_ACTION& aAction,
                                          std::unique_ptr<ACTION_MENU> aMenu )
 {
@@ -430,7 +296,7 @@ void ACTION_TOOLBAR::AddToolContextMenu( const TOOL_ACTION& aAction,
 }
 
 
-void ACTION_TOOLBAR::AddGroup( std::unique_ptr<ACTION_GROUP> aGroup )
+void ACTION_TOOLBAR::AddGroup( ACTION_GROUP* aGroup, bool aIsToggleEntry )
 {
     int                groupId       = aGroup->GetUIId();
     const TOOL_ACTION* defaultAction = aGroup->GetDefaultAction();
@@ -438,27 +304,20 @@ void ACTION_TOOLBAR::AddGroup( std::unique_ptr<ACTION_GROUP> aGroup )
     wxASSERT( GetParent() );
     wxASSERT( defaultAction );
 
-    // Turn this into a toggle entry if any one of the actions is a toggle entry
-    bool isToggleEntry = false;
-
-    for( const auto& act : aGroup->GetActions() )
-        isToggleEntry |= act->CheckToolbarState( TOOLBAR_STATE::TOGGLE );
-
-
-    m_toolKinds[ groupId ]    = isToggleEntry;
+    m_toolKinds[ groupId ]    = aIsToggleEntry;
     m_toolActions[ groupId ]  = defaultAction;
-    m_actionGroups[ groupId ] = std::move( aGroup );
+    m_actionGroups[ groupId ] = aGroup;
 
     // Add the main toolbar item representing the group
     AddTool( groupId, wxEmptyString,
              KiBitmapBundle( defaultAction->GetIcon(),
                              Pgm().GetCommonSettings()->m_Appearance.toolbar_icon_size ),
              KiDisabledBitmapBundle( defaultAction->GetIcon() ),
-             isToggleEntry ? wxITEM_CHECK : wxITEM_NORMAL,
+             aIsToggleEntry ? wxITEM_CHECK : wxITEM_NORMAL,
              wxEmptyString, wxEmptyString, nullptr );
 
     // Select the default action
-    doSelectAction( m_actionGroups[ groupId ].get(), *defaultAction );
+    doSelectAction( aGroup, *defaultAction );
 }
 
 
@@ -496,33 +355,19 @@ void ACTION_TOOLBAR::doSelectAction( ACTION_GROUP* aGroup, const TOOL_ACTION& aA
     // Register a new handler with the new UI conditions
     if( m_toolManager )
     {
-        m_toolManager->GetToolHolder()->UnregisterUIUpdateHandler( groupId );
-
         const ACTION_CONDITIONS* cond = m_toolManager->GetActionManager()->GetCondition( aAction );
 
-        // Register the new UI condition to control this entry
-        if( cond )
-        {
-            m_toolManager->GetToolHolder()->RegisterUIUpdateHandler( groupId, *cond );
-        }
-        else
-        {
-            wxLogTrace( kicadTraceToolStack, wxString::Format( "No UI condition for action %s",
-                                                               aAction.GetName() ) );
-        }
+        wxASSERT_MSG( cond, wxString::Format( "Missing UI condition for action %s",
+                                              aAction.GetName() ) );
+
+        m_toolManager->GetToolHolder()->UnregisterUIUpdateHandler( groupId );
+        m_toolManager->GetToolHolder()->RegisterUIUpdateHandler( groupId, *cond );
     }
 
     // Update the currently selected action
     m_toolActions[ groupId ] = &aAction;
 
     Refresh();
-}
-
-
-void ACTION_TOOLBAR::UpdateControlWidths()
-{
-    for( int id : m_controlIDs )
-        UpdateControlWidth( id );
 }
 
 
@@ -808,7 +653,7 @@ void ACTION_TOOLBAR::popupPalette( wxAuiToolBarItem* aItem )
     if( it == m_actionGroups.end() )
         return;
 
-    ACTION_GROUP* group = it->second.get();
+    ACTION_GROUP* group = it->second;
 
     wxAuiPaneInfo& pane = m_auiManager->GetPane( this );
 
@@ -1029,21 +874,3 @@ void ACTION_TOOLBAR::RefreshBitmaps()
 
     Refresh();
 }
-
-/*
- * Common controls for the toolbar
- */
-ACTION_TOOLBAR_CONTROL ACTION_TOOLBAR_CONTROLS::gridSelect( "control.GridSelector", _( "Grid Selector" ),
-                                                            _( "Grid Selection box" ) );
-
-ACTION_TOOLBAR_CONTROL ACTION_TOOLBAR_CONTROLS::zoomSelect( "control.ZoomSelector", _( "Zoom Selector" ),
-                                                            _( "Zoom Selection box" ) );
-
-ACTION_TOOLBAR_CONTROL ACTION_TOOLBAR_CONTROLS::ipcScripting( "control.IPCPlugin", _( "IPC/Scripting plugins" ),
-                                                              _( "Region to hold the IPC/Scripting action buttons" ) );
-
-ACTION_TOOLBAR_CONTROL ACTION_TOOLBAR_CONTROLS::layerSelector( "control.LayerSelector", _( "Layer selector" ),
-                                                               _( "Control to select the layer" ) );
-
-ACTION_TOOLBAR_CONTROL ACTION_TOOLBAR_CONTROLS::unitSelector( "control.UnitSelector", _( "Symbol unit selector" ),
-                                                              _( "Displays the current unit" ) );

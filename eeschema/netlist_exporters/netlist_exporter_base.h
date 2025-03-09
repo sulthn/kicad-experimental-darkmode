@@ -87,7 +87,7 @@ struct PIN_INFO
 class NETLIST_EXPORTER_BASE
 {
 public:
-    NETLIST_EXPORTER_BASE( SCHEMATIC* aSchematic ) :
+    NETLIST_EXPORTER_BASE( SCHEMATIC_IFACE* aSchematic ) :
         m_schematic( aSchematic )
     {
         wxASSERT( aSchematic );
@@ -192,7 +192,7 @@ protected:
     std::set<LIB_SYMBOL*, LIB_SYMBOL_LESS_THAN> m_libParts;
 
     /// The schematic we're generating a netlist for
-    SCHEMATIC*      m_schematic;
+    SCHEMATIC_IFACE*      m_schematic;
 };
 
 #endif

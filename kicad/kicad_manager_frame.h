@@ -54,9 +54,11 @@ public:
     void doCloseWindow() override;
     void OnSize( wxSizeEvent& event ) override;
 
-    void UnarchiveFiles();
+    void OnArchiveFiles( wxCommandEvent& event );
+    void OnUnarchiveFiles( wxCommandEvent& event );
 
     void OnOpenFileInTextEditor( wxCommandEvent& event );
+    void OnBrowseInFileExplorer( wxCommandEvent& event );
 
     void OnFileHistory( wxCommandEvent& event );
     void OnClearFileHistory( wxCommandEvent& aEvent );
@@ -73,6 +75,11 @@ public:
      * Hides the tabs for Editor notebook if there is only 1 page
      */
     void HideTabsIfNeeded();
+
+    /**
+     * (Re)Create the left vertical toolbar
+     */
+    void RecreateBaseLeftToolbar();
 
     wxString GetCurrentFileName() const override
     {
@@ -93,11 +100,6 @@ public:
                                 const std::vector<std::string>& aSchFileExtensions,
                                 const std::vector<std::string>& aPcbFileExtensions,
                                 int aSchFileType, int aPcbFileType );
-
-    /**
-     * Open dialog to import Altium project files.
-     */
-    void OnImportAltiumProjectFiles( wxCommandEvent& event );
 
     /**
      *  Open dialog to import CADSTAR Schematic and PCB Archive files.
@@ -232,6 +234,7 @@ private:
     PROJECT_TREE_PANE*    m_leftWin;
     wxAuiNotebook*        m_notebook;
     PANEL_KICAD_LAUNCHER* m_launcher;
+    ACTION_TOOLBAR*       m_mainToolBar;
     int                   m_lastToolbarIconSize;
 
     std::shared_ptr<PLUGIN_CONTENT_MANAGER> m_pcm;

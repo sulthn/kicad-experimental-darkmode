@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 4.2.1-62-g497c85bd-dirty)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -49,7 +49,7 @@ PANEL_JOBSET_BASE::PANEL_JOBSET_BASE( wxWindow* parent, wxWindowID id, const wxP
 	// Label Appearance
 
 	// Cell Defaults
-	m_jobsGrid->SetDefaultCellAlignment( wxALIGN_LEFT, wxALIGN_CENTER );
+	m_jobsGrid->SetDefaultCellAlignment( wxALIGN_LEFT, wxALIGN_TOP );
 	sbJobs->Add( m_jobsGrid, 1, wxEXPAND|wxLEFT|wxRIGHT|wxTOP, 3 );
 
 	wxBoxSizer* bJobsButtons;
@@ -79,30 +79,30 @@ PANEL_JOBSET_BASE::PANEL_JOBSET_BASE( wxWindow* parent, wxWindowID id, const wxP
 
 	bSizerUpper->Add( sbJobs, 7, wxEXPAND|wxTOP|wxRIGHT|wxLEFT, 5 );
 
-	wxStaticBoxSizer* sbDestinations;
-	sbDestinations = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Destinations") ), wxVERTICAL );
+	wxStaticBoxSizer* sbOutputs;
+	sbOutputs = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Outputs") ), wxVERTICAL );
 
-	m_destinationList = new wxScrolledWindow( sbDestinations->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL );
-	m_destinationList->SetScrollRate( 5, 5 );
-	m_destinationListSizer = new wxBoxSizer( wxVERTICAL );
+	m_outputList = new wxScrolledWindow( sbOutputs->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL );
+	m_outputList->SetScrollRate( 5, 5 );
+	m_outputListSizer = new wxBoxSizer( wxVERTICAL );
 
 
-	m_destinationList->SetSizer( m_destinationListSizer );
-	m_destinationList->Layout();
-	m_destinationListSizer->Fit( m_destinationList );
-	sbDestinations->Add( m_destinationList, 1, wxEXPAND, 0 );
+	m_outputList->SetSizer( m_outputListSizer );
+	m_outputList->Layout();
+	m_outputListSizer->Fit( m_outputList );
+	sbOutputs->Add( m_outputList, 1, wxEXPAND|wxALL, 0 );
 
 	wxBoxSizer* bOutputButtons;
 	bOutputButtons = new wxBoxSizer( wxHORIZONTAL );
 
-	m_buttonAddDestination = new STD_BITMAP_BUTTON( sbDestinations->GetStaticBox(), wxID_ANY, wxNullBitmap, wxDefaultPosition, wxDefaultSize, wxBU_AUTODRAW|0 );
-	bOutputButtons->Add( m_buttonAddDestination, 0, wxALIGN_CENTER_VERTICAL|wxBOTTOM|wxTOP, 5 );
+	m_buttonOutputAdd = new STD_BITMAP_BUTTON( sbOutputs->GetStaticBox(), wxID_ANY, wxNullBitmap, wxDefaultPosition, wxDefaultSize, wxBU_AUTODRAW|0 );
+	bOutputButtons->Add( m_buttonOutputAdd, 0, wxALIGN_CENTER_VERTICAL|wxBOTTOM|wxTOP, 5 );
 
 
-	sbDestinations->Add( bOutputButtons, 0, wxEXPAND|wxLEFT, 3 );
+	sbOutputs->Add( bOutputButtons, 0, wxEXPAND|wxLEFT, 3 );
 
 
-	bSizerUpper->Add( sbDestinations, 4, wxEXPAND|wxTOP|wxRIGHT|wxLEFT, 5 );
+	bSizerUpper->Add( sbOutputs, 4, wxEXPAND|wxTOP|wxRIGHT|wxLEFT, 5 );
 
 
 	bSizerMain->Add( bSizerUpper, 1, wxEXPAND, 5 );
@@ -119,8 +119,8 @@ PANEL_JOBSET_BASE::PANEL_JOBSET_BASE( wxWindow* parent, wxWindowID id, const wxP
 
 	bSizerButtons->Add( 10, 0, 0, wxEXPAND, 5 );
 
-	m_buttonGenerateAllDestinations = new wxButton( this, wxID_ANY, _("Generate All Destinations"), wxDefaultPosition, wxDefaultSize, 0 );
-	bSizerButtons->Add( m_buttonGenerateAllDestinations, 0, wxALL, 5 );
+	m_buttonRunAllOutputs = new wxButton( this, wxID_ANY, _("Generate All Outputs"), wxDefaultPosition, wxDefaultSize, 0 );
+	bSizerButtons->Add( m_buttonRunAllOutputs, 0, wxALL, 5 );
 
 
 	bSizerMain->Add( bSizerButtons, 0, wxEXPAND|wxTOP|wxBOTTOM, 5 );
@@ -136,9 +136,9 @@ PANEL_JOBSET_BASE::PANEL_JOBSET_BASE( wxWindow* parent, wxWindowID id, const wxP
 	m_buttonUp->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnJobButtonUp ), NULL, this );
 	m_buttonDown->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnJobButtonDown ), NULL, this );
 	m_buttonDelete->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnJobButtonDelete ), NULL, this );
-	m_buttonAddDestination->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnAddDestinationClick ), NULL, this );
+	m_buttonOutputAdd->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnAddOutputClick ), NULL, this );
 	m_buttonSave->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnSaveButtonClick ), NULL, this );
-	m_buttonGenerateAllDestinations->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnGenerateAllDestinationsClick ), NULL, this );
+	m_buttonRunAllOutputs->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnGenerateAllOutputsClick ), NULL, this );
 }
 
 PANEL_JOBSET_BASE::~PANEL_JOBSET_BASE()
@@ -150,13 +150,13 @@ PANEL_JOBSET_BASE::~PANEL_JOBSET_BASE()
 	m_buttonUp->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnJobButtonUp ), NULL, this );
 	m_buttonDown->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnJobButtonDown ), NULL, this );
 	m_buttonDelete->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnJobButtonDelete ), NULL, this );
-	m_buttonAddDestination->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnAddDestinationClick ), NULL, this );
+	m_buttonOutputAdd->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnAddOutputClick ), NULL, this );
 	m_buttonSave->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnSaveButtonClick ), NULL, this );
-	m_buttonGenerateAllDestinations->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnGenerateAllDestinationsClick ), NULL, this );
+	m_buttonRunAllOutputs->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_BASE::OnGenerateAllOutputsClick ), NULL, this );
 
 }
 
-PANEL_DESTINATION_BASE::PANEL_DESTINATION_BASE( wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style, const wxString& name ) : wxPanel( parent, id, pos, size, style, name )
+PANEL_JOBSET_OUTPUT_BASE::PANEL_JOBSET_OUTPUT_BASE( wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, long style, const wxString& name ) : wxPanel( parent, id, pos, size, style, name )
 {
 	this->SetBackgroundColour( wxSystemSettings::GetColour( wxSYS_COLOUR_3DLIGHT ) );
 
@@ -208,25 +208,25 @@ PANEL_DESTINATION_BASE::PANEL_DESTINATION_BASE( wxWindow* parent, wxWindowID id,
 	bSizerMain->Fit( this );
 
 	// Connect Events
-	this->Connect( wxEVT_RIGHT_DOWN, wxMouseEventHandler( PANEL_DESTINATION_BASE::OnRightDown ) );
-	m_statusBitmap->Connect( wxEVT_LEFT_DOWN, wxMouseEventHandler( PANEL_DESTINATION_BASE::OnLastStatusClick ), NULL, this );
-	m_buttonProperties->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_DESTINATION_BASE::OnProperties ), NULL, this );
-	m_buttonDelete->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_DESTINATION_BASE::OnDelete ), NULL, this );
-	m_buttonGenerate->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_DESTINATION_BASE::OnGenerate ), NULL, this );
+	this->Connect( wxEVT_RIGHT_DOWN, wxMouseEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnRightDown ) );
+	m_statusBitmap->Connect( wxEVT_LEFT_DOWN, wxMouseEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnLastStatusClick ), NULL, this );
+	m_buttonProperties->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnProperties ), NULL, this );
+	m_buttonDelete->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnDelete ), NULL, this );
+	m_buttonGenerate->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnGenerate ), NULL, this );
 }
 
-PANEL_DESTINATION_BASE::~PANEL_DESTINATION_BASE()
+PANEL_JOBSET_OUTPUT_BASE::~PANEL_JOBSET_OUTPUT_BASE()
 {
 	// Disconnect Events
-	this->Disconnect( wxEVT_RIGHT_DOWN, wxMouseEventHandler( PANEL_DESTINATION_BASE::OnRightDown ) );
-	m_statusBitmap->Disconnect( wxEVT_LEFT_DOWN, wxMouseEventHandler( PANEL_DESTINATION_BASE::OnLastStatusClick ), NULL, this );
-	m_buttonProperties->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_DESTINATION_BASE::OnProperties ), NULL, this );
-	m_buttonDelete->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_DESTINATION_BASE::OnDelete ), NULL, this );
-	m_buttonGenerate->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_DESTINATION_BASE::OnGenerate ), NULL, this );
+	this->Disconnect( wxEVT_RIGHT_DOWN, wxMouseEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnRightDown ) );
+	m_statusBitmap->Disconnect( wxEVT_LEFT_DOWN, wxMouseEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnLastStatusClick ), NULL, this );
+	m_buttonProperties->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnProperties ), NULL, this );
+	m_buttonDelete->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnDelete ), NULL, this );
+	m_buttonGenerate->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( PANEL_JOBSET_OUTPUT_BASE::OnGenerate ), NULL, this );
 
 }
 
-DIALOG_JOBSET_RUN_LOG_BASE::DIALOG_JOBSET_RUN_LOG_BASE( wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style ) : DIALOG_SHIM( parent, id, title, pos, size, style )
+DIALOG_OUTPUT_RUN_RESULTS_BASE::DIALOG_OUTPUT_RUN_RESULTS_BASE( wxWindow* parent, wxWindowID id, const wxString& title, const wxPoint& pos, const wxSize& size, long style ) : DIALOG_SHIM( parent, id, title, pos, size, style )
 {
 	this->SetSizeHints( wxSize( 450,250 ), wxDefaultSize );
 
@@ -241,12 +241,12 @@ DIALOG_JOBSET_RUN_LOG_BASE::DIALOG_JOBSET_RUN_LOG_BASE( wxWindow* parent, wxWind
 	bSizer16 = new wxBoxSizer( wxHORIZONTAL );
 
 	m_jobList = new wxListCtrl( this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT|wxLC_SINGLE_SEL );
-	bSizer16->Add( m_jobList, 1, wxALL|wxEXPAND, 5 );
+	bSizer16->Add( m_jobList, 3, wxALL|wxEXPAND, 5 );
 
 	m_textCtrlOutput = new wxTextCtrl( this, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_BESTWRAP|wxTE_MULTILINE|wxTE_READONLY );
 	m_textCtrlOutput->SetMinSize( wxSize( 420,-1 ) );
 
-	bSizer16->Add( m_textCtrlOutput, 1, wxALL|wxEXPAND, 5 );
+	bSizer16->Add( m_textCtrlOutput, 4, wxALL|wxEXPAND, 5 );
 
 
 	bMainSizer->Add( bSizer16, 1, wxEXPAND, 5 );
@@ -256,7 +256,7 @@ DIALOG_JOBSET_RUN_LOG_BASE::DIALOG_JOBSET_RUN_LOG_BASE( wxWindow* parent, wxWind
 	m_sdbSizer->AddButton( m_sdbSizerOK );
 	m_sdbSizer->Realize();
 
-	bMainSizer->Add( m_sdbSizer, 0, wxALL|wxEXPAND, 5 );
+	bMainSizer->Add( m_sdbSizer, 0, wxEXPAND, 5 );
 
 
 	this->SetSizer( bMainSizer );
@@ -266,16 +266,16 @@ DIALOG_JOBSET_RUN_LOG_BASE::DIALOG_JOBSET_RUN_LOG_BASE( wxWindow* parent, wxWind
 	this->Centre( wxBOTH );
 
 	// Connect Events
-	this->Connect( wxEVT_UPDATE_UI, wxUpdateUIEventHandler( DIALOG_JOBSET_RUN_LOG_BASE::OnUpdateUI ) );
-	m_jobList->Connect( wxEVT_COMMAND_LIST_ITEM_SELECTED, wxListEventHandler( DIALOG_JOBSET_RUN_LOG_BASE::OnJobListItemSelected ), NULL, this );
-	m_sdbSizerOK->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( DIALOG_JOBSET_RUN_LOG_BASE::OnButtonOk ), NULL, this );
+	m_jobList->Connect( wxEVT_COMMAND_LIST_ITEM_SELECTED, wxListEventHandler( DIALOG_OUTPUT_RUN_RESULTS_BASE::OnJobListItemSelected ), NULL, this );
+	m_jobList->Connect( wxEVT_SIZE, wxSizeEventHandler( DIALOG_OUTPUT_RUN_RESULTS_BASE::onJobListSize ), NULL, this );
+	m_sdbSizerOK->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( DIALOG_OUTPUT_RUN_RESULTS_BASE::OnButtonOk ), NULL, this );
 }
 
-DIALOG_JOBSET_RUN_LOG_BASE::~DIALOG_JOBSET_RUN_LOG_BASE()
+DIALOG_OUTPUT_RUN_RESULTS_BASE::~DIALOG_OUTPUT_RUN_RESULTS_BASE()
 {
 	// Disconnect Events
-	this->Disconnect( wxEVT_UPDATE_UI, wxUpdateUIEventHandler( DIALOG_JOBSET_RUN_LOG_BASE::OnUpdateUI ) );
-	m_jobList->Disconnect( wxEVT_COMMAND_LIST_ITEM_SELECTED, wxListEventHandler( DIALOG_JOBSET_RUN_LOG_BASE::OnJobListItemSelected ), NULL, this );
-	m_sdbSizerOK->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( DIALOG_JOBSET_RUN_LOG_BASE::OnButtonOk ), NULL, this );
+	m_jobList->Disconnect( wxEVT_COMMAND_LIST_ITEM_SELECTED, wxListEventHandler( DIALOG_OUTPUT_RUN_RESULTS_BASE::OnJobListItemSelected ), NULL, this );
+	m_jobList->Disconnect( wxEVT_SIZE, wxSizeEventHandler( DIALOG_OUTPUT_RUN_RESULTS_BASE::onJobListSize ), NULL, this );
+	m_sdbSizerOK->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( DIALOG_OUTPUT_RUN_RESULTS_BASE::OnButtonOk ), NULL, this );
 
 }

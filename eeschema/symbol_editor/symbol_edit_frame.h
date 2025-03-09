@@ -198,6 +198,9 @@ public:
     bool canCloseWindow( wxCloseEvent& aCloseEvent ) override;
     void doCloseWindow() override;
     void OnExitKiCad( wxCommandEvent& event );
+    void ReCreateHToolbar() override;
+    void ReCreateVToolbar() override;
+    void ReCreateOptToolbar() override;
 
     void LoadSettings( APP_SETTINGS_BASE* aCfg ) override;
     void SaveSettings( APP_SETTINGS_BASE* aCfg ) override;
@@ -314,6 +317,11 @@ public:
     bool LoadSymbol( const LIB_ID& aLibId, int aUnit, int aBodyStyle );
 
     /**
+     * Print a page.
+     */
+    void PrintPage( const RENDER_SETTINGS* aSettings ) override;
+
+    /**
      * Create the SVG print file for the current edited symbol.
      * @param aFullFileName is the full filename
      * @param aOffset is a plot offset, in iu
@@ -403,7 +411,6 @@ public:
     void emptyScreen();
 
 protected:
-    void configureToolbars() override;
     void setupUIConditions() override;
 
     void doReCreateMenuBar() override;
@@ -440,12 +447,12 @@ private:
      * Load a symbol from the current active library, optionally setting the selected unit
      * and convert.
      *
-     * @param aSymbolName The symbol alias name to load from the current library.
+     * @param aAliasName The symbol alias name to load from the current library.
      * @param aUnit Unit to be selected
      * @param aBodyStyle Convert to be selected
      * @return true if the symbol loaded correctly.
      */
-    bool LoadSymbolFromCurrentLib( const wxString& aSymbolName, int aUnit = 0, int aBodyStyle = 0 );
+    bool LoadSymbolFromCurrentLib( const wxString& aAliasName, int aUnit = 0, int aBodyStyle = 0 );
 
     /**
      * Create a copy of \a aLibEntry into memory.

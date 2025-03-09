@@ -60,7 +60,6 @@
 #include <tool/tool_manager.h>
 #include <tools/kicad_manager_actions.h>
 #include <tools/kicad_manager_control.h>
-#include <toolbars_kicad_manager.h>
 #include <wildcards_and_files_ext.h>
 #include <widgets/app_progress_dialog.h>
 #include <widgets/kistatusbar.h>
@@ -101,11 +100,13 @@ BEGIN_EVENT_TABLE( KICAD_MANAGER_FRAME, EDA_BASE_FRAME )
     // Menu events
     EVT_MENU( wxID_EXIT, KICAD_MANAGER_FRAME::OnExit )
     EVT_MENU( ID_EDIT_LOCAL_FILE_IN_TEXT_EDITOR, KICAD_MANAGER_FRAME::OnOpenFileInTextEditor )
+    EVT_MENU( ID_BROWSE_IN_FILE_EXPLORER, KICAD_MANAGER_FRAME::OnBrowseInFileExplorer )
+    EVT_MENU( ID_SAVE_AND_ZIP_FILES, KICAD_MANAGER_FRAME::OnArchiveFiles )
+    EVT_MENU( ID_READ_ZIP_ARCHIVE, KICAD_MANAGER_FRAME::OnUnarchiveFiles )
     EVT_MENU( ID_IMPORT_CADSTAR_ARCHIVE_PROJECT, KICAD_MANAGER_FRAME::OnImportCadstarArchiveFiles )
     EVT_MENU( ID_IMPORT_EAGLE_PROJECT, KICAD_MANAGER_FRAME::OnImportEagleFiles )
     EVT_MENU( ID_IMPORT_EASYEDA_PROJECT, KICAD_MANAGER_FRAME::OnImportEasyEdaFiles )
     EVT_MENU( ID_IMPORT_EASYEDAPRO_PROJECT, KICAD_MANAGER_FRAME::OnImportEasyEdaProFiles )
-    EVT_MENU( ID_IMPORT_ALTIUM_PROJECT, KICAD_MANAGER_FRAME::OnImportAltiumProjectFiles )
 
     // Range menu events
     EVT_MENU_RANGE( ID_LANGUAGE_CHOICE, ID_LANGUAGE_CHOICE_END,
@@ -131,6 +132,7 @@ KICAD_MANAGER_FRAME::KICAD_MANAGER_FRAME( wxWindow* parent, const wxString& titl
                         KICAD_MANAGER_FRAME_NAME, &::Kiway, unityScale ),
         m_leftWin( nullptr ),
         m_launcher( nullptr ),
+        m_mainToolBar( nullptr ),
         m_lastToolbarIconSize( 0 )
 {
     const int defaultLeftWinWidth = FromDIP( 250 );
@@ -202,16 +204,14 @@ KICAD_MANAGER_FRAME::KICAD_MANAGER_FRAME( wxWindow* parent, const wxString& titl
     setupTools();
     setupUIConditions();
 
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<KICAD_MANAGER_TOOLBAR_SETTINGS>( "kicad-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
+    RecreateBaseLeftToolbar();
     ReCreateMenuBar();
 
     m_auimgr.SetManagedWindow( this );
     m_auimgr.SetFlags( wxAUI_MGR_LIVE_RESIZE );
 
-    m_auimgr.AddPane( m_tbLeft,
-                      EDA_PANE().VToolbar().Name( "TopMainToolbar" ).Left().Layer( 2 ) );
+    m_auimgr.AddPane( m_mainToolBar,
+                      EDA_PANE().VToolbar().Name( "MainToolbar" ).Left().Layer( 2 ) );
 
     // BestSize() does not always set the actual pane size of m_leftWin to the required value.
     // It happens when m_leftWin is too large (roughly > 1/3 of the kicad manager frame width.
@@ -436,7 +436,6 @@ void KICAD_MANAGER_FRAME::setupUIConditions()
 
     manager->SetConditions( ACTIONS::saveAs,                       activeProjectCond );
     manager->SetConditions( KICAD_MANAGER_ACTIONS::closeProject,   activeProjectCond );
-    manager->SetConditions( KICAD_MANAGER_ACTIONS::archiveProject, activeProjectCond );
     manager->SetConditions( KICAD_MANAGER_ACTIONS::newJobsetFile,  activeProjectCond );
     manager->SetConditions( KICAD_MANAGER_ACTIONS::openJobsetFile, activeProjectCond );
 
@@ -445,6 +444,9 @@ void KICAD_MANAGER_FRAME::setupUIConditions()
     manager->SetConditions( ACTIONS::cut,     ENABLE( SELECTION_CONDITIONS::ShowNever ) );
     manager->SetConditions( ACTIONS::copy,    ENABLE( SELECTION_CONDITIONS::ShowNever ) );
     manager->SetConditions( ACTIONS::paste,   ENABLE( SELECTION_CONDITIONS::ShowNever ) );
+
+    // TODO: Switch this to an action
+    RegisterUIUpdateHandler( ID_SAVE_AND_ZIP_FILES, activeProjectCond );
 
 #undef ENABLE
 }
@@ -773,13 +775,6 @@ void KICAD_MANAGER_FRAME::OpenJobsFile( const wxFileName& aFileName, bool aCreat
 
         jobsFile->LoadFromFile();
 
-        if( aCreate && !aFileName.FileExists() )
-        {
-            JOBSET_DESTINATION* dest = jobsFile->AddNewDestination( JOBSET_DESTINATION_T::FOLDER );
-            dest->m_outputHandler->SetOutputPath( aFileName.GetName() );
-            jobsFile->SaveToFile( wxEmptyString, true );
-        }
-
         PANEL_JOBSET* jobPanel = new PANEL_JOBSET( m_notebook, this, std::move( jobsFile ) );
         jobPanel->SetProjectTied( true );
         jobPanel->SetClosable( true );
@@ -962,6 +957,13 @@ void KICAD_MANAGER_FRAME::OnOpenFileInTextEditor( wxCommandEvent& event )
 }
 
 
+void KICAD_MANAGER_FRAME::OnBrowseInFileExplorer( wxCommandEvent& event )
+{
+    // open project directory in host OS's file explorer
+    LaunchExternal( Prj().GetProjectPath() );
+}
+
+
 void KICAD_MANAGER_FRAME::RefreshProjectTree()
 {
     m_leftWin->ReCreateTreePrj();
@@ -981,7 +983,7 @@ void KICAD_MANAGER_FRAME::ShowChangedLanguage()
     EDA_BASE_FRAME::ShowChangedLanguage();
 
     // tooltips in toolbars
-    RecreateToolbars();
+    RecreateBaseLeftToolbar();
     m_launcher->CreateLaunchers();
 
     // update captions
@@ -1210,11 +1212,11 @@ void KICAD_MANAGER_FRAME::onToolbarSizeChanged()
 {
     // No idea why, but the same mechanism used in EDA_DRAW_FRAME doesn't work here
     // the only thing that seems to work is to blow it all up and start from scratch.
-    m_auimgr.DetachPane( m_tbLeft );
-    delete m_tbLeft;
-    m_tbLeft = nullptr;
-    RecreateToolbars();
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().HToolbar().Name( "TopMainToolbar" ).Left()
+    m_auimgr.DetachPane( m_mainToolBar );
+    delete m_mainToolBar;
+    m_mainToolBar = nullptr;
+    RecreateBaseLeftToolbar();
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( "MainToolbar" ).Left()
                       .Layer( 2 ) );
 
     m_auimgr.Update();

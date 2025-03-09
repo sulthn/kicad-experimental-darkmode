@@ -49,7 +49,6 @@
 #include "pl_editor_id.h"
 #include "pl_editor_settings.h"
 #include "properties_frame.h"
-#include <toolbars_pl_editor.h>
 #include "tools/pl_actions.h"
 #include "tools/pl_selection_tool.h"
 #include "tools/pl_drawing_tools.h"
@@ -95,7 +94,7 @@ PL_EDITOR_FRAME::PL_EDITOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
         m_mruImagePath( wxEmptyString )
 {
     m_maximizeByDefault = true;
-    SetUserUnits( EDA_UNITS::MM );
+    SetUserUnits( EDA_UNITS::MILLIMETRES );
 
     m_showBorderAndTitleBlock   = true; // true for reference drawings.
     DS_DATA_MODEL::GetTheInstance().m_EditMode = true;
@@ -135,10 +134,9 @@ PL_EDITOR_FRAME::PL_EDITOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     setupTools();
     setupUIConditions();
     ReCreateMenuBar();
-
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<PL_EDITOR_TOOLBAR_SETTINGS>( "pl_editor-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
+    ReCreateHToolbar();
+    ReCreateVToolbar();
+    ReCreateOptToolbar();
 
     wxWindow* stsbar = GetStatusBar();
     int       spacer = KIUI::GetTextSize( wxT( "M" ), stsbar ).x * 2;
@@ -181,15 +179,15 @@ PL_EDITOR_FRAME::PL_EDITOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_propertiesPagelayout = new PROPERTIES_FRAME( this );
 
     // Rows; layers 4 - 6
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( "TopMainToolbar" )
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( "MainToolbar" )
                       .Top().Layer( 6 ) );
-    m_auimgr.AddPane( m_tbLeft, EDA_PANE().VToolbar().Name( "LeftToolbar" )
+    m_auimgr.AddPane( m_optionsToolBar, EDA_PANE().VToolbar().Name( "OptToolbar" )
                       .Left().Layer( 3 ) );
     m_auimgr.AddPane( m_messagePanel, EDA_PANE().Messages().Name( "MsgPanel" )
                       .Bottom().Layer( 6 ) );
 
     // Columns; layers 1 - 3
-    m_auimgr.AddPane( m_tbRight, EDA_PANE().VToolbar().Name( "RightToolbar" )
+    m_auimgr.AddPane( m_drawToolBar, EDA_PANE().VToolbar().Name( "ToolsToolbar" )
                       .Right().Layer( 2 ) );
 
     m_auimgr.AddPane( m_propertiesPagelayout, EDA_PANE().Palette().Name( "Props" )
@@ -303,8 +301,8 @@ void PL_EDITOR_FRAME::setupUIConditions()
 
     mgr->SetConditions( ACTIONS::toggleGrid,        CHECK( cond.GridVisible() ) );
     mgr->SetConditions( ACTIONS::toggleCursorStyle, CHECK( cond.FullscreenCursor() ) );
-    mgr->SetConditions( ACTIONS::millimetersUnits,  CHECK( cond.Units( EDA_UNITS::MM ) ) );
-    mgr->SetConditions( ACTIONS::inchesUnits,       CHECK( cond.Units( EDA_UNITS::INCH ) ) );
+    mgr->SetConditions( ACTIONS::millimetersUnits,  CHECK( cond.Units( EDA_UNITS::MILLIMETRES ) ) );
+    mgr->SetConditions( ACTIONS::inchesUnits,       CHECK( cond.Units( EDA_UNITS::INCHES ) ) );
     mgr->SetConditions( ACTIONS::milsUnits,         CHECK( cond.Units( EDA_UNITS::MILS ) ) );
 
     mgr->SetConditions( ACTIONS::cut,               ENABLE( SELECTION_CONDITIONS::NotEmpty ) );
@@ -705,9 +703,9 @@ void PL_EDITOR_FRAME::DisplayGridMsg()
 
     switch( GetUserUnits() )
     {
-    case EDA_UNITS::INCH: gridformatter = wxS( "grid %.3f" ); break;
-    case EDA_UNITS::MM:   gridformatter = wxS( "grid %.4f" ); break;
-    default:              gridformatter = wxS( "grid %f" );   break;
+    case EDA_UNITS::INCHES:      gridformatter = wxS( "grid %.3f" ); break;
+    case EDA_UNITS::MILLIMETRES: gridformatter = wxS( "grid %.4f" ); break;
+    default:                     gridformatter = wxS( "grid %f" );   break;
     }
 
     double grid = EDA_UNIT_UTILS::UI::ToUserUnit( drawSheetIUScale, GetUserUnits(),
@@ -767,11 +765,11 @@ void PL_EDITOR_FRAME::UpdateStatusBar()
 
     switch( GetUserUnits() )
     {
-    case EDA_UNITS::INCH:     SetStatusText( _( "inches" ), 6 ); break;
-    case EDA_UNITS::MILS:     SetStatusText( _( "mils" ), 6 );   break;
-    case EDA_UNITS::MM:       SetStatusText( _( "mm" ), 6 );     break;
-    case EDA_UNITS::UNSCALED: SetStatusText( wxEmptyString, 6 ); break;
-    default:                  wxASSERT( false );                 break;
+    case EDA_UNITS::INCHES:      SetStatusText( _( "inches" ), 6 ); break;
+    case EDA_UNITS::MILS:        SetStatusText( _( "mils" ), 6 );   break;
+    case EDA_UNITS::MILLIMETRES: SetStatusText( _( "mm" ), 6 );     break;
+    case EDA_UNITS::UNSCALED:    SetStatusText( wxEmptyString, 6 ); break;
+    default:                     wxASSERT( false );                 break;
     }
 
     wxString line;
@@ -797,6 +795,29 @@ void PL_EDITOR_FRAME::UpdateStatusBar()
     line.Printf( _("coord origin: %s"),
                  m_originSelectBox->GetString( m_originSelectChoice ).GetData() );
     SetStatusText( line, 5 );
+}
+
+
+void PL_EDITOR_FRAME::PrintPage( const RENDER_SETTINGS* aSettings )
+{
+    GetScreen()->SetVirtualPageNumber( GetPageNumberOption() ? 1 : 2 );
+    DS_DATA_MODEL& model = DS_DATA_MODEL::GetTheInstance();
+
+    for( DS_DATA_ITEM* dataItem : model.GetItems() )
+    {
+        // Ensure the scaling factor (used only in printing) of bitmaps is up to date
+        if( dataItem->GetType() == DS_DATA_ITEM::DS_BITMAP )
+        {
+            BITMAP_BASE* bitmap = static_cast<DS_DATA_ITEM_BITMAP*>( dataItem )->m_ImageBitmap;
+            bitmap->SetPixelSizeIu( drawSheetIUScale.IU_PER_MILS * 1000 / bitmap->GetPPI() );
+        }
+    }
+
+    PrintDrawingSheet( aSettings, GetScreen(), nullptr, drawSheetIUScale.IU_PER_MILS,
+                       wxEmptyString );
+
+    GetCanvas()->DisplayDrawingSheet();
+    GetCanvas()->Refresh();
 }
 
 

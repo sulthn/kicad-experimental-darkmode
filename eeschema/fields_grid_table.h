@@ -46,8 +46,6 @@ public:
     {}
 
 protected:
-    int getFieldRow( FIELD_T aFieldId );
-
     void showPopupMenu( wxMenu& menu, wxGridEvent& aEvent ) override;
     void doPopupSelection( wxCommandEvent& event ) override;
 
@@ -120,9 +118,6 @@ public:
 
     wxString StringFromBool( bool aValue ) const;
     bool BoolFromString( const wxString& aValue ) const;
-
-    SCH_FIELD* GetField( FIELD_T aFieldId );
-    int GetFieldRow( FIELD_T aFieldId );
 
     void DetachFields();
 

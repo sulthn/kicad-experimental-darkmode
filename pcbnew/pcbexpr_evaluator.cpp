@@ -166,36 +166,18 @@ public:
             return *( m_item->GetEffectiveNetClass() )
                    == *( bValue->m_item->GetEffectiveNetClass() );
         }
-
-        if( b->GetType() == LIBEVAL::VT_STRING )
+        else
         {
-            if( m_item->GetEffectiveNetClass()->ContainsNetclassWithName( b->AsString() ) )
-                return true;
-
-            return m_item->GetEffectiveNetClass()->GetName() == b->AsString();
+            return LIBEVAL::VALUE::EqualTo( aCtx, b );
         }
-
-        return LIBEVAL::VALUE::EqualTo( aCtx, b );
     }
 
     bool NotEqualTo( LIBEVAL::CONTEXT* aCtx, const LIBEVAL::VALUE* b ) const override
     {
         if( const PCBEXPR_NETCLASS_VALUE* bValue = dynamic_cast<const PCBEXPR_NETCLASS_VALUE*>( b ) )
-        {
-            return *( m_item->GetEffectiveNetClass() )
-                   != *( bValue->m_item->GetEffectiveNetClass() );
-        }
-
-        if( b->GetType() == LIBEVAL::VT_STRING )
-        {
-            const bool isInConstituents =
-                    m_item->GetEffectiveNetClass()->ContainsNetclassWithName( b->AsString() );
-            const bool isFullName = m_item->GetEffectiveNetClass()->GetName() == b->AsString();
-
-            return !isInConstituents && !isFullName;
-        }
-
-        return LIBEVAL::VALUE::NotEqualTo( aCtx, b );
+            return m_item->GetEffectiveNetClass() != bValue->m_item->GetEffectiveNetClass();
+        else
+            return LIBEVAL::VALUE::NotEqualTo( aCtx, b );
     }
 
 protected:
@@ -236,16 +218,10 @@ public:
             // of all unique component class objects
             return aClass == bClass;
         }
-
-        if( b->GetType() == LIBEVAL::VT_STRING )
+        else
         {
-            if( m_item->GetComponentClass()->ContainsClassName( b->AsString() ) )
-                return true;
-
-            return m_item->GetComponentClass()->GetFullName() == b->AsString();
+            return LIBEVAL::VALUE::EqualTo( aCtx, b );
         }
-
-        return LIBEVAL::VALUE::EqualTo( aCtx, b );
     }
 
     bool NotEqualTo( LIBEVAL::CONTEXT* aCtx, const LIBEVAL::VALUE* b ) const override
@@ -254,7 +230,7 @@ public:
                     dynamic_cast<const PCBEXPR_COMPONENT_CLASS_VALUE*>( b ) )
         {
             if( !m_item || !bValue->m_item )
-                return LIBEVAL::VALUE::NotEqualTo( aCtx, b );
+                return LIBEVAL::VALUE::EqualTo( aCtx, b );
 
             const COMPONENT_CLASS* aClass = m_item->GetComponentClass();
             const COMPONENT_CLASS* bClass = bValue->m_item->GetComponentClass();
@@ -263,17 +239,10 @@ public:
             // of all unique component class objects
             return aClass != bClass;
         }
-
-        if( b->GetType() == LIBEVAL::VT_STRING )
+        else
         {
-            const bool isInConstituents =
-                    m_item->GetComponentClass()->ContainsClassName( b->AsString() );
-            const bool isFullName = m_item->GetComponentClass()->GetFullName() == b->AsString();
-
-            return !isInConstituents && !isFullName;
+            return LIBEVAL::VALUE::NotEqualTo( aCtx, b );
         }
-
-        return LIBEVAL::VALUE::NotEqualTo( aCtx, b );
     }
 
 protected:
@@ -356,20 +325,6 @@ LIBEVAL::VALUE* PCBEXPR_VAR_REF::GetValue( LIBEVAL::CONTEXT* aCtx )
             }
 
             return new LIBEVAL::VALUE( static_cast<double>( item->Get<int>( it->second ) ) );
-        }
-        else if( m_type == LIBEVAL::VT_NUMERIC_DOUBLE )
-        {
-            if( m_isOptional )
-            {
-                auto val = item->Get<std::optional<double>>( it->second );
-
-                if( val.has_value() )
-                    return new LIBEVAL::VALUE( val.value() );
-
-                return LIBEVAL::VALUE::MakeNullValue();
-            }
-
-            return new LIBEVAL::VALUE( item->Get<double>( it->second ) );
         }
         else
         {
@@ -549,15 +504,6 @@ std::unique_ptr<LIBEVAL::VAR_REF> PCBEXPR_UCODE::CreateVarRef( const wxString& a
                     vref->SetType( LIBEVAL::VT_NUMERIC );
                     vref->SetIsOptional();
                 }
-                else if( prop->TypeHash() == TYPE_HASH( double ) )
-                {
-                    vref->SetType( LIBEVAL::VT_NUMERIC_DOUBLE );
-                }
-                else if( prop->TypeHash() == TYPE_HASH( std::optional<double> ) )
-                {
-                    vref->SetType( LIBEVAL::VT_NUMERIC_DOUBLE );
-                    vref->SetIsOptional();
-                }
                 else if( prop->TypeHash() == TYPE_HASH( bool ) )
                 {
                     vref->SetType( LIBEVAL::VT_NUMERIC );
@@ -605,8 +551,7 @@ BOARD* PCBEXPR_CONTEXT::GetBoard() const
 
 const std::vector<wxString>& PCBEXPR_UNIT_RESOLVER::GetSupportedUnits() const
 {
-    static const std::vector<wxString> pcbUnits = { wxT( "mil" ), wxT( "mm" ), wxT( "in" ),
-                                                    wxT( "deg" ) };
+    static const std::vector<wxString> pcbUnits = { wxT( "mil" ), wxT( "mm" ), wxT( "in" ) };
 
     return pcbUnits;
 }
@@ -614,7 +559,7 @@ const std::vector<wxString>& PCBEXPR_UNIT_RESOLVER::GetSupportedUnits() const
 
 wxString PCBEXPR_UNIT_RESOLVER::GetSupportedUnitsMessage() const
 {
-    return _( "must be mm, in, mil, or deg" );
+    return _( "must be mm, in, or mil" );
 }
 
 
@@ -625,8 +570,8 @@ double PCBEXPR_UNIT_RESOLVER::Convert( const wxString& aString, int unitId ) con
     switch( unitId )
     {
     case 0: return EDA_UNIT_UTILS::UI::DoubleValueFromString( pcbIUScale, EDA_UNITS::MILS, aString );
-    case 1: return EDA_UNIT_UTILS::UI::DoubleValueFromString( pcbIUScale, EDA_UNITS::MM, aString );
-    case 2: return EDA_UNIT_UTILS::UI::DoubleValueFromString( pcbIUScale, EDA_UNITS::INCH, aString );
+    case 1: return EDA_UNIT_UTILS::UI::DoubleValueFromString( pcbIUScale, EDA_UNITS::MILLIMETRES, aString );
+    case 2: return EDA_UNIT_UTILS::UI::DoubleValueFromString( pcbIUScale, EDA_UNITS::INCHES, aString );
     default: return v;
     }
 };

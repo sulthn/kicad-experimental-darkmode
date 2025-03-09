@@ -325,7 +325,6 @@ bool EE_SELECTION_TOOL::Init()
     menu.AddItem( EE_ACTIONS::breakWire,          linesSelection     && EE_CONDITIONS::Idle, 250 );
     menu.AddItem( EE_ACTIONS::slice,              linesSelection     && EE_CONDITIONS::Idle, 250 );
     menu.AddItem( EE_ACTIONS::placeSheetPin,      sheetSelection     && EE_CONDITIONS::Idle, 250 );
-    menu.AddItem( EE_ACTIONS::autoplaceAllSheetPins, sheetSelection  && EE_CONDITIONS::Idle, 250 );
     menu.AddItem( EE_ACTIONS::syncSheetPins,      sheetSelection     && EE_CONDITIONS::Idle, 250 );
     menu.AddItem( EE_ACTIONS::assignNetclass,     connectedSelection && EE_CONDITIONS::Idle, 250 );
     menu.AddItem( EE_ACTIONS::editPageNumber,     schEditSheetPageNumberCondition, 250 );
@@ -607,11 +606,7 @@ int EE_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
 
             EE_COLLECTOR collector;
 
-            if( m_selection.GetSize() == 1 && dynamic_cast<SCH_TABLE*>( m_selection.GetItem( 0 ) ) )
-            {
-                m_toolMgr->RunAction( EE_ACTIONS::move );
-            }
-            else if( CollectHits( collector, evt->DragOrigin(), { SCH_TABLECELL_T } ) )
+            if( CollectHits( collector, evt->DragOrigin(), { SCH_TABLECELL_T } ) )
             {
                 selectTableCells( static_cast<SCH_TABLE*>( collector[0]->GetParent() ) );
             }
@@ -1005,15 +1000,14 @@ int EE_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
             evt->SetPassEvent();
         }
 
-        if( lastRolloverItem != niluuid && lastRolloverItem != rolloverItem )
+        if( rolloverItem != lastRolloverItem )
         {
-            EDA_ITEM* item = m_frame->GetItem( lastRolloverItem );
-
-            if( item->IsRollover() )
+            if( EDA_ITEM* item = m_frame->GetItem( lastRolloverItem ) )
             {
-                item->SetIsRollover( false );
+                item->ClearFlags( IS_ROLLOVER );
+                lastRolloverItem = niluuid;
 
-                if( item->Type() == SCH_FIELD_T || item->Type() == SCH_TABLECELL_T )
+                if( item->Type() == SCH_FIELD_T )
                     m_frame->GetCanvas()->GetView()->Update( item->GetParent() );
                 else
                     m_frame->GetCanvas()->GetView()->Update( item );
@@ -1024,18 +1018,17 @@ int EE_SELECTION_TOOL::Main( const TOOL_EVENT& aEvent )
         {
             EDA_ITEM* item = m_frame->GetItem( rolloverItem );
 
-            if( !item->IsRollover() )
+            if( item && !( item->GetFlags() & IS_ROLLOVER ) )
             {
-                item->SetIsRollover( true );
+                item->SetFlags( IS_ROLLOVER );
+                lastRolloverItem = rolloverItem;
 
-                if( item->Type() == SCH_FIELD_T || item->Type() == SCH_TABLECELL_T )
+                if( item->Type() == SCH_FIELD_T )
                     m_frame->GetCanvas()->GetView()->Update( item->GetParent() );
                 else
                     m_frame->GetCanvas()->GetView()->Update( item );
             }
         }
-
-        lastRolloverItem = rolloverItem;
 
         if( m_frame->ToolStackIsEmpty() )
         {
@@ -1124,7 +1117,7 @@ OPT_TOOL_EVENT EE_SELECTION_TOOL::autostartEvent( TOOL_EVENT* aEvent, EE_GRID_HE
             const SCH_SYMBOL* symbol = static_cast<const SCH_SYMBOL*>( aItem );
             const SCH_PIN*    pin = symbol->GetPin( pos );
 
-            if( !pin || !pin->IsPointClickableAnchor( pos ) )
+            if( !pin )
                 return OPT_TOOL_EVENT();
 
             if( !pin->IsVisible()
@@ -1636,7 +1629,7 @@ void EE_SELECTION_TOOL::GuessSelectionCandidates( EE_COLLECTOR& collector, const
                 }
 
                 // Filled shapes win hit tests anywhere inside them
-                dominating = shape->IsFilledForHitTesting();
+                dominating = shape->IsFilled();
             }
             else if( symbol )
             {
@@ -2709,9 +2702,6 @@ bool EE_SELECTION_TOOL::Selectable( const EDA_ITEM* aItem, const VECTOR2I* aPos,
         break;
     }
 
-    case NOT_USED:      // Things like CONSTRUCTION_GEOM that aren't part of the model
-        return false;
-
     default:            // Suppress warnings
         break;
     }
@@ -2858,50 +2848,6 @@ bool EE_SELECTION_TOOL::selectionContains( const VECTOR2I& aPoint ) const
 }
 
 
-int EE_SELECTION_TOOL::SelectNext( const TOOL_EVENT& aEvent )
-{
-    SCH_EDIT_FRAME* editFrame = dynamic_cast<SCH_EDIT_FRAME*>( m_frame );
-
-    if( !editFrame || !editFrame->GetNetNavigator() || m_selection.Size() == 0 )
-        return 0;
-
-    if( !m_selection.Front()->IsBrightened() )
-        return 0;
-
-    const SCH_ITEM* item = editFrame->SelectNextPrevNetNavigatorItem( true );
-
-    if( item )
-    {
-        select( const_cast<SCH_ITEM*>( item ) );
-        m_toolMgr->ProcessEvent( EVENTS::SelectedEvent );
-    }
-
-    return 0;
-}
-
-
-int EE_SELECTION_TOOL::SelectPrevious( const TOOL_EVENT& aEvent )
-{
-    SCH_EDIT_FRAME* editFrame = dynamic_cast<SCH_EDIT_FRAME*>( m_frame );
-
-    if( !editFrame || !editFrame->GetNetNavigator() || m_selection.Size() == 0 )
-        return 0;
-
-    if( !m_selection.Front()->IsBrightened() )
-        return 0;
-
-    const SCH_ITEM* item = editFrame->SelectNextPrevNetNavigatorItem( false );
-
-    if( item )
-    {
-        select( const_cast<SCH_ITEM*>( item ) );
-        m_toolMgr->ProcessEvent( EVENTS::SelectedEvent );
-    }
-
-    return 0;
-}
-
-
 void EE_SELECTION_TOOL::setTransitions()
 {
     Go( &EE_SELECTION_TOOL::UpdateMenu,          ACTIONS::updateMenu.MakeEvent() );
@@ -2923,9 +2869,6 @@ void EE_SELECTION_TOOL::setTransitions()
 
     Go( &EE_SELECTION_TOOL::SelectAll,           EE_ACTIONS::selectAll.MakeEvent() );
     Go( &EE_SELECTION_TOOL::UnselectAll,         EE_ACTIONS::unselectAll.MakeEvent() );
-
-    Go( &EE_SELECTION_TOOL::SelectNext,          EE_ACTIONS::nextNetItem.MakeEvent() );
-    Go( &EE_SELECTION_TOOL::SelectPrevious,      EE_ACTIONS::previousNetItem.MakeEvent() );
 
     Go( &EE_SELECTION_TOOL::disambiguateCursor,  EVENTS::DisambiguatePoint );
 }

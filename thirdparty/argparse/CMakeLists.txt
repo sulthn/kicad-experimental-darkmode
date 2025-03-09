@@ -7,14 +7,14 @@ else()
 endif()
 
 project(argparse
-        VERSION 3.2.0 
+        VERSION 3.0.0 
         DESCRIPTION "A single header argument parser for C++17"
         HOMEPAGE_URL "https://github.com/p-ranav/argparse"
         LANGUAGES CXX
 )
 
-option(ARGPARSE_INSTALL "Include an install target" ${ARGPARSE_IS_TOP_LEVEL})
-option(ARGPARSE_BUILD_TESTS "Build tests" ${ARGPARSE_IS_TOP_LEVEL})
+option(ARGPARSE_INSTALL "Include an install target" ON)
+option(ARGPARSE_BUILD_TESTS "Build tests" ON)
 option(ARGPARSE_BUILD_SAMPLES "Build samples" OFF)
 
 include(GNUInstallDirs)
@@ -32,11 +32,11 @@ if(ARGPARSE_BUILD_SAMPLES)
   add_subdirectory(samples)
 endif()
   
-if(ARGPARSE_BUILD_TESTS)
+if(ARGPARSE_BUILD_TESTS AND ARGPARSE_IS_TOP_LEVEL)
   add_subdirectory(test)
 endif()
   
-if(ARGPARSE_INSTALL)
+if(ARGPARSE_INSTALL AND ARGPARSE_IS_TOP_LEVEL)
   install(TARGETS argparse EXPORT argparseConfig)
   install(EXPORT argparseConfig
           NAMESPACE argparse::
@@ -55,7 +55,7 @@ if(ARGPARSE_INSTALL)
   endif()
 
   write_basic_package_version_file("${CMAKE_CONFIG_VERSION_FILE_NAME}"
-      COMPATIBILITY SameMajorVersion
+      COMPATIBILITY ExactVersion
       ${OPTIONAL_ARCH_INDEPENDENT}
   )
 

@@ -1006,24 +1006,6 @@ int BOARD_EDITOR_CONTROL::ViaSizeDec( const TOOL_EVENT& aEvent )
 }
 
 
-int BOARD_EDITOR_CONTROL::AutoTrackWidth( const TOOL_EVENT& aEvent )
-{
-    BOARD_DESIGN_SETTINGS& bds = getModel<BOARD>()->GetDesignSettings();
-
-    if( bds.UseCustomTrackViaSize() )
-    {
-        bds.UseCustomTrackViaSize( false );
-        bds.m_UseConnectedTrackWidth = true;
-    }
-    else
-    {
-        bds.m_UseConnectedTrackWidth = !bds.m_UseConnectedTrackWidth;
-    }
-
-    return 0;
-}
-
-
 int BOARD_EDITOR_CONTROL::PlaceFootprint( const TOOL_EVENT& aEvent )
 {
     if( m_inPlaceFootprint )
@@ -1200,7 +1182,7 @@ int BOARD_EDITOR_CONTROL::PlaceFootprint( const TOOL_EVENT& aEvent )
         }
         else if( evt->IsClick( BUT_RIGHT ) )
         {
-            m_menu->ShowContextMenu( selection() );
+            m_menu->ShowContextMenu(  selection()  );
         }
         else if( fp && ( evt->IsMotion() || evt->IsAction( &ACTIONS::refreshPreview ) ) )
         {
@@ -1668,14 +1650,6 @@ int BOARD_EDITOR_CONTROL::DrillOrigin( const TOOL_EVENT& aEvent )
         return 0;
     }
 
-    if( aEvent.IsAction( &PCB_ACTIONS::drillSetOrigin ) )
-    {
-        VECTOR2I origin = aEvent.Parameter<VECTOR2I>();
-        m_frame->SaveCopyInUndoList( m_placeOrigin.get(), UNDO_REDO::GRIDORIGIN );
-        DoSetDrillOrigin( getView(), m_frame, m_placeOrigin.get(), origin );
-        return 0;
-    }
-
     PCB_PICKER_TOOL* picker = m_toolMgr->GetTool<PCB_PICKER_TOOL>();
 
     // Deactivate other tools; particularly important if another PICKER is currently running
@@ -1736,7 +1710,6 @@ void BOARD_EDITOR_CONTROL::setTransitions()
     Go( &BOARD_EDITOR_CONTROL::TrackWidthDec,          PCB_ACTIONS::trackWidthDec.MakeEvent() );
     Go( &BOARD_EDITOR_CONTROL::ViaSizeInc,             PCB_ACTIONS::viaSizeInc.MakeEvent() );
     Go( &BOARD_EDITOR_CONTROL::ViaSizeDec,             PCB_ACTIONS::viaSizeDec.MakeEvent() );
-    Go( &BOARD_EDITOR_CONTROL::AutoTrackWidth,         PCB_ACTIONS::autoTrackWidth.MakeEvent() );
 
     // Zone actions
     Go( &BOARD_EDITOR_CONTROL::ZoneMerge,              PCB_ACTIONS::zoneMerge.MakeEvent() );
@@ -1746,7 +1719,6 @@ void BOARD_EDITOR_CONTROL::setTransitions()
     Go( &BOARD_EDITOR_CONTROL::PlaceFootprint,         PCB_ACTIONS::placeFootprint.MakeEvent() );
     Go( &BOARD_EDITOR_CONTROL::DrillOrigin,            PCB_ACTIONS::drillOrigin.MakeEvent() );
     Go( &BOARD_EDITOR_CONTROL::DrillOrigin,            PCB_ACTIONS::drillResetOrigin.MakeEvent() );
-    Go( &BOARD_EDITOR_CONTROL::DrillOrigin,            PCB_ACTIONS::drillSetOrigin.MakeEvent() );
 
     Go( &BOARD_EDITOR_CONTROL::EditFpInFpEditor,       PCB_ACTIONS::editFpInFpEditor.MakeEvent() );
     Go( &BOARD_EDITOR_CONTROL::EditFpInFpEditor,       PCB_ACTIONS::editLibFpInFpEditor.MakeEvent() );

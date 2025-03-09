@@ -29,7 +29,6 @@
 #include <sch_painter.h>
 #include <symbol_editor_settings.h>
 #include <symbol_library_manager.h>
-#include <toolbars_symbol_editor.h>
 #include <tool/action_toolbar.h>
 #include <tool/tool_manager.h>
 #include <tools/ee_actions.h>
@@ -45,135 +44,174 @@
 #endif
 
 
-std::optional<TOOLBAR_CONFIGURATION> SYMBOL_EDIT_TOOLBAR_SETTINGS::DefaultToolbarConfig( TOOLBAR_LOC aToolbar )
+void SYMBOL_EDIT_FRAME::ReCreateVToolbar()
 {
-    TOOLBAR_CONFIGURATION config;
-
-    // clang-format off
-    switch( aToolbar )
+    if( m_drawToolBar )
     {
-    case TOOLBAR_LOC::TOP_AUX:
-        return std::nullopt;
-
-    case TOOLBAR_LOC::LEFT:
-        config.AppendAction( ACTIONS::toggleGrid )
-              .AppendAction( ACTIONS::toggleGridOverrides )
-              .AppendAction( ACTIONS::inchesUnits )
-              .AppendAction( ACTIONS::milsUnits )
-              .AppendAction( ACTIONS::millimetersUnits )
-              .AppendAction( ACTIONS::toggleCursorStyle );
-
-        config.AppendSeparator()
-              .AppendAction( EE_ACTIONS::showElectricalTypes )
-              .AppendAction( EE_ACTIONS::showHiddenPins )
-              .AppendAction( EE_ACTIONS::showHiddenFields );
-        //    .AppendAction( EE_ACTIONS::togglePinAltIcons );
-
-        if( ADVANCED_CFG::GetCfg().m_DrawBoundingBoxes )
-            config.AppendAction( ACTIONS::toggleBoundingBoxes );
-
-        config.AppendSeparator()
-              .AppendAction( ACTIONS::showLibraryTree )
-              .AppendAction( ACTIONS::showProperties );
-
-        /* TODO: Implement context menus
-        EE_SELECTION_TOOL* selTool = m_toolManager->GetTool<EE_SELECTION_TOOL>();
-        std::unique_ptr<ACTION_MENU> gridMenu = std::make_unique<ACTION_MENU>( false, selTool );
-        gridMenu->Add( ACTIONS::gridProperties );
-        m_tbLeft->AddToolContextMenu( ACTIONS::toggleGrid, std::move( gridMenu ) );
-        */
-        break;
-
-    case TOOLBAR_LOC::RIGHT:
-        config.AppendAction( ACTIONS::selectionTool );
-
-        config.AppendSeparator()
-              .AppendAction( EE_ACTIONS::placeSymbolPin )
-              .AppendAction( EE_ACTIONS::placeSymbolText )
-              .AppendAction( EE_ACTIONS::drawSymbolTextBox )
-              .AppendAction( EE_ACTIONS::drawRectangle )
-              .AppendAction( EE_ACTIONS::drawCircle )
-              .AppendAction( EE_ACTIONS::drawArc )
-              .AppendAction( EE_ACTIONS::drawBezier )
-              .AppendAction( EE_ACTIONS::drawSymbolLines )
-              .AppendAction( EE_ACTIONS::drawSymbolPolygon )
-              .AppendAction( EE_ACTIONS::placeSymbolAnchor )
-              .AppendAction( ACTIONS::deleteTool);
-        break;
-
-    case TOOLBAR_LOC::TOP_MAIN:
-        config.AppendAction( EE_ACTIONS::newSymbol );
-
-/* TODO (ISM): Handle visibility changes
-        if( !IsSymbolFromSchematic() )
-            config.AppendAction( ACTIONS::saveAll );
-        else
-            config.AppendAction( ACTIONS::save );
-*/
-
-        config.AppendSeparator()
-              .AppendAction( ACTIONS::undo )
-              .AppendAction( ACTIONS::redo );
-
-        config.AppendSeparator()
-              .AppendAction( ACTIONS::zoomRedraw )
-              .AppendAction( ACTIONS::zoomInCenter )
-              .AppendAction( ACTIONS::zoomOutCenter )
-              .AppendAction( ACTIONS::zoomFitScreen )
-              .AppendAction( ACTIONS::zoomTool );
-
-        config.AppendSeparator()
-              .AppendAction( EE_ACTIONS::rotateCCW )
-              .AppendAction( EE_ACTIONS::rotateCW )
-              .AppendAction( EE_ACTIONS::mirrorV )
-              .AppendAction( EE_ACTIONS::mirrorH );
-
-        config.AppendSeparator()
-              .AppendAction( EE_ACTIONS::symbolProperties )
-              .AppendAction( EE_ACTIONS::pinTable );
-
-        config.AppendSeparator()
-              .AppendAction( ACTIONS::showDatasheet )
-              .AppendAction( EE_ACTIONS::checkSymbol );
-
-        config.AppendSeparator()
-              .AppendAction( EE_ACTIONS::showDeMorganStandard )
-              .AppendAction( EE_ACTIONS::showDeMorganAlternate );
-
-        config.AppendSeparator()
-              .AppendControl( ACTION_TOOLBAR_CONTROLS::unitSelector );
-
-        config.AppendSeparator()
-              .AppendAction( EE_ACTIONS::toggleSyncedPinsMode );
-
-        config.AppendSeparator()
-              .AppendAction( EE_ACTIONS::addSymbolToSchematic );
-        break;
+        m_drawToolBar->ClearToolbar();
+    }
+    else
+    {
+        m_drawToolBar = new ACTION_TOOLBAR( this, ID_V_TOOLBAR, wxDefaultPosition, wxDefaultSize,
+                                            KICAD_AUI_TB_STYLE | wxAUI_TB_VERTICAL );
+        m_drawToolBar->SetAuiManager( &m_auimgr );
     }
 
+    // Set up toolbar
+    // clang-format off
+    m_drawToolBar->Add( ACTIONS::selectionTool,           ACTION_TOOLBAR::TOGGLE );
+
+    m_drawToolBar->AddScaledSeparator( this );
+    m_drawToolBar->Add( EE_ACTIONS::placeSymbolPin,       ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::placeSymbolText,      ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::drawSymbolTextBox,    ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::drawRectangle,        ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::drawCircle,           ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::drawArc,              ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::drawBezier,           ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::drawSymbolLines,      ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::drawSymbolPolygon,    ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( EE_ACTIONS::placeSymbolAnchor,    ACTION_TOOLBAR::TOGGLE );
+    m_drawToolBar->Add( ACTIONS::deleteTool,              ACTION_TOOLBAR::TOGGLE );
     // clang-format on
-    return config;
+
+    m_drawToolBar->Realize();
 }
 
 
-void SYMBOL_EDIT_FRAME::configureToolbars()
+void SYMBOL_EDIT_FRAME::ReCreateHToolbar()
 {
-    SCH_BASE_FRAME::configureToolbars();
+    if( m_mainToolBar )
+    {
+        m_mainToolBar->ClearToolbar();
+    }
+    else
+    {
+        m_mainToolBar = new ACTION_TOOLBAR( this, ID_H_TOOLBAR, wxDefaultPosition, wxDefaultSize,
+                                            KICAD_AUI_TB_STYLE | wxAUI_TB_HORZ_LAYOUT );
+        m_mainToolBar->SetAuiManager( &m_auimgr );
+    }
 
-    auto unitDisplayFactory =
-        [this]( ACTION_TOOLBAR* aToolbar )
-        {
-            if( !m_unitSelectBox )
-            {
-                m_unitSelectBox = new wxComboBox( aToolbar, ID_LIBEDIT_SELECT_UNIT_NUMBER,
-                                                  wxEmptyString, wxDefaultPosition,
-                                                  wxSize( LISTBOX_WIDTH, -1 ), 0,
-                                                  nullptr, wxCB_READONLY );
-            }
+    // Set up toolbar
+    m_mainToolBar->Add( EE_ACTIONS::newSymbol );
 
-            aToolbar->Add( m_unitSelectBox );
-        };
+    if( !IsSymbolFromSchematic() )
+        m_mainToolBar->Add( ACTIONS::saveAll );
+    else
+        m_mainToolBar->Add( ACTIONS::save );
 
-    RegisterCustomToolbarControlFactory( ACTION_TOOLBAR_CONTROLS::unitSelector, unitDisplayFactory );
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( ACTIONS::undo );
+    m_mainToolBar->Add( ACTIONS::redo );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( ACTIONS::zoomRedraw );
+    m_mainToolBar->Add( ACTIONS::zoomInCenter );
+    m_mainToolBar->Add( ACTIONS::zoomOutCenter );
+    m_mainToolBar->Add( ACTIONS::zoomFitScreen );
+    m_mainToolBar->Add( ACTIONS::zoomTool, ACTION_TOOLBAR::TOGGLE, ACTION_TOOLBAR::CANCEL );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( EE_ACTIONS::rotateCCW );
+    m_mainToolBar->Add( EE_ACTIONS::rotateCW );
+    m_mainToolBar->Add( EE_ACTIONS::mirrorV );
+    m_mainToolBar->Add( EE_ACTIONS::mirrorH );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( EE_ACTIONS::symbolProperties );
+    m_mainToolBar->Add( EE_ACTIONS::pinTable );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( ACTIONS::showDatasheet );
+    m_mainToolBar->Add( EE_ACTIONS::checkSymbol );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( EE_ACTIONS::showDeMorganStandard,  ACTION_TOOLBAR::TOGGLE );
+    m_mainToolBar->Add( EE_ACTIONS::showDeMorganAlternate, ACTION_TOOLBAR::TOGGLE );
+
+    m_mainToolBar->AddScaledSeparator( this );
+
+    if( m_unitSelectBox == nullptr )
+        m_unitSelectBox = new wxComboBox( m_mainToolBar, ID_LIBEDIT_SELECT_UNIT_NUMBER,
+                wxEmptyString, wxDefaultPosition, wxSize( LISTBOX_WIDTH, -1 ), 0,
+                nullptr, wxCB_READONLY );
+    m_mainToolBar->AddControl( m_unitSelectBox );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( EE_ACTIONS::toggleSyncedPinsMode, ACTION_TOOLBAR::TOGGLE );
+
+    m_mainToolBar->AddScaledSeparator( this );
+    m_mainToolBar->Add( EE_ACTIONS::addSymbolToSchematic );
+
+    // after adding the buttons to the toolbar, must call Realize() to reflect the changes
+    m_mainToolBar->Realize();
 }
 
+
+void SYMBOL_EDIT_FRAME::ReCreateOptToolbar()
+{
+    if( m_optionsToolBar )
+    {
+        m_optionsToolBar->ClearToolbar();
+    }
+    else
+    {
+        m_optionsToolBar = new ACTION_TOOLBAR( this, ID_OPT_TOOLBAR,
+                                               wxDefaultPosition, wxDefaultSize,
+                                               KICAD_AUI_TB_STYLE | wxAUI_TB_VERTICAL );
+        m_optionsToolBar->SetAuiManager( &m_auimgr );
+    }
+
+    m_optionsToolBar->Add( ACTIONS::toggleGrid,             ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::toggleGridOverrides,    ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::inchesUnits,            ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::milsUnits,              ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::millimetersUnits,       ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::toggleCursorStyle,      ACTION_TOOLBAR::TOGGLE );
+
+    m_optionsToolBar->AddScaledSeparator( this );
+    m_optionsToolBar->Add( EE_ACTIONS::showElectricalTypes, ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( EE_ACTIONS::showHiddenPins,      ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( EE_ACTIONS::showHiddenFields,    ACTION_TOOLBAR::TOGGLE );
+    // m_optionsToolBar->Add( EE_ACTIONS::togglePinAltIcons,   ACTION_TOOLBAR::TOGGLE );
+
+    if( ADVANCED_CFG::GetCfg().m_DrawBoundingBoxes )
+        m_optionsToolBar->Add( ACTIONS::toggleBoundingBoxes, ACTION_TOOLBAR::TOGGLE );
+
+    m_optionsToolBar->AddScaledSeparator( this );
+    m_optionsToolBar->Add( ACTIONS::showLibraryTree,        ACTION_TOOLBAR::TOGGLE );
+    m_optionsToolBar->Add( ACTIONS::showProperties,         ACTION_TOOLBAR::TOGGLE );
+
+    EE_SELECTION_TOOL* selTool = m_toolManager->GetTool<EE_SELECTION_TOOL>();
+    std::unique_ptr<ACTION_MENU> gridMenu = std::make_unique<ACTION_MENU>( false, selTool );
+    gridMenu->Add( ACTIONS::gridProperties );
+    m_optionsToolBar->AddToolContextMenu( ACTIONS::toggleGrid, std::move( gridMenu ) );
+
+    m_optionsToolBar->Realize();
+}
+
+
+void SYMBOL_EDIT_FRAME::ToggleProperties()
+{
+    if( !m_propertiesPanel )
+        return;
+
+    bool show = !m_propertiesPanel->IsShownOnScreen();
+
+    wxAuiPaneInfo& propertiesPaneInfo = m_auimgr.GetPane( PropertiesPaneName() );
+    propertiesPaneInfo.Show( show );
+    updateSelectionFilterVisbility();
+
+    if( show )
+    {
+        SetAuiPaneSize( m_auimgr, propertiesPaneInfo,
+                        m_settings->m_AuiPanels.properties_panel_width, -1 );
+    }
+    else
+    {
+        m_settings->m_AuiPanels.properties_panel_width = m_propertiesPanel->GetSize().x;
+    }
+
+    m_auimgr.Update();
+    Refresh();
+}

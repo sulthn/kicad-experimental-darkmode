@@ -488,11 +488,11 @@ void BACK_ANNOTATE::applyChangelist()
             {
                 const wxString& fpFieldName = field.first;
                 const wxString& fpFieldValue = field.second;
-                SCH_FIELD*      symField = symbol->GetField( fpFieldName );
+                SCH_FIELD*      symField = symbol->FindField( fpFieldName );
 
                 // Skip fields that are individually controlled
-                if( fpFieldName == GetCanonicalFieldName( FIELD_T::REFERENCE )
-                    || fpFieldName == GetCanonicalFieldName( FIELD_T::VALUE ) )
+                if( fpFieldName == GetCanonicalFieldName( REFERENCE_FIELD )
+                    || fpFieldName == GetCanonicalFieldName( VALUE_FIELD ) )
                 {
                     continue;
                 }
@@ -527,8 +527,8 @@ void BACK_ANNOTATE::applyChangelist()
 
                     if( !m_dryRun )
                     {
-                        SCH_FIELD newField( symbol->GetPosition(), FIELD_T::USER, symbol,
-                                            fpFieldName );
+                        SCH_FIELD newField( symbol->GetPosition(), symbol->GetNextFieldId(),
+                                            symbol, fpFieldName );
                         newField.SetText( fpFieldValue );
                         newField.SetVisible( false ); // Don't clutter up the schematic
                         symbol->AddField( newField );
@@ -540,22 +540,28 @@ void BACK_ANNOTATE::applyChangelist()
 
             // 3. Existing field has been deleted from footprint and needs to be deleted from symbol
             // Check all symbol fields for existence in the footprint field map
-            for( SCH_FIELD& field : symbol->GetFields() )
+            for( int ii = symbol->GetFieldCount() - 1; ii >= 0; --ii )
             {
-                // Never delete mandatory fields
-                if( field.IsMandatory() )
+                SCH_FIELD* field = symbol->GetFieldById( ii );
+
+                if( !field )
                     continue;
 
-                if( fpData.m_fieldsMap.find( field.GetCanonicalName() ) == fpData.m_fieldsMap.end() )
+                // Never delete mandatory fields
+                if( field->IsMandatory() )
+                    continue;
+
+                if( fpData.m_fieldsMap.find( field->GetCanonicalName() )
+                    == fpData.m_fieldsMap.end() )
                 {
                     // Field not found in footprint field map, delete it
                     m_changesCount++;
                     msg.Printf( _( "Delete %s field '%s.'" ),
                                 ref.GetRef(),
-                                EscapeHTML( field.GetName() ) );
+                                EscapeHTML( field->GetCanonicalName() ) );
 
                     if( !m_dryRun )
-                        symbol->RemoveField( symbol->GetField( field.GetName() ) );
+                        symbol->RemoveField( field );
 
                     m_reporter.ReportHead( msg, RPT_SEVERITY_ACTION );
                 }
@@ -710,7 +716,7 @@ void BACK_ANNOTATE::processNetNameChange( SCH_COMMIT* aCommit, const wxString& a
         SCH_PIN*   schPin = static_cast<SCH_PIN*>( driver );
         SPIN_STYLE spin   = orientLabel( schPin );
 
-        if( schPin->IsPower() )
+        if( schPin->IsGlobalPower() )
         {
             msg.Printf( _( "Net %s cannot be changed to %s because it is driven by a power pin." ),
                         EscapeHTML( aOldName ),

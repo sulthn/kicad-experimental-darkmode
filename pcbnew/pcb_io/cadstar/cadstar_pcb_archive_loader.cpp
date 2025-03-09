@@ -3257,11 +3257,11 @@ void CADSTAR_PCB_ARCHIVE_LOADER::addAttribute( const ATTRIBUTE_LOCATION& aCadsta
                                                FOOTPRINT* aFootprint,
                                                const wxString& aAttributeValue )
 {
-    PCB_FIELD* field;
+    PCB_TEXT* txt;
 
     if( aCadstarAttributeID == COMPONENT_NAME_ATTRID )
     {
-        field = &aFootprint->Reference(); //text should be set outside this function
+        txt = &aFootprint->Reference(); //text should be set outside this function
     }
     else if( aCadstarAttributeID == PART_NAME_ATTRID )
     {
@@ -3269,15 +3269,15 @@ void CADSTAR_PCB_ARCHIVE_LOADER::addAttribute( const ATTRIBUTE_LOCATION& aCadsta
         {
             // Use PART_NAME_ATTRID as the value is value field is blank
             aFootprint->SetValue( aAttributeValue );
-            field = &aFootprint->Value();
+            txt = &aFootprint->Value();
         }
         else
         {
-            field = new PCB_FIELD( aFootprint, FIELD_T::USER, aCadstarAttributeID );
-            aFootprint->Add( field );
-            field->SetText( aAttributeValue );
+            txt = new PCB_TEXT( aFootprint );
+            aFootprint->Add( txt );
+            txt->SetText( aAttributeValue );
         }
-        field->SetVisible( false ); //make invisible to avoid clutter.
+        txt->SetVisible( false ); //make invisible to avoid clutter.
     }
     else if( aCadstarAttributeID != COMPONENT_NAME_2_ATTRID
              && getAttributeName( aCadstarAttributeID ) == wxT( "Value" ) )
@@ -3289,78 +3289,78 @@ void CADSTAR_PCB_ARCHIVE_LOADER::addAttribute( const ATTRIBUTE_LOCATION& aCadsta
         }
 
         aFootprint->SetValue( aAttributeValue );
-        field = &aFootprint->Value();
-        field->SetVisible( false ); //make invisible to avoid clutter.
+        txt = &aFootprint->Value();
+        txt->SetVisible( false ); //make invisible to avoid clutter.
     }
     else
     {
-        field = new PCB_FIELD( aFootprint, FIELD_T::USER, aCadstarAttributeID );
-        aFootprint->Add( field );
-        field->SetText( aAttributeValue );
-        field->SetVisible( false ); //make all user attributes invisible to avoid clutter.
+        txt = new PCB_TEXT( aFootprint );
+        aFootprint->Add( txt );
+        txt->SetText( aAttributeValue );
+        txt->SetVisible( false ); //make all user attributes invisible to avoid clutter.
         //TODO: Future improvement - allow user to decide what to do with attributes
     }
 
-    field->SetPosition( getKiCadPoint( aCadstarAttrLoc.Position ) );
-    field->SetLayer( getKiCadLayer( aCadstarAttrLoc.LayerID ) );
-    field->SetMirrored( aCadstarAttrLoc.Mirror );
-    field->SetTextAngle( getAngle( aCadstarAttrLoc.OrientAngle ) );
+    txt->SetPosition( getKiCadPoint( aCadstarAttrLoc.Position ) );
+    txt->SetLayer( getKiCadLayer( aCadstarAttrLoc.LayerID ) );
+    txt->SetMirrored( aCadstarAttrLoc.Mirror );
+    txt->SetTextAngle( getAngle( aCadstarAttrLoc.OrientAngle ) );
 
     if( aCadstarAttrLoc.Mirror ) // If mirroring, invert angle to match CADSTAR
-        field->SetTextAngle( -field->GetTextAngle() );
+        txt->SetTextAngle( -txt->GetTextAngle() );
 
-    applyTextCode( field, aCadstarAttrLoc.TextCodeID );
+    applyTextCode( txt, aCadstarAttrLoc.TextCodeID );
 
-    field->SetKeepUpright( false ); //Keeping it upright seems to result in incorrect orientation
+    txt->SetKeepUpright( false ); //Keeping it upright seems to result in incorrect orientation
 
     switch( aCadstarAttrLoc.Alignment )
     {
     case ALIGNMENT::NO_ALIGNMENT: // Default for Single line text is Bottom Left
-        FixTextPositionNoAlignment( field );
+        FixTextPositionNoAlignment( txt );
         KI_FALLTHROUGH;
     case ALIGNMENT::BOTTOMLEFT:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
         break;
 
     case ALIGNMENT::BOTTOMCENTER:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER );
         break;
 
     case ALIGNMENT::BOTTOMRIGHT:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_BOTTOM );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
         break;
 
     case ALIGNMENT::CENTERLEFT:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
         break;
 
     case ALIGNMENT::CENTERCENTER:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER );
         break;
 
     case ALIGNMENT::CENTERRIGHT:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
         break;
 
     case ALIGNMENT::TOPLEFT:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_TOP );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_TOP );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
         break;
 
     case ALIGNMENT::TOPCENTER:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_TOP );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_TOP );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_CENTER );
         break;
 
     case ALIGNMENT::TOPRIGHT:
-        field->SetVertJustify( GR_TEXT_V_ALIGN_TOP );
-        field->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
+        txt->SetVertJustify( GR_TEXT_V_ALIGN_TOP );
+        txt->SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
         break;
 
     default:
@@ -3416,6 +3416,8 @@ void CADSTAR_PCB_ARCHIVE_LOADER:: applyTextCode( EDA_TEXT*          aKiCadText,
         aKiCadText->SetTextSize(
                 VECTOR2I( EDA_UNIT_UTILS::Mils2IU( pcbIUScale, DEFAULT_SIZE_TEXT ),
                           EDA_UNIT_UTILS::Mils2IU( pcbIUScale, DEFAULT_SIZE_TEXT ) ) );
+
+        aKiCadText->SetVisible( false );
     }
     else
     {
@@ -3721,11 +3723,11 @@ void CADSTAR_PCB_ARCHIVE_LOADER::applyDimensionSettings( const DIMENSION&  aCads
                                         aCadstarDim.ID ) );
         KI_FALLTHROUGH;
     case UNITS::MM:
-        aKiCadDim->SetUnitsMode( DIM_UNITS_MODE::MM );
+        aKiCadDim->SetUnitsMode( DIM_UNITS_MODE::MILLIMETRES );
         break;
 
     case UNITS::INCH:
-        aKiCadDim->SetUnitsMode( DIM_UNITS_MODE::INCH );
+        aKiCadDim->SetUnitsMode( DIM_UNITS_MODE::INCHES );
         break;
 
     case UNITS::THOU:

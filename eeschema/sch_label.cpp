@@ -212,12 +212,6 @@ const wxString SCH_LABEL_BASE::GetDefaultFieldName( const wxString& aName, bool 
 }
 
 
-int SCH_LABEL_BASE::GetNextFieldOrdinal() const
-{
-    return NextFieldOrdinal( m_fields );
-}
-
-
 bool SCH_LABEL_BASE::IsType( const std::vector<KICAD_T>& aScanTypes ) const
 {
     static const std::vector<KICAD_T> wireAndPinTypes = { SCH_ITEM_LOCATE_WIRE_T, SCH_PIN_T };
@@ -583,7 +577,7 @@ void SCH_LABEL_BASE::AutoplaceFields( SCH_SCREEN* aScreen, AUTOPLACE_ALGO aAlgo 
             field.SetTextAngle( ANGLE_HORIZONTAL );
             field.SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
 
-            if( field.GetId() == FIELD_T::INTERSHEET_REFS )
+            if( field.GetCanonicalName() == wxT( "Intersheetrefs" ) )
                 offset.x = - ( labelLen + margin );
             else
                 offset.y = accumulated + field.GetTextHeight() / 2;
@@ -594,7 +588,7 @@ void SCH_LABEL_BASE::AutoplaceFields( SCH_SCREEN* aScreen, AUTOPLACE_ALGO aAlgo 
             field.SetTextAngle( ANGLE_VERTICAL );
             field.SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
 
-            if( field.GetId() == FIELD_T::INTERSHEET_REFS )
+            if( field.GetCanonicalName() == wxT( "Intersheetrefs" ) )
                 offset.y = - ( labelLen + margin );
             else
                 offset.x = accumulated + field.GetTextHeight() / 2;
@@ -605,7 +599,7 @@ void SCH_LABEL_BASE::AutoplaceFields( SCH_SCREEN* aScreen, AUTOPLACE_ALGO aAlgo 
             field.SetTextAngle( ANGLE_HORIZONTAL );
             field.SetHorizJustify( GR_TEXT_H_ALIGN_LEFT );
 
-            if( field.GetId() == FIELD_T::INTERSHEET_REFS )
+            if( field.GetCanonicalName() == wxT( "Intersheetrefs" ) )
                 offset.x = labelLen + margin;
             else
                 offset.y = accumulated + field.GetTextHeight() / 2;
@@ -616,7 +610,7 @@ void SCH_LABEL_BASE::AutoplaceFields( SCH_SCREEN* aScreen, AUTOPLACE_ALGO aAlgo 
             field.SetTextAngle( ANGLE_VERTICAL );
             field.SetHorizJustify( GR_TEXT_H_ALIGN_RIGHT );
 
-            if( field.GetId() == FIELD_T::INTERSHEET_REFS )
+            if( field.GetCanonicalName() == wxT( "Intersheetrefs" ) )
                 offset.y = labelLen + margin;
             else
                 offset.x = accumulated + field.GetTextHeight() / 2;
@@ -626,7 +620,7 @@ void SCH_LABEL_BASE::AutoplaceFields( SCH_SCREEN* aScreen, AUTOPLACE_ALGO aAlgo 
 
         field.SetTextPos( GetTextPos() + offset );
 
-        if( field.GetId() == FIELD_T::INTERSHEET_REFS )
+        if( field.GetCanonicalName() != wxT( "Intersheetrefs" ) )
             accumulated += field.GetTextHeight() + margin;
     }
 
@@ -856,43 +850,7 @@ void SCH_LABEL_BASE::RunOnChildren( const std::function<void( SCH_ITEM* )>& aFun
 
 bool SCH_LABEL_BASE::Matches( const EDA_SEARCH_DATA& aSearchData, void* aAuxData ) const
 {
-    if( SCH_ITEM::Matches( UnescapeString( GetText() ), aSearchData ) )
-    {
-        return true;
-    }
-
-    const SCH_SEARCH_DATA* searchData = dynamic_cast<const SCH_SEARCH_DATA*>( &aSearchData );
-    SCH_CONNECTION* connection = nullptr;
-    SCH_SHEET_PATH* sheetPath = reinterpret_cast<SCH_SHEET_PATH*>( aAuxData );
-
-    if( searchData && searchData->searchNetNames && sheetPath
-        && ( connection = Connection( sheetPath ) ) )
-    {
-        if( connection->IsBus() )
-        {
-            auto allMembers = connection->AllMembers();
-
-            std::set<wxString> netNames;
-
-            for( std::shared_ptr<SCH_CONNECTION> member : allMembers )
-                netNames.insert( member->GetNetName() );
-
-            for( const wxString& netName : netNames )
-            {
-                if( EDA_ITEM::Matches( netName, aSearchData ) )
-                    return true;
-            }
-
-            return false;
-        }
-
-        wxString netName = connection->GetNetName();
-
-        if( EDA_ITEM::Matches( netName, aSearchData ) )
-            return true;
-    }
-
-    return false;
+    return SCH_ITEM::Matches( UnescapeString( GetText() ), aSearchData );
 }
 
 
@@ -946,10 +904,7 @@ std::vector<VECTOR2I> SCH_LABEL_BASE::GetConnectionPoints() const
 
 std::vector<int> SCH_LABEL_BASE::ViewGetLayers() const
 {
-    return { LAYER_DANGLING,
-             LAYER_DEVICE,
-             LAYER_NETCLASS_REFS,
-             LAYER_FIELDS,
+    return { LAYER_DANGLING, LAYER_DEVICE, LAYER_NETCLASS_REFS, LAYER_FIELDS,
              LAYER_SELECTION_SHADOWS };
 }
 
@@ -1406,6 +1361,52 @@ void SCH_LABEL_BASE::Plot( PLOTTER* aPlotter, bool aBackground, const SCH_PLOT_O
 }
 
 
+void SCH_LABEL_BASE::Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                            const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed )
+{
+    static std::vector<VECTOR2I> s_poly;
+
+    SCH_CONNECTION* connection = Connection();
+    int             layer = ( connection && connection->IsBus() ) ? LAYER_BUS : m_layer;
+    wxDC*           DC = aSettings->GetPrintDC();
+    COLOR4D         color = aSettings->GetLayerColor( layer );
+    bool            blackAndWhiteMode = GetGRForceBlackPenState();
+    int             penWidth = GetEffectivePenWidth( aSettings );
+    VECTOR2I        text_offset = aOffset + GetSchematicTextOffset( aSettings );
+    COLOR4D          labelColor = GetLabelColor();
+
+    if( !blackAndWhiteMode && labelColor != COLOR4D::UNSPECIFIED )
+        color = labelColor;
+
+    EDA_TEXT::Print( aSettings, text_offset, color );
+
+    CreateGraphicShape( aSettings, s_poly, GetTextPos() + aOffset );
+
+    if( GetShape() == LABEL_FLAG_SHAPE::F_DOT )
+    {
+        GRLine( DC, s_poly[0], s_poly[1], penWidth, color );
+
+        int radius = ( s_poly[2] - s_poly[1] ).EuclideanNorm();
+        GRFilledCircle( DC, s_poly[2], radius, penWidth, color, color );
+    }
+    else if( GetShape() == LABEL_FLAG_SHAPE::F_ROUND )
+    {
+        GRLine( DC, s_poly[0], s_poly[1], penWidth, color );
+
+        int radius = ( s_poly[2] - s_poly[1] ).EuclideanNorm();
+        GRCircle( DC, s_poly[2], radius, penWidth, color );
+    }
+    else
+    {
+        if( !s_poly.empty() )
+            GRPoly( DC, s_poly.size(), &s_poly[0], false, penWidth, color, color );
+    }
+
+    for( SCH_FIELD& field : m_fields )
+        field.Print( aSettings, aUnit, aBodyStyle, aOffset, aForceNoFill, aDimmed );
+}
+
+
 bool SCH_LABEL_BASE::AutoRotateOnPlacement() const
 {
     return m_autoRotateOnPlacement;
@@ -1802,12 +1803,11 @@ SCH_GLOBALLABEL::SCH_GLOBALLABEL( const VECTOR2I& pos, const wxString& text ) :
 
     SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
 
-    m_fields.emplace_back( SCH_FIELD( pos, FIELD_T::INTERSHEET_REFS, this,
-                                      ::GetDefaultFieldName( FIELD_T::INTERSHEET_REFS, false ) ) );
-    m_fields.back().SetText( wxT( "${INTERSHEET_REFS}" ) );
-    m_fields.back().SetVisible( false );
-    m_fields.back().SetLayer( LAYER_INTERSHEET_REFS );
-    m_fields.back().SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
+    m_fields.emplace_back( SCH_FIELD( pos, INTERSHEET_REFS, this, wxT( "Sheet References" ) ) );
+    m_fields[0].SetText( wxT( "${INTERSHEET_REFS}" ) );
+    m_fields[0].SetVisible( false );
+    m_fields[0].SetLayer( LAYER_INTERSHEET_REFS );
+    m_fields[0].SetVertJustify( GR_TEXT_V_ALIGN_CENTER );
 }
 
 
@@ -1827,22 +1827,6 @@ bool SCH_GLOBALLABEL::Deserialize( const google::protobuf::Any &aContainer )
 {
     // TODO
     return false;
-}
-
-
-SCH_FIELD* SCH_GLOBALLABEL::GetField( FIELD_T aFieldType )
-{
-    if( SCH_FIELD* field = FindField( m_fields, aFieldType ) )
-        return field;
-
-    m_fields.emplace_back( this, aFieldType );
-    return &m_fields.back();
-}
-
-
-const SCH_FIELD* SCH_GLOBALLABEL::GetField( FIELD_T aFieldType ) const
-{
-    return FindField( m_fields, aFieldType );
 }
 
 
@@ -1946,13 +1930,8 @@ bool SCH_GLOBALLABEL::ResolveTextVar( const SCH_SHEET_PATH* aPath, wxString* tok
 
 std::vector<int> SCH_GLOBALLABEL::ViewGetLayers() const
 {
-    return { LAYER_DANGLING,
-             LAYER_GLOBLABEL,
-             LAYER_DEVICE,
-             LAYER_INTERSHEET_REFS,
-             LAYER_NETCLASS_REFS,
-             LAYER_FIELDS,
-             LAYER_SELECTION_SHADOWS };
+    return { LAYER_DANGLING,      LAYER_GLOBLABEL, LAYER_DEVICE,           LAYER_INTERSHEET_REFS,
+             LAYER_NETCLASS_REFS, LAYER_FIELDS,    LAYER_SELECTION_SHADOWS };
 }
 
 

@@ -62,7 +62,6 @@
 #include <view/view_controls.h>
 #include <wx/srchctrl.h>
 #include <wx/log.h>
-#include <toolbars_symbol_viewer.h>
 
 #include <default_values.h>
 #include <string_utils.h>
@@ -143,10 +142,8 @@ SYMBOL_VIEWER_FRAME::SYMBOL_VIEWER_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     setupTools();
     setupUIConditions();
 
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<SYMBOL_VIEWER_TOOLBAR_SETTINGS>( "symbol_viewer-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
-
+    ReCreateHToolbar();
+    ReCreateVToolbar();
     ReCreateMenuBar();
 
     wxPanel* libPanel = new wxPanel( this );
@@ -203,7 +200,7 @@ SYMBOL_VIEWER_FRAME::SYMBOL_VIEWER_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     CreateInfoBar();
 
     // Manage main toolbar
-    m_auimgr.AddPane( m_tbTopMain, EDA_PANE().HToolbar().Name( "TopMainToolbar" ).Top().Layer(6) );
+    m_auimgr.AddPane( m_mainToolBar, EDA_PANE().HToolbar().Name( "MainToolbar" ).Top().Layer(6) );
     m_auimgr.AddPane( m_messagePanel, EDA_PANE().Messages().Name( "MsgPanel" ) .Bottom().Layer(6) );
 
     m_auimgr.AddPane( libPanel, EDA_PANE().Palette().Name( "Libraries" ).Left().Layer(2)
@@ -960,8 +957,8 @@ const BOX2I SYMBOL_VIEWER_FRAME::GetDocumentExtents( bool aIncludeAllVisible ) c
     }
     else
     {
-        std::shared_ptr<LIB_SYMBOL> tmp = symbol->IsDerived() ? symbol->GetParent().lock()
-                                                              : symbol->SharedPtr();
+        std::shared_ptr<LIB_SYMBOL> tmp = symbol->IsAlias() ? symbol->GetParent().lock()
+                                                            : symbol->SharedPtr();
 
         wxCHECK( tmp, BOX2I( VECTOR2I( -200, -200 ), VECTOR2I( 400, 400 ) ) );
 

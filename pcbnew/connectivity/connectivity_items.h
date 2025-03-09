@@ -138,6 +138,7 @@ public:
     {
         m_parent = aParent;
         m_canChangeNet = aCanChangeNet;
+        m_visited = false;
         m_valid = true;
         m_dirty = true;
         m_anchors.reserve( std::max( 6, aAnchorCount ) );
@@ -231,6 +232,9 @@ public:
     const std::vector<CN_ITEM*>& ConnectedItems() const { return m_connected; }
     void ClearConnections() { m_connected.clear(); }
 
+    void SetVisited( bool aVisited ) { m_visited = aVisited; }
+    bool Visited() const { return m_visited; }
+
     bool CanChangeNet() const { return m_canChangeNet; }
 
     void Connect( CN_ITEM* b )
@@ -270,6 +274,7 @@ private:
 
     bool            m_canChangeNet;  ///< can the net propagator modify the netcode?
 
+    bool            m_visited;       ///< visited flag for the BFS scan
     bool            m_valid;         ///< used to identify garbage items (we use lazy removal)
 
     std::mutex      m_listLock;      ///< mutex protecting this item's connected_items set to

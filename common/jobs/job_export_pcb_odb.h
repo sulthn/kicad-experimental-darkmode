@@ -35,8 +35,8 @@ public:
 
     enum class ODB_UNITS
     {
-        MM,
-        INCH,       // Do not use IN: it conflicts with a Windows header
+        MILLIMETERS,
+        INCHES,
     };
 
     enum class ODB_COMPRESSION
@@ -46,12 +46,11 @@ public:
         TGZ,
     };
 
-public:
-    wxString       m_filename;
-    wxString       m_drawingSheet;
+    wxString m_filename;
+    wxString m_drawingSheet;
 
-    ODB_UNITS      m_units;
-    int            m_precision;
+    ODB_UNITS m_units;
+    int m_precision;
 
     ODB_COMPRESSION m_compressionMode;
 };

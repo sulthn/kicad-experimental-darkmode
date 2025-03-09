@@ -1045,7 +1045,7 @@ void PCB_IO_EAGLE::loadPlain( wxXmlNode* aGraphics )
                     dimension->SetTextSize( textSize );
                     dimension->SetTextThickness( textThickness );
                     dimension->SetLineThickness( designSettings.GetLineThickness( layer ) );
-                    dimension->SetUnits( EDA_UNITS::MM );
+                    dimension->SetUnits( EDA_UNITS::MILLIMETRES );
                 }
                 else if( d.dimensionType == wxT( "leader" ) )
                 {
@@ -1096,7 +1096,7 @@ void PCB_IO_EAGLE::loadPlain( wxXmlNode* aGraphics )
                     dimension->SetTextSize( textSize );
                     dimension->SetTextThickness( textThickness );
                     dimension->SetLineThickness( designSettings.GetLineThickness( layer ) );
-                    dimension->SetUnits( EDA_UNITS::MM );
+                    dimension->SetUnits( EDA_UNITS::MILLIMETRES );
 
                     // check which axis the dimension runs in
                     // because the "height" of the dimension is perpendicular to that axis
@@ -1605,7 +1605,7 @@ ZONE* PCB_IO_EAGLE::loadPolygon( wxXmlNode* aPolyNode )
     zone->AddPolygon( polygon.COutline( 0 ) );
 
     // If the pour is a cutout it needs to be set to a keepout
-    if( p.pour == EPOLYGON::ECUTOUT )
+    if( p.pour == EPOLYGON::CUTOUT )
     {
         zone->SetIsRuleArea( true );
         zone->SetDoNotAllowVias( false );
@@ -1615,7 +1615,7 @@ ZONE* PCB_IO_EAGLE::loadPolygon( wxXmlNode* aPolyNode )
         zone->SetDoNotAllowCopperPour( true );
         zone->SetHatchStyle( ZONE_BORDER_DISPLAY_STYLE::NO_HATCH );
     }
-    else if( p.pour == EPOLYGON::EHATCH )
+    else if( p.pour == EPOLYGON::HATCH )
     {
         int spacing = p.spacing ? p.spacing->ToPcbUnits() : 50 * pcbIUScale.IU_PER_MILS;
 
@@ -2295,9 +2295,9 @@ void PCB_IO_EAGLE::packagePolygon( FOOTPRINT* aFootprint, wxXmlNode* aTree ) con
         if( v1.curve )
         {
             EVERTEX  v2 = vertices[i + 1];
-            VECTOR2I center = ConvertArcCenter( VECTOR2I( kicad_x( v1.x ), kicad_y( v1.y ) ),
-                                                VECTOR2I( kicad_x( v2.x ), kicad_y( v2.y ) ),
-                                                *v1.curve );
+            VECTOR2I center =
+                    ConvertArcCenter( VECTOR2I( kicad_x( v1.x ), kicad_y( v1.y ) ),
+                                      VECTOR2I( kicad_x( v2.x ), kicad_y( v2.y ) ), *v1.curve );
             double angle = DEG2RAD( *v1.curve );
             double end_angle = atan2( kicad_y( v2.y ) - center.y, kicad_x( v2.x ) - center.x );
             double radius = sqrt( pow( center.x - kicad_x( v1.x ), 2 )
@@ -2313,15 +2313,16 @@ void PCB_IO_EAGLE::packagePolygon( FOOTPRINT* aFootprint, wxXmlNode* aTree ) con
 
             for( double a = end_angle + angle; fabs( a - end_angle ) > fabs( delta ); a -= delta )
             {
-                pts.push_back( VECTOR2I( KiROUND( radius * cos( a ) ),
-                                         KiROUND( radius * sin( a ) ) ) + center );
+                pts.push_back(
+                        VECTOR2I( KiROUND( radius * cos( a ) ), KiROUND( radius * sin( a ) ) )
+                        + center );
             }
         }
     }
 
     PCB_LAYER_ID layer = kicad_layer( p.layer );
 
-    if( ( p.pour == EPOLYGON::ECUTOUT && layer != UNDEFINED_LAYER )
+    if( ( p.pour == EPOLYGON::CUTOUT && layer != UNDEFINED_LAYER )
         || p.layer == EAGLE_LAYER::TRESTRICT
         || p.layer == EAGLE_LAYER::BRESTRICT
         || p.layer == EAGLE_LAYER::VRESTRICT )
@@ -2344,8 +2345,7 @@ void PCB_IO_EAGLE::packagePolygon( FOOTPRINT* aFootprint, wxXmlNode* aTree ) con
         {
             wxLogMessage( wxString::Format( _( "Ignoring a polygon since Eagle layer '%s' (%d) "
                                                "was not mapped" ),
-                                            eagle_layer_name( p.layer ),
-                                            p.layer ) );
+                                            eagle_layer_name( p.layer ), p.layer ) );
             return;
         }
 
@@ -2360,8 +2360,8 @@ void PCB_IO_EAGLE::packagePolygon( FOOTPRINT* aFootprint, wxXmlNode* aTree ) con
         dwg->SetPolyPoints( pts );
         dwg->Rotate( { 0, 0 }, aFootprint->GetOrientation() );
         dwg->Move( aFootprint->GetPosition() );
-        dwg->GetPolyShape().Inflate( p.width.ToPcbUnits() / 2, CORNER_STRATEGY::ALLOW_ACUTE_CORNERS,
-                                     ARC_HIGH_DEF );
+        dwg->GetPolyShape().Inflate( p.width.ToPcbUnits() / 2,
+                                     CORNER_STRATEGY::ALLOW_ACUTE_CORNERS, ARC_HIGH_DEF );
     }
 }
 
@@ -2421,8 +2421,7 @@ void PCB_IO_EAGLE::packageCircle( FOOTPRINT* aFootprint, wxXmlNode* aTree ) cons
         {
             wxLogMessage( wxString::Format( _( "Ignoring a circle since Eagle layer '%s' (%d) "
                                                "was not mapped" ),
-                                            eagle_layer_name( e.layer ),
-                                            e.layer ) );
+                                            eagle_layer_name( e.layer ), e.layer ) );
             return;
         }
 
@@ -2527,9 +2526,9 @@ void PCB_IO_EAGLE::packageSMD( FOOTPRINT* aFootprint, wxXmlNode* aTree ) const
     int minPadSize = std::min( padSize.x, padSize.y );
 
     // Rounded rectangle pads
-    int roundRadius = eagleClamp( m_rules->srMinRoundness * 2,
-                                  (int) ( minPadSize * m_rules->srRoundness ),
-                                  m_rules->srMaxRoundness * 2 );
+    int roundRadius =
+            eagleClamp( m_rules->srMinRoundness * 2, (int) ( minPadSize * m_rules->srRoundness ),
+                        m_rules->srMaxRoundness * 2 );
 
     if( e.roundness || roundRadius > 0 )
     {
@@ -2667,7 +2666,7 @@ void PCB_IO_EAGLE::loadClasses( wxXmlNode* aClasses )
                              entry.first,
                              eClass.name,
                              m_classMap[ entry.first ]->GetName(),
-                             EDA_UNIT_UTILS::UI::StringFromValue( pcbIUScale, EDA_UNITS::MM, entry.second.ToPcbUnits() ) );
+                             EDA_UNIT_UTILS::UI::StringFromValue( pcbIUScale, EDA_UNITS::MILLIMETRES, entry.second.ToPcbUnits() ) );
 
                 m_customRules += wxT( "\n" ) + rule;
             }
@@ -2831,15 +2830,14 @@ void PCB_IO_EAGLE::loadSignals( wxXmlNode* aSignals )
 
                     // make sure the via diameter respects the restring rules
 
-                    int via_width = via->GetWidth( PADSTACK::ALL_LAYERS );
-
-                    if( !v.diam || via_width <= via->GetDrill() )
+                    if( !v.diam || via->GetWidth( PADSTACK::ALL_LAYERS ) <= via->GetDrill() )
                     {
-                        double annular_width = ( via_width - via->GetDrill() ) / 2.0;
-                        double clamped_annular_width = eagleClamp( m_rules->rlMinViaOuter,
-                                                                   annular_width,
-                                                                   m_rules->rlMaxViaOuter );
-                        via->SetWidth( PADSTACK::ALL_LAYERS, drillz + 2 * clamped_annular_width );
+                        double annulus = eagleClamp(
+                                m_rules->rlMinViaOuter,
+                                static_cast<double>( via->GetWidth( PADSTACK::ALL_LAYERS ) / 2
+                                                     - via->GetDrill() ),
+                                m_rules->rlMaxViaOuter );
+                        via->SetWidth( PADSTACK::ALL_LAYERS, drillz + 2 * annulus );
                     }
 
                     if( kidiam < m_min_via )

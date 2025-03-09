@@ -27,7 +27,6 @@
 #include <fmt/core.h>
 #include <wx/filename.h>
 #include <kiway.h>
-#include <schematic.h>
 #include "sim_lib_mgr.h"
 
 std::string SPICE_GENERATOR_IBIS::ModelName( const SPICE_ITEM& aItem ) const
@@ -52,19 +51,18 @@ std::vector<std::string> SPICE_GENERATOR_IBIS::CurrentNames( const SPICE_ITEM& a
 }
 
 
-std::string SPICE_GENERATOR_IBIS::IbisDevice( const SPICE_ITEM& aItem, SCHEMATIC* aSchematic,
+std::string SPICE_GENERATOR_IBIS::IbisDevice( const SPICE_ITEM& aItem, const PROJECT& aProject,
                                               const wxString& aCacheDir,
                                               REPORTER&       aReporter ) const
 {
-    std::string ibisLibFilename = GetFieldValue( &aItem.fields, SIM_LIBRARY::LIBRARY_FIELD );
-    std::string ibisCompName    = GetFieldValue( &aItem.fields, SIM_LIBRARY::NAME_FIELD  );
-    std::string ibisPinName     = GetFieldValue( &aItem.fields, SIM_LIBRARY_IBIS::PIN_FIELD );
-    std::string ibisModelName   = GetFieldValue( &aItem.fields, SIM_LIBRARY_IBIS::MODEL_FIELD );
-    bool        diffMode        = GetFieldValue( &aItem.fields, SIM_LIBRARY_IBIS::DIFF_FIELD ) == "1";
+    std::string ibisLibFilename = SIM_MODEL::GetFieldValue( &aItem.fields, SIM_LIBRARY::LIBRARY_FIELD );
+    std::string ibisCompName    = SIM_MODEL::GetFieldValue( &aItem.fields, SIM_LIBRARY::NAME_FIELD  );
+    std::string ibisPinName     = SIM_MODEL::GetFieldValue( &aItem.fields, SIM_LIBRARY_IBIS::PIN_FIELD );
+    std::string ibisModelName   = SIM_MODEL::GetFieldValue( &aItem.fields, SIM_LIBRARY_IBIS::MODEL_FIELD );
+    bool        diffMode        = SIM_MODEL::GetFieldValue( &aItem.fields, SIM_LIBRARY_IBIS::DIFF_FIELD ) == "1";
 
     WX_STRING_REPORTER reporter;
-    SIM_LIB_MGR        mgr( &aSchematic->Prj(), aSchematic );
-    wxString           path = mgr.ResolveLibraryPath( ibisLibFilename, reporter );
+    wxString           path = SIM_LIB_MGR::ResolveLibraryPath( ibisLibFilename, &aProject, reporter );
 
     if( reporter.HasMessage() )
         THROW_IO_ERROR( reporter.GetMessages() );

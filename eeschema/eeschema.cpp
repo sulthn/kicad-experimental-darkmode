@@ -67,10 +67,6 @@
 #include <panel_sym_display_options.h>
 #include <sim/simulator_frame.h>
 
-#include <dialogs/panel_toolbar_customization.h>
-#include <toolbars_sch_editor.h>
-#include <toolbars_symbol_editor.h>
-
 #include <wx/crt.h>
 
 // The main sheet of the project
@@ -154,7 +150,7 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
 
     IFACE( const char* aName, KIWAY::FACE_T aType ) :
             KIFACE_BASE( aName, aType ),
-            UNITS_PROVIDER( schIUScale, EDA_UNITS::MM )
+            UNITS_PROVIDER( schIUScale, EDA_UNITS::MILLIMETRES )
     {}
 
     bool OnKifaceStart( PGM_BASE* aProgram, int aCtlBits, KIWAY* aKiway ) override;
@@ -259,24 +255,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
             return new PANEL_SYM_EDITING_OPTIONS( aParent, this, frame );
         }
 
-        case PANEL_SYM_TOOLBARS:
-        {
-            SETTINGS_MANAGER&  mgr = Pgm().GetSettingsManager();
-            APP_SETTINGS_BASE* cfg = mgr.GetAppSettings<SYMBOL_EDITOR_SETTINGS>( "symbol_editor" );
-            TOOLBAR_SETTINGS*  tb  = mgr.GetToolbarSettings<SYMBOL_EDIT_TOOLBAR_SETTINGS>( "symbol_editor-toolbars" );
-
-            std::vector<TOOL_ACTION*>            actions;
-            std::vector<ACTION_TOOLBAR_CONTROL*> controls;
-
-            for( TOOL_ACTION* action : ACTION_MANAGER::GetActionList() )
-                actions.push_back( action );
-
-            for( ACTION_TOOLBAR_CONTROL* control : ACTION_TOOLBAR::GetCustomControlList() )
-                controls.push_back( control );
-
-            return new PANEL_TOOLBAR_CUSTOMIZATION( aParent, cfg, tb, actions, controls );
-        }
-
         case PANEL_SYM_COLORS:
             return new PANEL_SYM_COLOR_SETTINGS( aParent );
 
@@ -327,24 +305,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
             EDA_BASE_FRAME* schSettingsProvider = aKiway->Player( FRAME_SCH, false );
 
             return new PANEL_EESCHEMA_ANNOTATION_OPTIONS( aParent, schSettingsProvider );
-        }
-
-        case PANEL_SCH_TOOLBARS:
-        {
-            SETTINGS_MANAGER&  mgr = Pgm().GetSettingsManager();
-            APP_SETTINGS_BASE* cfg = mgr.GetAppSettings<EESCHEMA_SETTINGS>( "eeschema" );
-            TOOLBAR_SETTINGS*  tb  = mgr.GetToolbarSettings<SCH_EDIT_TOOLBAR_SETTINGS>( "eeschema-toolbars" );
-
-            std::vector<TOOL_ACTION*>            actions;
-            std::vector<ACTION_TOOLBAR_CONTROL*> controls;
-
-            for( TOOL_ACTION* action : ACTION_MANAGER::GetActionList() )
-                actions.push_back( action );
-
-            for( ACTION_TOOLBAR_CONTROL* control : ACTION_TOOLBAR::GetCustomControlList() )
-                controls.push_back( control );
-
-            return new PANEL_TOOLBAR_CUSTOMIZATION( aParent, cfg, tb, actions, controls );
         }
 
         case PANEL_SCH_COLORS:

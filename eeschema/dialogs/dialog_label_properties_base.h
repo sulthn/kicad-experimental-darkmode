@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6a-dirty)
+// C++ code generated with wxFormBuilder (version 4.0.0-0-g0efcecf)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -25,7 +25,6 @@ class WX_GRID;
 #include <wx/settings.h>
 #include <wx/textctrl.h>
 #include <wx/combobox.h>
-#include <wx/checkbox.h>
 #include <wx/hyperlink.h>
 #include <wx/sizer.h>
 #include <wx/grid.h>
@@ -37,6 +36,7 @@ class WX_GRID;
 #include <wx/statbox.h>
 #include <wx/radiobut.h>
 #include <wx/choice.h>
+#include <wx/checkbox.h>
 #include <wx/panel.h>
 #include <wx/gbsizer.h>
 #include <wx/dialog.h>
@@ -53,7 +53,7 @@ class DIALOG_LABEL_PROPERTIES_BASE : public DIALOG_SHIM
 	protected:
 		enum
 		{
-			wxID_VALUESINGLE = 6000,
+			wxID_VALUESINGLE = 1000
 		};
 
 		wxFlexGridSizer* m_textEntrySizer;
@@ -61,9 +61,6 @@ class DIALOG_LABEL_PROPERTIES_BASE : public DIALOG_SHIM
 		wxTextCtrl* m_valueSingleLine;
 		wxStaticText* m_labelCombo;
 		wxComboBox* m_valueCombo;
-		wxStaticText* m_labelMultiLine;
-		wxTextCtrl* m_valueMultiLine;
-		wxCheckBox* m_cbMultiLine;
 		wxHyperlinkCtrl* m_syntaxHelp;
 		WX_GRID* m_grid;
 		STD_BITMAP_BUTTON* m_bpAdd;
@@ -108,7 +105,6 @@ class DIALOG_LABEL_PROPERTIES_BASE : public DIALOG_SHIM
 		virtual void OnUpdateUI( wxUpdateUIEvent& event ) { event.Skip(); }
 		virtual void OnValueCharHook( wxKeyEvent& event ) { event.Skip(); }
 		virtual void OnEnterKey( wxCommandEvent& event ) { event.Skip(); }
-		virtual void onMultiLabelCheck( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnFormattingHelp( wxHyperlinkEvent& event ) { event.Skip(); }
 		virtual void OnSizeGrid( wxSizeEvent& event ) { event.Skip(); }
 		virtual void OnAddField( wxCommandEvent& event ) { event.Skip(); }

@@ -82,11 +82,6 @@ DIALOG_PLOT_BASE::DIALOG_PLOT_BASE( wxWindow* parent, wxWindowID id, const wxStr
 
 	gbSizer1->Add( m_plotSheetRef, wxGBPosition( 0, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL, 5 );
 
-	m_subtractMaskFromSilk = new wxCheckBox( sbOptionsSizer->GetStaticBox(), wxID_ANY, _("Subtract soldermask from silkscreen"), wxDefaultPosition, wxDefaultSize, 0 );
-	m_subtractMaskFromSilk->SetToolTip( _("Remove silkscreen from areas without soldermask") );
-
-	gbSizer1->Add( m_subtractMaskFromSilk, wxGBPosition( 1, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL, 5 );
-
 	m_plotDNP = new wxCheckBox( sbOptionsSizer->GetStaticBox(), wxID_ANY, _("Indicate DNP on fabrication layers"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_plotDNP->SetToolTip( _("Hide or cross-out DNP footprints on fabrication layers") );
 
@@ -99,6 +94,11 @@ DIALOG_PLOT_BASE::DIALOG_PLOT_BASE( wxWindow* parent, wxWindowID id, const wxStr
 
 	m_crossoutDNP = new wxRadioButton( sbOptionsSizer->GetStaticBox(), wxID_ANY, _("Cross-out"), wxDefaultPosition, wxDefaultSize, 0 );
 	gbSizer1->Add( m_crossoutDNP, wxGBPosition( 4, 0 ), wxGBSpan( 1, 1 ), wxLEFT, 25 );
+
+	m_plotInvisibleText = new wxCheckBox( sbOptionsSizer->GetStaticBox(), wxID_ANY, _("Force plotting of invisible values / refs"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_plotInvisibleText->SetToolTip( _("Force plot invisible footprint values and reference designators") );
+
+	gbSizer1->Add( m_plotInvisibleText, wxGBPosition( 1, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL, 5 );
 
 	m_sketchPadsOnFabLayers = new wxCheckBox( sbOptionsSizer->GetStaticBox(), ID_ALLOW_PRINT_PAD_ON_SILKSCREEN, _("Sketch pads on fabrication layers"), wxDefaultPosition, wxDefaultSize, 0 );
 	m_sketchPadsOnFabLayers->SetToolTip( _("Include pad outlines on F.Fab and B.Fab layers when plotting") );
@@ -212,6 +212,11 @@ DIALOG_PLOT_BASE::DIALOG_PLOT_BASE( wxWindow* parent, wxWindowID id, const wxStr
 	m_generateGerberJobFile->SetToolTip( _("Generate a Gerber job file that contains info about the board,\nand the list of generated Gerber plot files") );
 
 	gbSizer2->Add( m_generateGerberJobFile, wxGBPosition( 1, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL, 5 );
+
+	m_subtractMaskFromSilk = new wxCheckBox( m_GerberOptionsSizer->GetStaticBox(), wxID_ANY, _("Subtract soldermask from silkscreen"), wxDefaultPosition, wxDefaultSize, 0 );
+	m_subtractMaskFromSilk->SetToolTip( _("Remove silkscreen from areas without soldermask") );
+
+	gbSizer2->Add( m_subtractMaskFromSilk, wxGBPosition( 2, 0 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL, 5 );
 
 	coordFormatLabel = new wxStaticText( m_GerberOptionsSizer->GetStaticBox(), wxID_ANY, _("Coordinate format:"), wxDefaultPosition, wxDefaultSize, 0 );
 	coordFormatLabel->Wrap( -1 );
@@ -382,9 +387,6 @@ DIALOG_PLOT_BASE::DIALOG_PLOT_BASE( wxWindow* parent, wxWindowID id, const wxStr
 	m_SVGColorChoice = new wxChoice( m_svgOptionsSizer->GetStaticBox(), wxID_ANY, wxDefaultPosition, wxDefaultSize, m_SVGColorChoiceNChoices, m_SVGColorChoiceChoices, 0 );
 	m_SVGColorChoice->SetSelection( 0 );
 	gbSizer3->Add( m_SVGColorChoice, wxGBPosition( 1, 1 ), wxGBSpan( 1, 1 ), wxALIGN_CENTER_VERTICAL|wxRIGHT|wxLEFT, 5 );
-
-	m_SVG_fitPageToBoard = new wxCheckBox( m_svgOptionsSizer->GetStaticBox(), wxID_ANY, _("Fit page to board"), wxDefaultPosition, wxDefaultSize, 0 );
-	gbSizer3->Add( m_SVG_fitPageToBoard, wxGBPosition( 2, 0 ), wxGBSpan( 2, 1 ), wxALL, 5 );
 
 
 	m_svgOptionsSizer->Add( gbSizer3, 1, wxEXPAND|wxBOTTOM, 5 );

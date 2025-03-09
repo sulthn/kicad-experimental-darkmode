@@ -587,7 +587,7 @@ int SCH_EDITOR_CONTROL::SimProbe( const TOOL_EVENT& aEvent )
                         SCH_SYMBOL* symbol = static_cast<SCH_SYMBOL*>( item->GetParent() );
 
                         WX_STRING_REPORTER reporter;
-                        SIM_LIB_MGR        mgr( &m_frame->Prj(), &m_frame->Schematic() );
+                        SIM_LIB_MGR        mgr( &m_frame->Prj() );
 
                         SIM_MODEL&  model = mgr.CreateModel( &sheet, *symbol, reporter ).model;
 
@@ -1164,21 +1164,21 @@ int SCH_EDITOR_CONTROL::UpdateNetHighlighting( const TOOL_EVENT& aEvent )
             {
                 if( SCH_CONNECTION* pinConn = symbol->GetPins()[0]->Connection() )
                 {
-                    for( FIELD_T id : { FIELD_T::REFERENCE, FIELD_T::VALUE } )
-                    {
-                        SCH_FIELD* field = symbol->GetField( id );
+                    std::vector<SCH_FIELD>& fields = symbol->GetFields();
 
-                        if( !field->IsVisible() )
+                    for( int id : { REFERENCE_FIELD, VALUE_FIELD } )
+                    {
+                        if( !fields[id].IsVisible() )
                             continue;
 
-                        if( !field->IsBrightened() && connNames.count( pinConn->Name() ) )
+                        if( !fields[id].IsBrightened() && connNames.count( pinConn->Name() ) )
                         {
-                            field->SetBrightened();
+                            fields[id].SetBrightened();
                             redrawItem = symbol;
                         }
-                        else if( field->IsBrightened() && !connNames.count( pinConn->Name() ) )
+                        else if( fields[id].IsBrightened() && !connNames.count( pinConn->Name() ) )
                         {
-                            field->ClearBrightened();
+                            fields[id].ClearBrightened();
                             redrawItem = symbol;
                         }
                     }
@@ -1499,12 +1499,12 @@ void SCH_EDITOR_CONTROL::updatePastedSymbol( SCH_SYMBOL* aSymbol,
 
         // Some legacy versions saved value fields escaped.  While we still do in the symbol
         // editor, we don't anymore in the schematic, so be sure to unescape them.
-        SCH_FIELD* valueField = aSymbol->GetField( FIELD_T::VALUE );
+        SCH_FIELD* valueField = aSymbol->GetField( VALUE_FIELD );
         valueField->SetText( UnescapeString( valueField->GetText() ) );
 
         // Pasted from notepad or an older instance of eeschema.  Use the values in the fields
         // instead.
-        newInstance.m_Reference = aSymbol->GetField( FIELD_T::REFERENCE )->GetText();
+        newInstance.m_Reference = aSymbol->GetField( REFERENCE_FIELD )->GetText();
         newInstance.m_Unit = aSymbol->GetUnit();
     }
 
@@ -1656,9 +1656,8 @@ int SCH_EDITOR_CONTROL::Paste( const TOOL_EVENT& aEvent )
 
     SCH_SHEET   tempSheet;
     SCH_SCREEN* tempScreen = new SCH_SCREEN( &m_frame->Schematic() );
-    std::unique_ptr<wxImage> clipImg = GetImageFromClipboard();
 
-    if( !aEvent.IsAction( &ACTIONS::duplicate ) && clipImg )
+    if( std::unique_ptr<wxImage> clipImg = GetImageFromClipboard() )
     {
         // Just image data
         auto bitmap = std::make_unique<SCH_BITMAP>();
@@ -1798,8 +1797,8 @@ int SCH_EDITOR_CONTROL::Paste( const TOOL_EVENT& aEvent )
         if( item->Type() == SCH_SHEET_T )
         {
             SCH_SHEET* sheet = static_cast<SCH_SHEET*>( item );
-            SCH_FIELD* nameField = sheet->GetField( FIELD_T::SHEET_NAME );
-            wxString   baseName = nameField->GetText();
+            SCH_FIELD& nameField = sheet->GetFields()[SHEETNAME];
+            wxString   baseName = nameField.GetText();
             wxFileName srcFn = sheet->GetFileName();
 
             if( srcFn.IsRelative() )
@@ -1909,8 +1908,8 @@ int SCH_EDITOR_CONTROL::Paste( const TOOL_EVENT& aEvent )
         else if( item->Type() == SCH_SHEET_T )
         {
             SCH_SHEET*  sheet          = (SCH_SHEET*) item;
-            SCH_FIELD*  nameField      = sheet->GetField( FIELD_T::SHEET_NAME );
-            wxString    baseName       = nameField->GetText();
+            SCH_FIELD&  nameField      = sheet->GetFields()[SHEETNAME];
+            wxString    baseName       = nameField.GetText();
             wxString    candidateName  = baseName;
             wxString    number;
 
@@ -1931,7 +1930,7 @@ int SCH_EDITOR_CONTROL::Paste( const TOOL_EVENT& aEvent )
             while( hierarchy.NameExists( candidateName ) )
                 candidateName = wxString::Format( wxT( "%s%d" ), baseName, uniquifier++ );
 
-            nameField->SetText( candidateName );
+            nameField.SetText( candidateName );
 
             wxFileName     fn = sheet->GetFileName();
             SCH_SCREEN*    existingScreen = nullptr;

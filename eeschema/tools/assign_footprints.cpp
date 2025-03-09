@@ -89,10 +89,9 @@ void SCH_EDITOR_CONTROL::AssignFootprints( const std::string& aChangedSetOfRefer
                     // For backwards-compatibility CvPcb currently updates all instances of a
                     // symbol (even though it lists these instances separately).
                     wxString        oldfp = refs[ii].GetFootprint();
-                    SCH_FIELD*      footprintField = symbol->GetField( FIELD_T::FOOTPRINT );
 
-                    if( oldfp.IsEmpty() && footprintField->IsVisible() )
-                        footprintField->SetVisible( false );
+                    if( oldfp.IsEmpty() && symbol->GetField( FOOTPRINT_FIELD )->IsVisible() )
+                        symbol->GetField( FOOTPRINT_FIELD )->SetVisible( false );
 
                     if( oldfp != footprint )
                     {
@@ -100,7 +99,8 @@ void SCH_EDITOR_CONTROL::AssignFootprints( const std::string& aChangedSetOfRefer
                         SCH_SCREEN* screen = refs[ii].GetSheetPath().LastScreen();
 
                         commit.Modify( symbol, screen );
-                        footprintField->SetText( footprint );
+
+                        symbol->SetFootprintFieldText( footprint );
                     }
                 }
             }
@@ -191,7 +191,7 @@ bool SCH_EDITOR_CONTROL::processCmpToFootprintLinkFile( const wxString& aFullFil
                 symbol->SetFootprintFieldText( footprint );
 
                 if( aForceVisibilityState )
-                    symbol->GetField( FIELD_T::FOOTPRINT )->SetVisible( aVisibilityState );
+                    symbol->GetField( FOOTPRINT_FIELD )->SetVisible( aVisibilityState );
             }
         }
     }

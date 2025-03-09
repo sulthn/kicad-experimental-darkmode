@@ -96,9 +96,13 @@ public:
 
     wxString GetShownText( bool aAllowExtraText, int aDepth = 0 ) const override;
 
+    /// PCB_TEXTBOXes are always visible:
+    void SetVisible( bool aVisible ) override { /* do nothing */}
+    bool IsVisible() const override { return true; }
+
     bool Matches( const EDA_SEARCH_DATA& aSearchData, void* aAuxData ) const override;
 
-    std::vector<VECTOR2I> GetCornersInSequence() const;
+    std::vector<VECTOR2I> GetAnchorAndOppositeCorner() const;
 
     void Move( const VECTOR2I& aMoveVector ) override;
 

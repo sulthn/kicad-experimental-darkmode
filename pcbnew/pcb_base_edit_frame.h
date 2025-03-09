@@ -232,8 +232,6 @@ public:
                                 wxArrayString* aTokens );
 
 protected:
-    void configureToolbars() override;
-
     /**
      * Prompts a user to select global or project library tables
      *
@@ -263,8 +261,6 @@ protected:
     PANEL_SELECTION_FILTER*              m_selectionFilterPanel;
     APPEARANCE_CONTROLS*                 m_appearancePanel;
     std::unique_ptr<LAYER_PAIR_SETTINGS> m_layerPairSettings;
-
-    PCB_LAYER_BOX_SELECTOR* m_SelLayerBox; // a combo box to display and select active layer
 
     wxAuiNotebook*          m_tabbedPanel;        /// Panel with Layers and Object Inspector tabs
 

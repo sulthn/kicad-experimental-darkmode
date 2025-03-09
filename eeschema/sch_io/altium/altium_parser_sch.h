@@ -151,7 +151,6 @@ struct ASCH_SYMBOL
 {
     int      currentpartid;
     int      m_indexInSheet;
-    wxString uniqueid;
     wxString libreference;
     wxString sourcelibraryname;
     wxString componentdescription;
@@ -366,14 +365,6 @@ enum class ASCH_TEXT_FRAME_ALIGNMENT
 };
 
 
-enum class ASCH_PORT_ALIGNMENT
-{
-    CENTER = 0,
-    RIGHT  = 1,
-    LEFT   = 2
-};
-
-
 struct ASCH_LABEL : ASCH_OWNER_INTERFACE
 {
     VECTOR2I location;
@@ -531,13 +522,13 @@ struct ASCH_LINE : ASCH_OWNER_INTERFACE, ASCH_BORDER_INTERFACE
 
 struct ASCH_SIGNAL_HARNESS : ASCH_OWNER_INTERFACE
 {
-    VECTOR2I point1;
-    VECTOR2I point2;
+    VECTOR2I Point1;
+    VECTOR2I Point2;
 
-    std::vector<VECTOR2I> points;
+    std::vector<VECTOR2I> Points;
 
-    int color;
-    int lineWidth;
+    int Color;
+    int LineWidth;
 
     explicit ASCH_SIGNAL_HARNESS( const std::map<wxString, wxString>& aProps );
 };
@@ -545,14 +536,17 @@ struct ASCH_SIGNAL_HARNESS : ASCH_OWNER_INTERFACE
 
 struct ASCH_HARNESS_CONNECTOR : ASCH_OWNER_INTERFACE
 {
-    VECTOR2I m_location;
-    VECTOR2I m_size;
+    VECTOR2I Location;
+    VECTOR2I Size;
 
-    int m_areaColor;
-    int m_color;
-    int m_lineWidth;
-    int m_primaryConnectionPosition;
-    ASCH_SHEET_ENTRY_SIDE m_harnessConnectorSide;
+    int AreaColor;
+    int Color;
+    int LineWidth;
+    //int locationX; // keep just in case
+    //int locationY;
+    int LocationPrimaryConnectionPosition;
+    //int xSize;     // keep just in case
+    //int ySize;
 
     explicit ASCH_HARNESS_CONNECTOR( const std::map<wxString, wxString>& aProps );
 };
@@ -695,7 +689,7 @@ struct ASCH_PORT : ASCH_OWNER_INTERFACE
     int      TextColor;
     int      FontID;
 
-    ASCH_PORT_ALIGNMENT m_align;
+    ASCH_TEXT_FRAME_ALIGNMENT Alignment;
 
     ASCH_PORT_IOTYPE IOtype;
     ASCH_PORT_STYLE  Style;

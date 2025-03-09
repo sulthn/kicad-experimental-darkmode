@@ -35,18 +35,9 @@
 #include <kidialog.h>
 #include <connectivity/connectivity_data.h>
 #include <board_commit.h>
-#include <magic_enum.hpp>
 
 
-bool DIALOG_TRACK_VIA_PROPERTIES::IPC4761_CONFIGURATION::operator==(
-        const IPC4761_CONFIGURATION& aOther ) const
-{
-    return ( tent == aOther.tent ) && ( plug == aOther.plug ) && ( cover == aOther.cover )
-           && ( cap == aOther.cap ) && ( fill == aOther.fill );
-}
-
-
-DIALOG_TRACK_VIA_PROPERTIES::DIALOG_TRACK_VIA_PROPERTIES( PCB_BASE_EDIT_FRAME* aParent,
+DIALOG_TRACK_VIA_PROPERTIES::DIALOG_TRACK_VIA_PROPERTIES( PCB_BASE_FRAME* aParent,
                                                           const PCB_SELECTION& aItems ) :
         DIALOG_TRACK_VIA_PROPERTIES_BASE( aParent ),
         m_frame( aParent ),
@@ -110,6 +101,11 @@ DIALOG_TRACK_VIA_PROPERTIES::DIALOG_TRACK_VIA_PROPERTIES( PCB_BASE_EDIT_FRAME* a
     m_ViaEndLayer->SetBoardFrame( aParent );
     m_ViaEndLayer->Resync();
 
+    m_btnLinkTenting->SetBitmap( KiBitmapBundle( BITMAPS::edit_cmp_symb_links ) );
+    m_btnLinkTenting->SetValue( true );
+    m_tentingBackCtrl->Disable();
+    m_tentingBackLabel->Disable();
+
     wxFont infoFont = KIUI::GetInfoFont( this );
     m_techLayersLabel->SetFont( infoFont );
 
@@ -127,101 +123,33 @@ DIALOG_TRACK_VIA_PROPERTIES::DIALOG_TRACK_VIA_PROPERTIES( PCB_BASE_EDIT_FRAME* a
     // The selection layer for tracks
     int track_selection_layer = -1;
 
-    auto getAnnularRingSelection = []( const PCB_VIA* via ) -> int
-    {
-        switch( via->Padstack().UnconnectedLayerMode() )
-        {
-        default:
-        case PADSTACK::UNCONNECTED_LAYER_MODE::KEEP_ALL: return 0;
-        case PADSTACK::UNCONNECTED_LAYER_MODE::REMOVE_EXCEPT_START_AND_END: return 1;
-        case PADSTACK::UNCONNECTED_LAYER_MODE::REMOVE_ALL: return 2;
-        }
-    };
+    auto getAnnularRingSelection =
+            []( const PCB_VIA* via ) -> int
+            {
+                switch( via->Padstack().UnconnectedLayerMode() )
+                {
+                default:
+                case PADSTACK::UNCONNECTED_LAYER_MODE::KEEP_ALL:                    return 0;
+                case PADSTACK::UNCONNECTED_LAYER_MODE::REMOVE_EXCEPT_START_AND_END: return 1;
+                case PADSTACK::UNCONNECTED_LAYER_MODE::REMOVE_ALL:                  return 2;
+                }
+            };
 
-    for( auto& preset : magic_enum::enum_values<IPC4761_PRESET>() )
-    {
-        if( preset >= IPC4761_PRESET::CUSTOM )
-            continue;
+    auto getTentingSelection =
+            []( const PCB_VIA* via, PCB_LAYER_ID aLayer ) -> int
+            {
+                std::optional<bool> tentingOverride = via->Padstack().IsTented( aLayer );
 
-        const auto& name_it = m_IPC4761Names.find( preset );
+                if( tentingOverride.has_value() )
+                {
+                    if( *tentingOverride )
+                        return 1;   // Tented
 
-        wxString name = _( "Unknown choice" );
+                    return 2;   // Not tented
+                }
 
-        if( name_it != m_IPC4761Names.end() )
-            name = name_it->second;
-
-        m_protectionFeatures->AppendString( name );
-    }
-
-    auto getProtectionSurface = []( const std::optional<bool>& front,
-                                    const std::optional<bool>& back ) -> IPC4761_SURFACE
-    {
-        IPC4761_SURFACE value = IPC4761_SURFACE::CUSTOM;
-
-        if( !front.has_value() )
-            value = IPC4761_SURFACE::FROM_RULES;
-        else if( front.value() )
-            value = IPC4761_SURFACE::FRONT;
-        else
-            value = IPC4761_SURFACE::NONE;
-
-        if( !back.has_value() )
-        {
-            if( value == IPC4761_SURFACE::FROM_RULES )
-                return IPC4761_SURFACE::FROM_RULES;
-        }
-        else if( back.value() )
-        {
-            if( value == IPC4761_SURFACE::FRONT )
-                return IPC4761_SURFACE::BOTH;
-            else if( value == IPC4761_SURFACE::NONE )
-                return IPC4761_SURFACE::BACK;
-        }
-        else
-        {
-            if( value == IPC4761_SURFACE::FRONT )
-                return IPC4761_SURFACE::FRONT;
-            else if( value == IPC4761_SURFACE::NONE )
-                return IPC4761_SURFACE::NONE;
-        }
-
-        return IPC4761_SURFACE::CUSTOM;
-    };
-
-    auto getProtectionDrill = []( const std::optional<bool>& drill ) -> IPC4761_DRILL
-    {
-        if( !drill.has_value() )
-            return IPC4761_DRILL::FROM_RULES;
-        if( drill.value() )
-            return IPC4761_DRILL::SET;
-
-        return IPC4761_DRILL::NOT_SET;
-    };
-
-    auto getViaConfiguration = [&]( const PCB_VIA* via ) -> IPC4761_PRESET
-    {
-        IPC4761_CONFIGURATION config;
-        config.tent = getProtectionSurface( via->Padstack().FrontOuterLayers().has_solder_mask,
-                                            via->Padstack().BackOuterLayers().has_solder_mask );
-
-        config.cover = getProtectionSurface( via->Padstack().FrontOuterLayers().has_covering,
-                                             via->Padstack().BackOuterLayers().has_covering );
-
-        config.plug = getProtectionSurface( via->Padstack().FrontOuterLayers().has_plugging,
-                                            via->Padstack().BackOuterLayers().has_plugging );
-
-        config.cap = getProtectionDrill( via->Padstack().Drill().is_capped );
-
-        config.fill = getProtectionDrill( via->Padstack().Drill().is_filled );
-
-        for( const auto& [preset, configuration] : m_IPC4761Presets )
-        {
-            if( configuration == config )
-                return preset;
-        }
-
-        return IPC4761_PRESET::CUSTOM;
-    };
+                return 0;   // From design rules
+            };
 
     // Look for values that are common for every item that is selected
     for( EDA_ITEM* item : m_items )
@@ -311,6 +239,16 @@ DIALOG_TRACK_VIA_PROPERTIES::DIALOG_TRACK_VIA_PROPERTIES( PCB_BASE_EDIT_FRAME* a
                     m_viaNotFree->SetValue( !v->GetIsFree() );
                     m_annularRingsCtrl->SetSelection( getAnnularRingSelection( v ) );
 
+                    m_tentingFrontCtrl->SetSelection( getTentingSelection( v, F_Mask ) );
+                    m_tentingBackCtrl->SetSelection( getTentingSelection( v, B_Mask ) );
+
+                    bool link = m_tentingFrontCtrl->GetSelection()
+                                == m_tentingBackCtrl->GetSelection();
+
+                    m_btnLinkTenting->SetValue( link );
+                    m_tentingBackCtrl->Enable( !link );
+                    m_tentingBackLabel->Enable( !link );
+
                     selection_first_layer = v->TopLayer();
                     selection_last_layer = v->BottomLayer();
 
@@ -322,18 +260,6 @@ DIALOG_TRACK_VIA_PROPERTIES::DIALOG_TRACK_VIA_PROPERTIES( PCB_BASE_EDIT_FRAME* a
                     m_teardropWidthPercent.SetDoubleValue( v->GetTeardropParams().m_BestWidthRatio*100.0 );
                     m_teardropHDPercent.SetDoubleValue( v->GetTeardropParams().m_WidthtoSizeFilterRatio*100.0 );
                     m_curvedEdges->SetValue( v->GetTeardropParams().m_CurvedEdges );
-
-                    IPC4761_PRESET preset = getViaConfiguration( v );
-
-                    if( preset >= IPC4761_PRESET::CUSTOM )
-                    {
-                        m_protectionFeatures->SetSelection(
-                                m_protectionFeatures->Append( INDETERMINATE_ACTION ) );
-                    }
-                    else
-                    {
-                        m_protectionFeatures->SetSelection( static_cast<int>( preset ) );
-                    }
                 }
                 else        // check if values are the same for every selected via
                 {
@@ -389,14 +315,6 @@ DIALOG_TRACK_VIA_PROPERTIES::DIALOG_TRACK_VIA_PROPERTIES( PCB_BASE_EDIT_FRAME* a
 
                     if( m_teardropHDPercent.GetDoubleValue() != v->GetTeardropParams().m_WidthtoSizeFilterRatio*100.0 )
                         m_teardropHDPercent.SetValue( INDETERMINATE_STATE );
-
-
-                    if( static_cast<int>( getViaConfiguration( v ) )
-                        != m_protectionFeatures->GetSelection() )
-                    {
-                        m_protectionFeatures->SetSelection(
-                                m_protectionFeatures->Append( INDETERMINATE_STATE ) );
-                    }
                 }
 
                 if( v->IsLocked() )
@@ -619,31 +537,7 @@ void DIALOG_TRACK_VIA_PROPERTIES::onUnitsChanged( wxCommandEvent& aEvent )
 }
 
 
-bool DIALOG_TRACK_VIA_PROPERTIES::confirmShortingNets( int aNet, const std::set<int>& shortingNets )
-{
-    wxString msg;
-
-    if( shortingNets.size() == 1 )
-    {
-        msg.Printf( _( "Applying these changes will short net %s with %s." ),
-                    m_netSelector->GetValue(),
-                    m_frame->GetBoard()->FindNet( *shortingNets.begin() )->GetNetname() );
-    }
-    else
-    {
-        msg.Printf( _( "Applying these changes will short net %s with other nets." ),
-                    m_netSelector->GetValue() );
-    }
-
-    KIDIALOG dlg( this, msg, _( "Confirmation" ), wxOK | wxCANCEL | wxICON_WARNING );
-    dlg.SetOKCancelLabels( _( "Apply Anyway" ), _( "Cancel Changes" ) );
-    dlg.DoNotShowCheckbox( __FILE__, __LINE__ );
-
-    return dlg.ShowModal() == wxID_OK;
-}
-
-
-bool DIALOG_TRACK_VIA_PROPERTIES::confirmPadChange( const std::set<PAD*>& changingPads )
+bool DIALOG_TRACK_VIA_PROPERTIES::confirmPadChange( const std::vector<PAD*>& changingPads )
 {
     wxString msg;
 
@@ -683,14 +577,6 @@ bool DIALOG_TRACK_VIA_PROPERTIES::confirmPadChange( const std::set<PAD*>& changi
 
 bool DIALOG_TRACK_VIA_PROPERTIES::TransferDataFromWindow()
 {
-    std::vector<PCB_TRACK*> selected_tracks;
-
-    for( EDA_ITEM* item : m_items )
-    {
-        if( PCB_TRACK* track = dynamic_cast<PCB_TRACK*>( item ) )
-            selected_tracks.push_back( track );
-    }
-
     // Check for malformed data ONLY; design rules and constraints are the business of DRC.
 
     if( m_vias )
@@ -742,50 +628,51 @@ bool DIALOG_TRACK_VIA_PROPERTIES::TransferDataFromWindow()
     bool         changeLock = m_lockedCbox->Get3StateValue() != wxCHK_UNDETERMINED;
     bool         setLock = m_lockedCbox->Get3StateValue() == wxCHK_CHECKED;
 
-    for( PCB_TRACK* track : selected_tracks )
+    for( EDA_ITEM* item : m_items )
     {
-        commit.Modify( track );
+        commit.Modify( item );
 
-        switch( track->Type() )
+        switch( item->Type() )
         {
             case PCB_TRACE_T:
             case PCB_ARC_T:
             {
                 wxASSERT( m_tracks );
+                PCB_TRACK* t = static_cast<PCB_TRACK*>( item );
 
                 if( !m_trackStartX.IsIndeterminate() )
-                    track->SetStartX( m_trackStartX.GetIntValue() );
+                    t->SetStartX( m_trackStartX.GetIntValue() );
 
                 if( !m_trackStartY.IsIndeterminate() )
-                    track->SetStartY( m_trackStartY.GetIntValue() );
+                    t->SetStartY( m_trackStartY.GetIntValue() );
 
                 if( !m_trackEndX.IsIndeterminate() )
-                    track->SetEndX( m_trackEndX.GetIntValue() );
+                    t->SetEndX( m_trackEndX.GetIntValue() );
 
                 if( !m_trackEndY.IsIndeterminate() )
-                    track->SetEndY( m_trackEndY.GetIntValue() );
+                    t->SetEndY( m_trackEndY.GetIntValue() );
 
                 if( !m_trackWidth.IsIndeterminate() )
-                    track->SetWidth( m_trackWidth.GetIntValue() );
+                    t->SetWidth( m_trackWidth.GetIntValue() );
 
                 int layer = m_TrackLayerCtrl->GetLayerSelection();
 
                 if( layer != UNDEFINED_LAYER )
-                    track->SetLayer( (PCB_LAYER_ID) layer );
+                    t->SetLayer( (PCB_LAYER_ID) layer );
 
                 if ( m_trackHasSolderMask->Get3StateValue() != wxCHK_UNDETERMINED )
-                    track->SetHasSolderMask( m_trackHasSolderMask->GetValue() );
+                    t->SetHasSolderMask( m_trackHasSolderMask->GetValue() );
 
                 if( !m_trackMaskMargin.IsIndeterminate() )
                 {
                     if( m_trackMaskMargin.IsNull() )
-                        track->SetLocalSolderMaskMargin( {} );
+                        t->SetLocalSolderMaskMargin( {} );
                     else
-                        track->SetLocalSolderMaskMargin( m_trackMaskMargin.GetIntValue() );
+                        t->SetLocalSolderMaskMargin( m_trackMaskMargin.GetIntValue() );
                 }
 
                 if( changeLock )
-                    track->SetLocked( setLock );
+                    t->SetLocked( setLock );
 
                 break;
             }
@@ -793,30 +680,30 @@ bool DIALOG_TRACK_VIA_PROPERTIES::TransferDataFromWindow()
             case PCB_VIA_T:
             {
                 wxASSERT( m_vias );
-                PCB_VIA* via = static_cast<PCB_VIA*>( track );
+                PCB_VIA* v = static_cast<PCB_VIA*>( item );
 
                 if( !m_viaX.IsIndeterminate() )
-                    via->SetPosition( VECTOR2I( m_viaX.GetIntValue(), via->GetPosition().y ) );
+                    v->SetPosition( VECTOR2I( m_viaX.GetIntValue(), v->GetPosition().y ) );
 
                 if( !m_viaY.IsIndeterminate() )
-                    via->SetPosition( VECTOR2I( via->GetPosition().x, m_viaY.GetIntValue() ) );
+                    v->SetPosition( VECTOR2I( v->GetPosition().x, m_viaY.GetIntValue() ) );
 
                 if( m_viaNotFree->Get3StateValue() != wxCHK_UNDETERMINED )
-                    via->SetIsFree( !m_viaNotFree->GetValue() );
+                    v->SetIsFree( !m_viaNotFree->GetValue() );
 
                 if( !m_viaDiameter.IsIndeterminate() )
-                    via->SetPadstack( *m_viaStack );
+                    v->SetPadstack( *m_viaStack );
 
                 switch( m_ViaTypeChoice->GetSelection() )
                 {
                 case 0:
-                    via->SetViaType( VIATYPE::THROUGH );
+                    v->SetViaType( VIATYPE::THROUGH );
                     break;
                 case 1:
-                    via->SetViaType( VIATYPE::MICROVIA );
+                    v->SetViaType( VIATYPE::MICROVIA );
                     break;
                 case 2:
-                    via->SetViaType( VIATYPE::BLIND_BURIED );
+                    v->SetViaType( VIATYPE::BLIND_BURIED );
                     break;
                 default:
                     break;
@@ -828,40 +715,55 @@ bool DIALOG_TRACK_VIA_PROPERTIES::TransferDataFromWindow()
                 if( startLayer != UNDEFINED_LAYER )
                 {
                     m_viaStack->Drill().start = startLayer;
-                    via->SetTopLayer( startLayer );
+                    v->SetTopLayer( startLayer );
                 }
 
                 if( endLayer != UNDEFINED_LAYER )
                 {
                     m_viaStack->Drill().end = endLayer;
-                    via->SetBottomLayer( endLayer );
+                    v->SetBottomLayer( endLayer );
                 }
 
-                via->SanitizeLayers();
+                v->SanitizeLayers();
 
                 switch( m_annularRingsCtrl->GetSelection() )
                 {
                 case 0:
-                    via->Padstack().SetUnconnectedLayerMode(
+                    v->Padstack().SetUnconnectedLayerMode(
                             PADSTACK::UNCONNECTED_LAYER_MODE::KEEP_ALL );
                     break;
                 case 1:
-                    via->Padstack().SetUnconnectedLayerMode(
+                    v->Padstack().SetUnconnectedLayerMode(
                             PADSTACK::UNCONNECTED_LAYER_MODE::REMOVE_EXCEPT_START_AND_END );
                     break;
                 case 2:
-                    via->Padstack().SetUnconnectedLayerMode(
+                    v->Padstack().SetUnconnectedLayerMode(
                             PADSTACK::UNCONNECTED_LAYER_MODE::REMOVE_ALL );
                     break;
                 default:
                     break;
                 }
 
+                switch( m_tentingFrontCtrl->GetSelection() )
+                {
+                default:
+                case 0: v->Padstack().FrontOuterLayers().has_solder_mask.reset();  break;
+                case 1: v->Padstack().FrontOuterLayers().has_solder_mask = true;   break;
+                case 2: v->Padstack().FrontOuterLayers().has_solder_mask = false;  break;
+                }
+
+                switch( m_tentingBackCtrl->GetSelection() )
+                {
+                default:
+                case 0: v->Padstack().BackOuterLayers().has_solder_mask.reset();  break;
+                case 1: v->Padstack().BackOuterLayers().has_solder_mask = true;   break;
+                case 2: v->Padstack().BackOuterLayers().has_solder_mask = false;  break;
+                }
 
                 if( !m_viaDrill.IsIndeterminate() )
-                    via->SetDrill( m_viaDrill.GetIntValue() );
+                    v->SetDrill( m_viaDrill.GetIntValue() );
 
-                TEARDROP_PARAMETERS* targetParams = &via->GetTeardropParams();
+                TEARDROP_PARAMETERS* targetParams = &v->GetTeardropParams();
 
                 if( m_cbTeardrops->Get3StateValue() != wxCHK_UNDETERMINED )
                     targetParams->m_Enabled = m_cbTeardrops->GetValue();
@@ -889,73 +791,7 @@ bool DIALOG_TRACK_VIA_PROPERTIES::TransferDataFromWindow()
                     targetParams->m_CurvedEdges = m_curvedEdges->GetValue();
 
                 if( changeLock )
-                    via->SetLocked( setLock );
-
-                auto setSurfaceProtection = [&]( std::optional<bool>& aFront,
-                                                 std::optional<bool>& aBack,
-                                                 IPC4761_SURFACE      aProtection )
-                {
-                    switch( aProtection )
-                    {
-                    case IPC4761_SURFACE::FROM_RULES:
-                        aFront.reset();
-                        aBack.reset();
-                        break;
-                    case IPC4761_SURFACE::NONE:
-                        aFront = false;
-                        aBack = false;
-                        break;
-                    case IPC4761_SURFACE::FRONT:
-                        aFront = true;
-                        aBack = false;
-                        break;
-                    case IPC4761_SURFACE::BACK:
-                        aFront = false;
-                        aBack = true;
-                        break;
-                    case IPC4761_SURFACE::BOTH:
-                        aFront = true;
-                        aBack = true;
-                        break;
-                    case IPC4761_SURFACE::CUSTOM: return;
-                    }
-                };
-
-                auto setDrillProtection =
-                        [&]( std::optional<bool>& aDrill, IPC4761_DRILL aProtection )
-                {
-                    switch( aProtection )
-                    {
-                    case IPC4761_DRILL::FROM_RULES: aDrill.reset(); break;
-                    case IPC4761_DRILL::NOT_SET: aDrill = false; break;
-                    case IPC4761_DRILL::SET: aDrill = true; break;
-                    }
-                };
-
-                IPC4761_PRESET selectedPreset =
-                        static_cast<IPC4761_PRESET>( m_protectionFeatures->GetSelection() );
-
-                if( selectedPreset < IPC4761_PRESET::CUSTOM ) // Do not change custom feaure list.
-                {
-                    const IPC4761_CONFIGURATION config = m_IPC4761Presets.at( selectedPreset );
-
-                    setSurfaceProtection( via->Padstack().FrontOuterLayers().has_solder_mask,
-                                          via->Padstack().BackOuterLayers().has_solder_mask,
-                                          config.tent );
-
-                    setSurfaceProtection( via->Padstack().FrontOuterLayers().has_plugging,
-                                          via->Padstack().BackOuterLayers().has_plugging,
-                                          config.plug );
-
-                    setSurfaceProtection( via->Padstack().FrontOuterLayers().has_covering,
-                                          via->Padstack().BackOuterLayers().has_covering,
-                                          config.cover );
-
-                    setDrillProtection( via->Padstack().Drill().is_filled, config.fill );
-
-                    setDrillProtection( via->Padstack().Drill().is_capped, config.cap );
-                }
-
+                    v->SetLocked( setLock );
 
                 break;
             }
@@ -966,76 +802,74 @@ bool DIALOG_TRACK_VIA_PROPERTIES::TransferDataFromWindow()
         }
     }
 
-    std::set<int>  shortingNets;
-    int            newNetCode = m_netSelector->GetSelectedNetcode();
-    std::set<PAD*> changingPads;
-
-    // Do NOT use the connectivity code here.  It will propagate through zones, and we haven't
-    // refilled those yet so it's going to pick up a whole bunch of other nets any time the track
-    // width was increased.
-    auto collide =
-            [&]( BOARD_CONNECTED_ITEM* a, BOARD_CONNECTED_ITEM* b )
-            {
-                for( PCB_LAYER_ID layer : LSET( a->GetLayerSet() & b->GetLayerSet() ).Seq() )
-                {
-                    if( a->GetEffectiveShape( layer )->Collide( b->GetEffectiveShape( layer ).get() ) )
-                        return true;
-                }
-
-                return false;
-            };
-
-    for( PCB_TRACK* track : selected_tracks )
-    {
-        for( PCB_TRACK* other : m_frame->GetBoard()->Tracks() )
-        {
-            if( other->GetNetCode() == track->GetNetCode() || other->GetNetCode() == newNetCode )
-                continue;
-
-            if( collide( track, other ) )
-                shortingNets.insert( other->GetNetCode() );
-        }
-
-        for( FOOTPRINT* footprint : m_frame->GetBoard()->Footprints() )
-        {
-            for( PAD* pad : footprint->Pads() )
-            {
-                if( pad->GetNetCode() == newNetCode )
-                    continue;
-
-                if( collide( track, pad ) )
-                {
-                    if( pad->GetNetCode() == track->GetNetCode() )
-                        changingPads.insert( pad );
-                    else
-                        shortingNets.insert( pad->GetNetCode() );
-                }
-            }
-        }
-    }
-
-    if( shortingNets.size() && !confirmShortingNets( newNetCode, shortingNets ) )
-    {
-        commit.Revert();
-        return true;
-    }
-
-    if( !m_netSelector->IsIndeterminate() )
-    {
-        if( changingPads.empty() || confirmPadChange( changingPads ) )
-        {
-            for( PCB_TRACK* track : selected_tracks )
-                track->SetNetCode( newNetCode );
-
-            for( PAD* pad : changingPads )
-            {
-                commit.Modify( pad );
-                pad->SetNetCode( newNetCode );
-            }
-        }
-    }
-
     commit.Push( _( "Edit Track/Via Properties" ) );
+
+    // Pushing the commit will have updated the connectivity so we can now test to see if we
+    // need to update any pad nets.
+
+    auto              connectivity = m_frame->GetBoard()->GetConnectivity();
+    int               newNetCode = m_netSelector->GetSelectedNetcode();
+    bool              updateNets = false;
+    std::vector<PAD*> changingPads;
+
+    if ( !m_netSelector->IsIndeterminate() )
+    {
+        updateNets = true;
+
+        for( EDA_ITEM* item : m_items )
+        {
+            BOARD_CONNECTED_ITEM* boardItem = static_cast<BOARD_CONNECTED_ITEM*>( item );
+            auto connectedItems = connectivity->GetConnectedItems( boardItem,
+                    { PCB_TRACE_T, PCB_ARC_T, PCB_PAD_T, PCB_VIA_T, PCB_FOOTPRINT_T }, true );
+
+            for ( BOARD_CONNECTED_ITEM* citem : connectedItems )
+            {
+                if( citem->Type() == PCB_PAD_T )
+                {
+                    PAD* pad = static_cast<PAD*>( citem );
+
+                    if( pad->GetNetCode() != newNetCode && !alg::contains( changingPads, citem ) )
+                        changingPads.push_back( pad );
+                }
+            }
+        }
+    }
+
+    if( changingPads.size() && !confirmPadChange( changingPads ) )
+        updateNets = false;
+
+    if( updateNets )
+    {
+        for( EDA_ITEM* item : m_items )
+        {
+            commit.Modify( item );
+
+            switch( item->Type() )
+            {
+                case PCB_TRACE_T:
+                case PCB_ARC_T:
+                    static_cast<PCB_TRACK*>( item )->SetNetCode( newNetCode );
+                    break;
+
+                case PCB_VIA_T:
+                    static_cast<PCB_VIA*>( item )->SetNetCode( newNetCode );
+                    break;
+
+                default:
+                    wxASSERT( false );
+                    break;
+            }
+        }
+
+        for( PAD* pad : changingPads )
+        {
+            commit.Modify( pad );
+            pad->SetNetCode( newNetCode );
+        }
+
+        commit.Push( _( "Update Nets" ) );
+    }
+
     return true;
 }
 
@@ -1252,6 +1086,29 @@ void DIALOG_TRACK_VIA_PROPERTIES::onViaEdit( wxCommandEvent& aEvent )
         m_annularRingsLabel->Show( getLayerDepth() > 1 );
         m_annularRingsCtrl->Show( getLayerDepth() > 1 );
     }
+}
+
+
+void DIALOG_TRACK_VIA_PROPERTIES::onFrontTentingChanged( wxCommandEvent& event )
+{
+    if( m_btnLinkTenting->GetValue() )
+        m_tentingBackCtrl->SetSelection( m_tentingFrontCtrl->GetSelection() );
+
+    event.Skip();
+}
+
+
+void DIALOG_TRACK_VIA_PROPERTIES::onTentingLinkToggle( wxCommandEvent& event )
+{
+    bool link = m_btnLinkTenting->GetValue();
+
+    m_tentingBackCtrl->Enable( !link );
+    m_tentingBackLabel->Enable( !link );
+
+    if( link )
+        m_tentingBackCtrl->SetSelection( m_tentingFrontCtrl->GetSelection() );
+
+    event.Skip();
 }
 
 

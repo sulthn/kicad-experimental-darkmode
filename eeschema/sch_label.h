@@ -131,6 +131,17 @@ enum FLAG_SHAPE : unsigned int
 };
 
 
+enum  GLOBALLABEL_FIELD_T
+{
+    INTERSHEET_REFS = 0,
+
+    /// The first 2 are mandatory, and must be instantiated in #SCH_SHEET.
+    GLOBALLABEL_MANDATORY_FIELD_COUNT
+};
+
+#define GLOBALLABEL_MANDATORY_FIELDS { INTERSHEET_REFS }
+
+
 class SCH_LABEL_BASE : public SCH_TEXT
 {
 public:
@@ -196,11 +207,6 @@ public:
     }
 
     static const wxString GetDefaultFieldName( const wxString& aName, bool aUseDefaultName );
-
-    /**
-     * Return the next ordinal for a user field for this label
-     */
-    int GetNextFieldOrdinal() const;
 
     virtual int GetMandatoryFieldCount()              { return 0; }
 
@@ -334,6 +340,12 @@ public:
     std::vector<int> ViewGetLayers() const override;
 
     void GetMsgPanelInfo( EDA_DRAW_FRAME* aFrame, std::vector<MSG_PANEL_ITEM>& aList ) override;
+
+    void Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                const VECTOR2I& offset, bool aForceNoFill, bool aDimmed ) override;
+
+    void PrintBackground( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                          const VECTOR2I& aOffset, bool aDimmed ) override {}
 
     void Plot( PLOTTER* aPlotter, bool aBackground, const SCH_PLOT_OPTS& aPlotOpts,
                int aUnit, int aBodyStyle, const VECTOR2I& aOffset, bool aDimmed ) override;
@@ -534,13 +546,6 @@ public:
     }
 
     int GetMandatoryFieldCount() override { return 1; }
-
-    /**
-     * Return a mandatory field in this label.  The const version will return nullptr if the
-     * field doesn't exist; the non-const version will create it.
-     */
-    SCH_FIELD* GetField( FIELD_T aFieldType );
-    const SCH_FIELD* GetField( FIELD_T aFieldNdx ) const;
 
     void SetSpinStyle( SPIN_STYLE aSpinStyle ) override;
 

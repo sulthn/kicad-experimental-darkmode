@@ -31,14 +31,21 @@
 #include <symbol_viewer_frame.h>
 #include <project_rescue.h>
 #include <project_sch.h>
+#include <sch_symbol.h>
+#include <sch_sheet.h>
 #include <sch_edit_frame.h>
+#include <schematic.h>
 #include <string_utils.h>
 #include <symbol_lib_table.h>
 #include <wildcards_and_files_ext.h>
+#include <project_sch.h>
 #include <wx/msgdlg.h>
 
 #include <cctype>
 #include <map>
+
+
+typedef std::pair<SCH_SYMBOL*, wxString> SYMBOL_NAME_PAIR;
 
 
 // Helper sort function, used in getSymbols, to sort a symbol list by lib_id
@@ -131,7 +138,8 @@ RESCUE_CASE_CANDIDATE::RESCUE_CASE_CANDIDATE( const wxString& aRequestedName,
 void RESCUE_CASE_CANDIDATE::FindRescues( RESCUER& aRescuer,
                                          boost::ptr_vector<RESCUE_CANDIDATE>& aCandidates )
 {
-    std::map<wxString, RESCUE_CASE_CANDIDATE> candidate_map;
+    typedef std::map<wxString, RESCUE_CASE_CANDIDATE> candidate_map_t;
+    candidate_map_t candidate_map;
 
     // Remember the list of symbols is sorted by symbol name.
     // So a search in libraries is made only once by group
@@ -161,14 +169,16 @@ void RESCUE_CASE_CANDIDATE::FindRescues( RESCUER& aRescuer,
 
             // If the case sensitive match failed, try a case insensitive match.
             PROJECT_SCH::SchLibs( aRescuer.GetPrj() )
-                            ->FindLibraryNearEntries( case_insensitive_matches, symbol_name );
+                    ->FindLibraryNearEntries( case_insensitive_matches,
+                                                                  symbol_name );
 
             // If there are not case insensitive matches either, the symbol cannot be rescued.
             if( !case_insensitive_matches.size() )
                 continue;
 
             RESCUE_CASE_CANDIDATE candidate( symbol_name, case_insensitive_matches[0]->GetName(),
-                                             case_insensitive_matches[0], eachSymbol->GetUnit(),
+                                             case_insensitive_matches[0],
+                                             eachSymbol->GetUnit(),
                                              eachSymbol->GetBodyStyle() );
 
             candidate_map[symbol_name] = candidate;
@@ -176,8 +186,10 @@ void RESCUE_CASE_CANDIDATE::FindRescues( RESCUER& aRescuer,
     }
 
     // Now, dump the map into aCandidates
-    for( const auto& [ name, candidate ] : candidate_map )
-        aCandidates.push_back( new RESCUE_CASE_CANDIDATE( candidate ) );
+    for( const candidate_map_t::value_type& each_pair : candidate_map )
+    {
+        aCandidates.push_back( new RESCUE_CASE_CANDIDATE( each_pair.second ) );
+    }
 }
 
 
@@ -240,7 +252,8 @@ RESCUE_CACHE_CANDIDATE::RESCUE_CACHE_CANDIDATE()
 void RESCUE_CACHE_CANDIDATE::FindRescues( RESCUER& aRescuer,
                                           boost::ptr_vector<RESCUE_CANDIDATE>& aCandidates )
 {
-    std::map<wxString, RESCUE_CACHE_CANDIDATE> candidate_map;
+    typedef std::map<wxString, RESCUE_CACHE_CANDIDATE> candidate_map_t;
+    candidate_map_t candidate_map;
 
     // Remember the list of symbols is sorted by symbol name.
     // So a search in libraries is made only once by group
@@ -267,19 +280,18 @@ void RESCUE_CACHE_CANDIDATE::FindRescues( RESCUER& aRescuer,
             // the LIB_NICKNAME_LIB_SYMBOL_NAME case.
             if( !cache_match && eachSymbol->GetLibId().IsValid() )
             {
-                wxString tmp = wxString::Format( wxT( "%s-%s" ),
-                                                 eachSymbol->GetLibId().GetLibNickname().wx_str(),
-                                                 eachSymbol->GetLibId().GetLibItemName().wx_str() );
+                wxString tmp;
+
+                tmp = eachSymbol->GetLibId().GetLibNickname().wx_str() + wxT( "_" ) +
+                      eachSymbol->GetLibId().GetLibItemName().wx_str();
                 cache_match = findSymbol( tmp, PROJECT_SCH::SchLibs( aRescuer.GetPrj() ), true );
             }
 
             // Test whether there is a conflict or if the symbol can only be found in the cache
             // and the symbol name does not have any illegal characters.
-            if( cache_match && lib_match
-                    && !cache_match->PinsConflictWith( *lib_match, true, true, true, true, false ) )
-            {
+            if( cache_match && lib_match &&
+                !cache_match->PinsConflictWith( *lib_match, true, true, true, true, false ) )
                 continue;
-            }
 
             if( !cache_match && lib_match )
                 continue;
@@ -293,8 +305,10 @@ void RESCUE_CACHE_CANDIDATE::FindRescues( RESCUER& aRescuer,
     }
 
     // Now, dump the map into aCandidates
-    for( const auto& [name, candidate] : candidate_map )
-        aCandidates.push_back( new RESCUE_CACHE_CANDIDATE( candidate ) );
+    for( const candidate_map_t::value_type& each_pair : candidate_map )
+    {
+        aCandidates.push_back( new RESCUE_CACHE_CANDIDATE( each_pair.second ) );
+    }
 }
 
 
@@ -303,23 +317,14 @@ wxString RESCUE_CACHE_CANDIDATE::GetActionDescription() const
     wxString action;
 
     if( !m_cache_candidate && !m_lib_candidate )
-    {
         action.Printf( _( "Cannot rescue symbol %s which is not available in any library or "
-                          "the cache." ),
-                       m_requested_name );
-    }
+                          "the cache." ), m_requested_name );
     else if( m_cache_candidate && !m_lib_candidate )
-    {
         action.Printf( _( "Rescue symbol %s found only in cache library to %s." ),
-                       m_requested_name,
-                       m_new_name );
-    }
+                       m_requested_name, m_new_name );
     else
-    {
         action.Printf( _( "Rescue modified symbol %s to %s" ),
-                       m_requested_name,
-                       m_new_name );
-    }
+                       m_requested_name, m_new_name );
 
     return action;
 }
@@ -354,12 +359,13 @@ bool RESCUE_CACHE_CANDIDATE::PerformAction( RESCUER* aRescuer )
 }
 
 
-RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::RESCUE_SYMBOL_LIB_TABLE_CANDIDATE( const LIB_ID& aRequestedId,
-                                                                      const LIB_ID& aNewId,
-                                                                      LIB_SYMBOL* aCacheCandidate,
-                                                                      LIB_SYMBOL* aLibCandidate,
-                                                                      int aUnit, int aConvert ) :
-        RESCUE_CANDIDATE()
+RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::RESCUE_SYMBOL_LIB_TABLE_CANDIDATE(
+    const LIB_ID& aRequestedId,
+    const LIB_ID& aNewId,
+    LIB_SYMBOL* aCacheCandidate,
+    LIB_SYMBOL* aLibCandidate,
+    int aUnit,
+    int aConvert ) : RESCUE_CANDIDATE()
 {
     m_requested_id = aRequestedId;
     m_requested_name = aRequestedId.Format().wx_str();
@@ -378,10 +384,13 @@ RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::RESCUE_SYMBOL_LIB_TABLE_CANDIDATE()
 }
 
 
-void RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::FindRescues( RESCUER& aRescuer,
-                                                     boost::ptr_vector<RESCUE_CANDIDATE>& aCandidates )
+void RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::FindRescues(
+    RESCUER& aRescuer,
+    boost::ptr_vector<RESCUE_CANDIDATE>& aCandidates )
 {
-    std::map<LIB_ID, RESCUE_SYMBOL_LIB_TABLE_CANDIDATE> candidate_map;
+    typedef std::map<LIB_ID, RESCUE_SYMBOL_LIB_TABLE_CANDIDATE> candidate_map_t;
+
+    candidate_map_t candidate_map;
 
     // Remember the list of symbols is sorted by LIB_ID.
     // So a search in libraries is made only once by group
@@ -412,9 +421,8 @@ void RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::FindRescues( RESCUER& aRescuer,
             // the LIB_NICKNAME_LIB_SYMBOL_NAME case.
             if( !cache_match )
             {
-                symbolName.Printf( wxT( "%s-%s" ),
-                                   symbol_id.GetLibNickname().wx_str(),
-                                   symbol_id.GetLibItemName().wx_str() );
+                symbolName = symbol_id.GetLibNickname().wx_str() + wxT( "_" ) +
+                             symbol_id.GetLibItemName().wx_str();
                 cache_match = findSymbol( symbolName, PROJECT_SCH::SchLibs( aRescuer.GetPrj() ),
                                           true );
             }
@@ -428,8 +436,8 @@ void RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::FindRescues( RESCUER& aRescuer,
 
             LIB_SYMBOL_SPTR lib_match_parent;
 
-            // If it's a derived symbol, use the parent symbol to perform the pin test.
-            if( lib_match && lib_match->IsDerived() )
+            // If it's a derive symbol, use the parent symbol to perform the pin test.
+            if( lib_match && lib_match->IsAlias() )
             {
                 lib_match_parent = lib_match->GetRootSymbol();
 
@@ -442,8 +450,8 @@ void RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::FindRescues( RESCUER& aRescuer,
             // Test whether there is a conflict or if the symbol can only be found in the cache.
             if( LIB_ID::HasIllegalChars( symbol_id.GetLibItemName() ) == -1 )
             {
-                if( cache_match && lib_match
-                    && !cache_match->PinsConflictWith( *lib_match, true, true, true, true, false ) )
+                if( cache_match && lib_match &&
+                    !cache_match->PinsConflictWith( *lib_match, true, true, true, true, false ) )
                 {
                     continue;
                 }
@@ -460,9 +468,8 @@ void RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::FindRescues( RESCUER& aRescuer,
             // library.
             wxString libNickname = GetRescueLibraryFileName( aRescuer.Schematic() ).GetName();
 
-            LIB_ID new_id( libNickname, wxString::Format( wxT( "%s-%s" ),
-                                                          new_name,
-                                                          symbol_id.GetLibNickname().wx_str() ) );
+            LIB_ID new_id( libNickname, new_name + wxS( "-" ) +
+                           symbol_id.GetLibNickname().wx_str() );
 
             RESCUE_SYMBOL_LIB_TABLE_CANDIDATE candidate( symbol_id, new_id, cache_match, lib_match,
                                                          eachSymbol->GetUnit(),
@@ -473,8 +480,10 @@ void RESCUE_SYMBOL_LIB_TABLE_CANDIDATE::FindRescues( RESCUER& aRescuer,
     }
 
     // Now, dump the map into aCandidates
-    for( const auto& [name, candidate] : candidate_map )
-        aCandidates.push_back( new RESCUE_SYMBOL_LIB_TABLE_CANDIDATE( candidate ) );
+    for( const candidate_map_t::value_type& each_pair : candidate_map )
+    {
+        aCandidates.push_back( new RESCUE_SYMBOL_LIB_TABLE_CANDIDATE( each_pair.second ) );
+    }
 }
 
 

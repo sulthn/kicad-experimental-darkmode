@@ -358,28 +358,26 @@ void BRDITEMS_PLOTTER::PlotFootprintTextItems( const FOOTPRINT* aFootprint )
     if( !GetPlotFPText() )
         return;
 
-    const PCB_TEXT* reference = &aFootprint->Reference();
-    PCB_LAYER_ID    refLayer = reference->GetLayer();
+    const PCB_TEXT* textItem = &aFootprint->Reference();
+    PCB_LAYER_ID    textLayer = textItem->GetLayer();
 
     // Reference and value have special controls for forcing their plotting
-    if( GetPlotReference()
-            && m_layerMask[refLayer]
-            && reference->IsVisible()
-            && !( aFootprint->IsDNP() && hideDNPItems( refLayer ) ) )
+    if( GetPlotReference() && m_layerMask[textLayer]
+            && ( textItem->IsVisible() || GetPlotInvisibleText() )
+            && !( aFootprint->IsDNP() && hideDNPItems( textLayer ) ) )
     {
-        PlotText( reference, refLayer, reference->IsKnockout(), reference->GetFontMetrics(),
-                  aFootprint->IsDNP() && crossoutDNPItems( refLayer ) );
+        PlotText( textItem, textLayer, textItem->IsKnockout(), textItem->GetFontMetrics(),
+                  aFootprint->IsDNP() && crossoutDNPItems( textLayer ) );
     }
 
-    const PCB_TEXT* value  = &aFootprint->Value();
-    PCB_LAYER_ID    valueLayer = value->GetLayer();
+    textItem  = &aFootprint->Value();
+    textLayer = textItem->GetLayer();
 
-    if( GetPlotValue()
-            && m_layerMask[valueLayer]
-            && value->IsVisible()
-            && !( aFootprint->IsDNP() && hideDNPItems( valueLayer ) ) )
+    if( GetPlotValue() && m_layerMask[textLayer]
+            && ( textItem->IsVisible() || GetPlotInvisibleText() )
+            && !( aFootprint->IsDNP() && hideDNPItems( textLayer ) ) )
     {
-        PlotText( value, valueLayer, value->IsKnockout(), value->GetFontMetrics(),
+        PlotText( textItem, textLayer, textItem->IsKnockout(), textItem->GetFontMetrics(),
                   false );
     }
 
@@ -396,8 +394,10 @@ void BRDITEMS_PLOTTER::PlotFootprintTextItems( const FOOTPRINT* aFootprint )
 
     for( BOARD_ITEM* item : aFootprint->GraphicalItems() )
     {
-        if( PCB_TEXT* textItem = dynamic_cast<PCB_TEXT*>( item ) )
-            texts.push_back( textItem );
+        textItem = dynamic_cast<const PCB_TEXT*>( item );
+
+        if( textItem )
+            texts.push_back( static_cast<PCB_TEXT*>( item ) );
     }
 
     for( const PCB_TEXT* text : texts )
@@ -405,8 +405,8 @@ void BRDITEMS_PLOTTER::PlotFootprintTextItems( const FOOTPRINT* aFootprint )
         if( !text->IsVisible() )
             continue;
 
-        PCB_LAYER_ID textLayer = text->GetLayer();
-        bool         strikeout = false;
+        textLayer = text->GetLayer();
+        bool strikeout = false;
 
         if( textLayer == Edge_Cuts || textLayer >= PCB_LAYER_ID_COUNT )
             continue;
@@ -729,19 +729,11 @@ void BRDITEMS_PLOTTER::PlotText( const EDA_TEXT* aText, PCB_LAYER_ID aLayer, boo
 
     if( aIsKnockout )
     {
+        const PCB_TEXT* text = static_cast<const PCB_TEXT*>( aText );
         SHAPE_POLY_SET  finalPoly;
 
-        if( const PCB_TEXT* text = dynamic_cast<const PCB_TEXT*>( aText) )
-        {
-            text->TransformTextToPolySet( finalPoly, 0, m_board->GetDesignSettings().m_MaxError,
-                                          ERROR_INSIDE );
-        }
-        else if( const PCB_TEXTBOX* textbox = dynamic_cast<const PCB_TEXTBOX*>( aText ) )
-        {
-            textbox->TransformTextToPolySet( finalPoly, 0, m_board->GetDesignSettings().m_MaxError,
-                                             ERROR_INSIDE );
-        }
-
+        text->TransformTextToPolySet( finalPoly, 0, m_board->GetDesignSettings().m_MaxError,
+                                      ERROR_INSIDE );
         finalPoly.Fracture();
 
         for( int ii = 0; ii < finalPoly.OutlineCount(); ++ii )
@@ -933,7 +925,7 @@ void BRDITEMS_PLOTTER::PlotShape( const PCB_SHAPE* aShape )
             break;
 
         case SHAPE_T::CIRCLE:
-            if( aShape->IsSolidFill() )
+            if( aShape->IsFilled() )
             {
                 int diameter = aShape->GetRadius() * 2 + thickness;
 
@@ -1004,7 +996,7 @@ void BRDITEMS_PLOTTER::PlotShape( const PCB_SHAPE* aShape )
                                          m_board->GetDesignSettings().m_MaxError );
                     }
 
-                    FILL_T fill = aShape->IsSolidFill() ? FILL_T::FILLED_SHAPE : FILL_T::NO_FILL;
+                    FILL_T fill = aShape->IsFilled() ? FILL_T::FILLED_SHAPE : FILL_T::NO_FILL;
 
                     for( int jj = 0; jj < tmpPoly.OutlineCount(); ++jj )
                     {
@@ -1055,7 +1047,7 @@ void BRDITEMS_PLOTTER::PlotShape( const PCB_SHAPE* aShape )
                                   m_board->GetDesignSettings().m_MaxError );
                 }
 
-                FILL_T fill_mode = aShape->IsSolidFill() ? FILL_T::FILLED_SHAPE : FILL_T::NO_FILL;
+                FILL_T fill_mode = aShape->IsFilled() ? FILL_T::FILLED_SHAPE : FILL_T::NO_FILL;
 
                 if( poly.OutlineCount() > 0 )
                 {
@@ -1098,24 +1090,6 @@ void BRDITEMS_PLOTTER::PlotShape( const PCB_SHAPE* aShape )
         for( SHAPE* shape : shapes )
             delete shape;
     }
-
-    if( aShape->IsHatchedFill() )
-    {
-        for( int ii = 0; ii < aShape->GetHatching().OutlineCount(); ++ii )
-        {
-            if( m_plotter->GetPlotterType() == PLOT_FORMAT::GERBER )
-            {
-                GERBER_PLOTTER* gbr_plotter = static_cast<GERBER_PLOTTER*>( m_plotter );
-                gbr_plotter->PlotPolyAsRegion( aShape->GetHatching().Outline( ii ),
-                                               FILL_T::FILLED_SHAPE, 0, &gbr_metadata );
-            }
-            else
-            {
-                m_plotter->PlotPoly( aShape->GetHatching().Outline( ii ), FILL_T::FILLED_SHAPE,
-                                     0, &gbr_metadata );
-            }
-        }
-    }
 }
 
 
@@ -1124,6 +1098,8 @@ void BRDITEMS_PLOTTER::PlotTableBorders( const PCB_TABLE* aTable )
     if( !m_layerMask[aTable->GetLayer()] )
         return;
 
+    VECTOR2I     pos = aTable->GetPosition();
+    VECTOR2I     end = aTable->GetEnd();
     int          lineWidth;
     LINE_STYLE   lineStyle;
     GBR_METADATA gbr_metadata;
@@ -1166,6 +1142,15 @@ void BRDITEMS_PLOTTER::PlotTableBorders( const PCB_TABLE* aTable )
                 }
             };
 
+    auto strokeRect =
+            [&]( const VECTOR2I& ptA, const VECTOR2I& ptB )
+            {
+                strokeLine( VECTOR2I( ptA.x, ptA.y ), VECTOR2I( ptB.x, ptA.y ) );
+                strokeLine( VECTOR2I( ptB.x, ptA.y ), VECTOR2I( ptB.x, ptB.y ) );
+                strokeLine( VECTOR2I( ptB.x, ptB.y ), VECTOR2I( ptA.x, ptB.y ) );
+                strokeLine( VECTOR2I( ptA.x, ptB.y ), VECTOR2I( ptA.x, ptA.y ) );
+            };
+
     if( aTable->GetSeparatorsStroke().GetWidth() >= 0 )
     {
         setupStroke( aTable->GetSeparatorsStroke() );
@@ -1174,22 +1159,13 @@ void BRDITEMS_PLOTTER::PlotTableBorders( const PCB_TABLE* aTable )
         {
             for( int col = 0; col < aTable->GetColCount() - 1; ++col )
             {
-                int row = 1;
-                if( aTable->StrokeHeader() )
+                for( int row = 0; row < aTable->GetRowCount(); ++row )
                 {
-                    row = 0;
-                }
+                    PCB_TABLECELL* cell = aTable->GetCell( row, col );
+                    VECTOR2I       topRight( cell->GetEndX(), cell->GetStartY() );
 
-                for( ; row < aTable->GetRowCount(); ++row )
-                {
-                    PCB_TABLECELL*        cell = aTable->GetCell( row, col );
-                    std::vector<VECTOR2I> corners = cell->GetCornersInSequence();
-
-                    if( corners.size() == 4 )
-                    {
-                        // Draw right edge (between adjacent cells)
-                        strokeLine( corners[1], corners[2] );
-                    }
+                    if( cell->GetColSpan() > 0 && cell->GetRowSpan() > 0 )
+                        strokeLine( topRight, cell->GetEnd() );
                 }
             }
         }
@@ -1200,14 +1176,11 @@ void BRDITEMS_PLOTTER::PlotTableBorders( const PCB_TABLE* aTable )
             {
                 for( int col = 0; col < aTable->GetColCount(); ++col )
                 {
-                    PCB_TABLECELL*        cell = aTable->GetCell( row, col );
-                    std::vector<VECTOR2I> corners = cell->GetCornersInSequence();
+                    PCB_TABLECELL* cell = aTable->GetCell( row, col );
+                    VECTOR2I       botLeft( cell->GetStartX(), cell->GetEndY() );
 
-                    if( corners.size() == 4 )
-                    {
-                        // Draw bottom edge (between adjacent cells)
-                        strokeLine( corners[2], corners[3] );
-                    }
+                    if( cell->GetColSpan() > 0 && cell->GetRowSpan() > 0 )
+                        strokeLine( botLeft, cell->GetEnd() );
                 }
             }
         }
@@ -1216,30 +1189,22 @@ void BRDITEMS_PLOTTER::PlotTableBorders( const PCB_TABLE* aTable )
     if( aTable->GetBorderStroke().GetWidth() >= 0 )
     {
         setupStroke( aTable->GetBorderStroke() );
-
-        std::vector<VECTOR2I> topLeft = aTable->GetCell( 0, 0 )->GetCornersInSequence();
-        std::vector<VECTOR2I> bottomLeft =
-                aTable->GetCell( aTable->GetRowCount() - 1, 0 )->GetCornersInSequence();
-        std::vector<VECTOR2I> topRight =
-                aTable->GetCell( 0, aTable->GetColCount() - 1 )->GetCornersInSequence();
-        std::vector<VECTOR2I> bottomRight =
-                aTable->GetCell( aTable->GetRowCount() - 1, aTable->GetColCount() - 1 )
-                        ->GetCornersInSequence();
+        PCB_TABLECELL* cell = aTable->GetCell( 0, 0 );
 
         if( aTable->StrokeHeader() )
         {
-            strokeLine( topLeft[0], topRight[1] );
-            strokeLine( topLeft[0], topLeft[3] );
-            strokeLine( topLeft[3], topRight[2] );
-            strokeLine( topRight[1], topRight[2] );
+            if( !cell->GetTextAngle().IsHorizontal() )
+                strokeLine( VECTOR2I( cell->GetEndX(), pos.y ), VECTOR2I( cell->GetEndX(), cell->GetEndY() ) );
+            else
+                strokeLine( VECTOR2I( pos.x, cell->GetEndY() ), VECTOR2I( end.x, cell->GetEndY() ) );
         }
 
         if( aTable->StrokeExternal() )
         {
-            strokeLine( topLeft[3], topRight[2] );
-            strokeLine( topRight[2], bottomRight[2] );
-            strokeLine( bottomRight[2], bottomLeft[3] );
-            strokeLine( bottomLeft[3], topLeft[3] );
+            RotatePoint( pos, aTable->GetPosition(), cell->GetTextAngle() );
+            RotatePoint( end, aTable->GetPosition(), cell->GetTextAngle() );
+
+            strokeRect( pos, end );
         }
     }
 }

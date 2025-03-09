@@ -110,8 +110,6 @@ public:
     virtual wxString GetDescription() const = 0;
     virtual wxString GetKeyWords() const = 0;
 
-    virtual bool IsGlobalPower() const = 0;
-    virtual bool IsLocalPower() const = 0;
     virtual bool IsPower() const = 0;
     virtual bool IsNormal() const = 0;
 
@@ -138,7 +136,7 @@ public:
     virtual const wxString GetValue( bool aResolve, const SCH_SHEET_PATH* aPath,
                                      bool aAllowExtraText ) const = 0;
 
-    virtual void GetFields( std::vector<SCH_FIELD*>& aVector, bool aVisibleOnly ) const = 0;
+    virtual void GetFields( std::vector<SCH_FIELD*>& aVector, bool aVisibleOnly ) = 0;
 
     virtual std::vector<SCH_PIN*> GetPins() const = 0;
 

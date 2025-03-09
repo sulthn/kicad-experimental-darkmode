@@ -116,15 +116,10 @@ public:
         bool    m_DisplayPadFill;
     };
 
-    double m_FootprintViewerZoom;               ///< The last zoom level used (0 for auto)
-    bool   m_FootprintViewerAutoZoomOnSelect;   ///< true to use automatic zoom on fp selection
-
     VIEWERS_DISPLAY_OPTIONS m_ViewersDisplay;
 
     PCB_VIEWERS_SETTINGS_BASE( const std::string& aFilename, int aSchemaVersion ):
-        APP_SETTINGS_BASE( aFilename, aSchemaVersion ),
-        m_FootprintViewerZoom( 1.0 ),
-        m_FootprintViewerAutoZoomOnSelect( true )
+        APP_SETTINGS_BASE( aFilename, aSchemaVersion )
     {
         m_ViewersDisplay.m_DisplayGraphicsFill = true;
         m_ViewersDisplay.m_DisplayTextFill = true;
@@ -214,6 +209,20 @@ public:
         int    compressFormat;
     };
 
+    struct DIALOG_EXPORT_SVG
+    {
+        bool             black_and_white;
+        bool             mirror;
+        bool             one_file;
+        bool             plot_board_edges;
+        int              page_size;
+        wxString         output_dir;        // legacy; now in project settings
+        std::vector<int> layers;
+        bool             use_selected_theme;// color theme option to use for export
+                                            // false = board theme, true = selected theme
+        wxString         color_theme;       // color theme used for export
+    };
+
     struct DIALOG_EXPORT_VRML
     {
         int    units;
@@ -244,7 +253,6 @@ public:
         int  map_file_type;
         int  zeros_format;
         bool generate_map;
-        bool generate_tenting;
     };
 
     struct DIALOG_IMPORT_GRAPHICS
@@ -388,6 +396,8 @@ public:
 
     DIALOG_EXPORT_ODBPP m_ExportODBPP;
 
+    DIALOG_EXPORT_SVG m_ExportSvg;
+
     DIALOG_EXPORT_VRML m_ExportVrml;
 
     DIALOG_FOOTPRINT_WIZARD_LIST m_FootprintWizardList;
@@ -447,6 +457,8 @@ public:
 
     std::unique_ptr<PNS::ROUTING_SETTINGS> m_PnsSettings;
 
+    double m_FootprintViewerZoom;               ///< The last zoom level used (0 for auto)
+    bool   m_FootprintViewerAutoZoomOnSelect;   ///< true to use automatic zoom on fp selection
     int    m_FootprintViewerLibListWidth;
     int    m_FootprintViewerFPListWidth;
 

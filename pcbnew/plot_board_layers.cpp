@@ -46,84 +46,12 @@
 #include <gbr_metadata.h>
 #include <advanced_config.h>
 
-
-void GenerateLayerPoly( SHAPE_POLY_SET* aResult, BOARD *aBoard, PCB_LAYER_ID aLayer,
-                        bool aPlotFPText, bool aPlotReferences, bool aPlotValues );
-
-
-void PlotLayer( BOARD* aBoard, PLOTTER* aPlotter, const LSET& layerMask,
-                const PCB_PLOT_PARAMS& plotOpts )
-{
-    // PlotLayerOutlines() is designed only for DXF plotters.
-    if( plotOpts.GetFormat() == PLOT_FORMAT::DXF && plotOpts.GetDXFPlotPolygonMode() )
-        PlotLayerOutlines( aBoard, aPlotter, layerMask, plotOpts );
-    else
-        PlotStandardLayer( aBoard, aPlotter, layerMask, plotOpts );
-};
-
-
-void PlotPolySet( BOARD* aBoard, PLOTTER* aPlotter, const PCB_PLOT_PARAMS& aPlotOpt,
-                  SHAPE_POLY_SET* aPolySet, PCB_LAYER_ID aLayer )
-{
-    BRDITEMS_PLOTTER itemplotter( aPlotter, aBoard, aPlotOpt );
-    LSET             layers = { aLayer };
-
-    itemplotter.SetLayerSet( layers );
-
-    // To avoid a lot of code, use a ZONE to handle and plot polygons, because our polygons look
-    // exactly like filled areas in zones.
-    // Note, also this code is not optimized: it creates a lot of copy/duplicate data.
-    // However it is not complex, and fast enough for plot purposes (copy/convert data is only a
-    // very small calculation time for these calculations).
-    ZONE zone( aBoard );
-    zone.SetMinThickness( 0 );
-    zone.SetLayer( aLayer );
-
-    aPolySet->Fracture();
-    itemplotter.PlotZone( &zone, aLayer, *aPolySet );
-}
-
-
-/**
- * Plot a solder mask layer.
- *
- * Solder mask layers have a minimum thickness value and cannot be drawn like standard layers,
- * unless the minimum thickness is 0.
+/*
+ * Plot a solder mask layer.  Solder mask layers have a minimum thickness value and cannot be
+ * drawn like standard layers, unless the minimum thickness is 0.
  */
-void PlotSolderMaskLayer( BOARD* aBoard, PLOTTER* aPlotter, LSET aLayerMask,
-                          const PCB_PLOT_PARAMS& aPlotOpt )
-{
-    if( aBoard->GetDesignSettings().m_SolderMaskMinWidth == 0 )
-    {
-        PlotLayer( aBoard, aPlotter, aLayerMask, aPlotOpt );
-        return;
-    }
-
-    SHAPE_POLY_SET solderMask;
-    PCB_LAYER_ID   layer = aLayerMask[B_Mask] ? B_Mask : F_Mask;
-
-    GenerateLayerPoly( &solderMask, aBoard, layer, aPlotOpt.GetPlotFPText(),
-                       aPlotOpt.GetPlotReference(), aPlotOpt.GetPlotValue() );
-
-    PlotPolySet( aBoard, aPlotter, aPlotOpt, &solderMask, layer );
-}
-
-
-void PlotClippedSilkLayer( BOARD* aBoard, PLOTTER* aPlotter, LSET aLayerMask,
-                           const PCB_PLOT_PARAMS& aPlotOpt )
-{
-    SHAPE_POLY_SET silkscreen, solderMask;
-    PCB_LAYER_ID   silkLayer = aLayerMask[F_SilkS] ? F_SilkS : B_SilkS;
-    PCB_LAYER_ID   maskLayer = aLayerMask[F_SilkS] ? F_Mask : B_Mask;
-
-    GenerateLayerPoly( &silkscreen, aBoard, silkLayer, aPlotOpt.GetPlotFPText(),
-                       aPlotOpt.GetPlotReference(), aPlotOpt.GetPlotValue() );
-    GenerateLayerPoly( &solderMask, aBoard, maskLayer, aPlotOpt.GetPlotFPText(),
-                       aPlotOpt.GetPlotReference(), aPlotOpt.GetPlotValue() );
-
-    silkscreen.BooleanSubtract( solderMask );
-    PlotPolySet( aBoard, aPlotter, aPlotOpt, &silkscreen, silkLayer );
-}
+static void PlotSolderMaskLayer( BOARD *aBoard, PLOTTER* aPlotter, LSET aLayerMask,
+                                 const PCB_PLOT_PARAMS& aPlotOpt, int aMinThickness );
 
 
 void PlotBoardLayers( BOARD* aBoard, PLOTTER* aPlotter, const LSEQ& aLayers,
@@ -140,7 +68,8 @@ void PlotBoardLayers( BOARD* aBoard, PLOTTER* aPlotter, const LSEQ& aLayers,
                        && !aPlotOptions.GetLayerSelection().ClearNonCopperLayers().empty() );
 
     for( PCB_LAYER_ID layer : aLayers )
-        PlotOneBoardLayer( aBoard, aPlotter, layer, aPlotOptions, layer == aLayers[0] );
+        PlotOneBoardLayer( aBoard, aPlotter, layer, aPlotOptions );
+
 
     if( plot_mark )
     {
@@ -193,7 +122,8 @@ void PlotInteractiveLayer( BOARD* aBoard, PLOTTER* aPlotter, const PCB_PLOT_PARA
         properties.emplace_back( wxString::Format( wxT( "!%s = %s" ), _( "Library Description" ),
                                                    fp->GetLibDescription() ) );
 
-        properties.emplace_back( wxString::Format( wxT( "!%s = %s" ), _( "Keywords" ),
+        properties.emplace_back( wxString::Format( wxT( "!%s = %s" ),
+                                                   _( "Keywords" ),
                                                    fp->GetKeywords() ) );
 #endif
         // Draw items are plotted with a position offset. So we need to move
@@ -217,9 +147,20 @@ void PlotInteractiveLayer( BOARD* aBoard, PLOTTER* aPlotter, const PCB_PLOT_PARA
 
 
 void PlotOneBoardLayer( BOARD *aBoard, PLOTTER* aPlotter, PCB_LAYER_ID aLayer,
-                        const PCB_PLOT_PARAMS& aPlotOpt, bool isPrimaryLayer )
+                        const PCB_PLOT_PARAMS& aPlotOpt )
 {
+    auto plotLayer =
+            [&]( LSET layerMask, PCB_PLOT_PARAMS& plotOpts )
+            {
+                // PlotLayerOutlines() is designed only for DXF plotters.
+                if( plotOpts.GetFormat() == PLOT_FORMAT::DXF && plotOpts.GetDXFPlotPolygonMode() )
+                    PlotLayerOutlines( aBoard, aPlotter, layerMask, plotOpts );
+                else
+                    PlotStandardLayer( aBoard, aPlotter, layerMask, plotOpts );
+            };
+
     PCB_PLOT_PARAMS plotOpt = aPlotOpt;
+    int soldermask_min_thickness = aBoard->GetDesignSettings().m_SolderMaskMinWidth;
 
     // Set a default color and the text mode for this layer
     aPlotter->SetColor( BLACK );
@@ -238,7 +179,7 @@ void PlotOneBoardLayer( BOARD *aBoard, PLOTTER* aPlotter, PCB_LAYER_ID aLayer,
         else
             plotOpt.SetSkipPlotNPTH_Pads( true );
 
-        PlotLayer( aBoard, aPlotter, layer_mask, plotOpt );
+        plotLayer( layer_mask, plotOpt );
     }
     else
     {
@@ -253,7 +194,15 @@ void PlotOneBoardLayer( BOARD *aBoard, PLOTTER* aPlotter, PCB_LAYER_ID aLayer,
             plotOpt.SetDXFPlotPolygonMode( true );
 
             // Plot solder mask:
-            PlotSolderMaskLayer( aBoard, aPlotter, layer_mask, plotOpt );
+            if( soldermask_min_thickness == 0 )
+            {
+                plotLayer( layer_mask, plotOpt );
+            }
+            else
+            {
+                PlotSolderMaskLayer( aBoard, aPlotter, layer_mask, plotOpt,
+                                     soldermask_min_thickness );
+            }
 
             break;
 
@@ -267,45 +216,36 @@ void PlotOneBoardLayer( BOARD *aBoard, PLOTTER* aPlotter, PCB_LAYER_ID aLayer,
             // Use outline mode for DXF
             plotOpt.SetDXFPlotPolygonMode( true );
 
-            PlotLayer( aBoard, aPlotter, layer_mask, plotOpt );
+            plotLayer( layer_mask, plotOpt );
 
             break;
 
         case F_SilkS:
         case B_SilkS:
-            if( plotOpt.GetSubtractMaskFromSilk() )
+            plotLayer( layer_mask, plotOpt );
+
+            // Gerber: Subtract soldermask from silkscreen if enabled
+            if( aPlotter->GetPlotterType() == PLOT_FORMAT::GERBER
+                    && plotOpt.GetSubtractMaskFromSilk() )
             {
-                if( aPlotter->GetPlotterType() == PLOT_FORMAT::GERBER && isPrimaryLayer )
-                {
-                    // Use old-school, positive/negative mask plotting which preserves utilization
-                    // of Gerber aperture masks.  This method can only be used when the given silk
-                    // layer is the primary layer as the negative mask will also knockout any other
-                    // (non-silk) layers that were plotted before the silk layer.
-
-                    PlotStandardLayer( aBoard, aPlotter, layer_mask, plotOpt );
-
-                    // Create the mask to subtract by creating a negative layer polarity
-                    aPlotter->SetLayerPolarity( false );
-
-                    // Disable plot pad holes
-                    plotOpt.SetDrillMarksType( DRILL_MARKS::NO_DRILL_SHAPE );
-
-                    // Plot the mask
-                    layer_mask = ( aLayer == F_SilkS ) ? LSET( { F_Mask } ) : LSET( { B_Mask } );
-                    PlotSolderMaskLayer( aBoard, aPlotter, layer_mask, plotOpt );
-
-                    // Disable the negative polarity
-                    aPlotter->SetLayerPolarity( true );
-                }
+                if( aLayer == F_SilkS )
+                    layer_mask = LSET( { F_Mask } );
                 else
-                {
-                    PlotClippedSilkLayer( aBoard, aPlotter, layer_mask, plotOpt );
-                }
+                    layer_mask = LSET( { B_Mask } );
 
-                break;
+                // Create the mask to subtract by creating a negative layer polarity
+                aPlotter->SetLayerPolarity( false );
+
+                // Disable plot pad holes
+                plotOpt.SetDrillMarksType( DRILL_MARKS::NO_DRILL_SHAPE );
+
+                // Plot the mask
+                PlotStandardLayer( aBoard, aPlotter, layer_mask, plotOpt );
+
+                // Disable the negative polarity
+                aPlotter->SetLayerPolarity( true );
             }
 
-            PlotLayer( aBoard, aPlotter, layer_mask, plotOpt );
             break;
 
         case Dwgs_User:
@@ -319,7 +259,7 @@ void PlotOneBoardLayer( BOARD *aBoard, PLOTTER* aPlotter, PCB_LAYER_ID aLayer,
         case F_Fab:
         case B_Fab:
         default:
-            PlotLayer( aBoard, aPlotter, layer_mask, plotOpt );
+            plotLayer( layer_mask, plotOpt );
             break;
         }
     }
@@ -918,57 +858,72 @@ void PlotLayerOutlines( BOARD* aBoard, PLOTTER* aPlotter, LSET aLayerMask,
 
 
 /**
- * Generates a SHAPE_POLY_SET representing the plotted items on a layer.
+ * Plot a solder mask layer.
+ *
+ * Solder mask layers have a minimum thickness value and cannot be drawn like standard layers,
+ * unless the minimum thickness is 0.
+ *
+ * The algorithm is somewhat complicated to allow for min web thickness while also preserving
+ * pad attributes in Gerber.
+ *
+ * 1 - create initial polygons for every shape
+ * 2 - inflate and deflate polygons with Min Thickness/2, and merges the result
+ * 3 - substract all initial polygons from (2), leaving the areas where the thickness was less
+ *      than min thickness
+ * 4 - plot all initial shapes by flashing (or using regions), including Gerber attribute data
+ * 5 - plot remaining polygons from (2) (witout any Gerber attributes)
  */
-void GenerateLayerPoly( SHAPE_POLY_SET* aResult, BOARD *aBoard, PCB_LAYER_ID aLayer,
-                         bool aPlotFPText, bool aPlotReferences, bool aPlotValues )
-{
-#define ERROR maxError, ERROR_OUTSIDE
 
+void PlotSolderMaskLayer( BOARD *aBoard, PLOTTER* aPlotter, LSET aLayerMask,
+                          const PCB_PLOT_PARAMS& aPlotOpt, int aMinThickness )
+{
     int             maxError = aBoard->GetDesignSettings().m_MaxError;
+    PCB_LAYER_ID    layer = aLayerMask[B_Mask] ? B_Mask : F_Mask;
     SHAPE_POLY_SET  buffer;
     SHAPE_POLY_SET* boardOutline = nullptr;
-    int             inflate = 0;
 
     if( aBoard->GetBoardPolygonOutlines( buffer ) )
         boardOutline = &buffer;
 
-    if( aLayer == F_Mask || aLayer == B_Mask )
-    {
-        // We remove 1nm as we expand both sides of the shapes, so allowing for a strictly greater
-        // than or equal comparison in the shape separation (boolean add)
-        inflate = aBoard->GetDesignSettings().m_SolderMaskMinWidth / 2 - 1;
-    }
+    // We remove 1nm as we expand both sides of the shapes, so allowing for a strictly greater
+    // than or equal comparison in the shape separation (boolean add)
+    int inflate = aMinThickness / 2 - 1;
+
+    BRDITEMS_PLOTTER itemplotter( aPlotter, aBoard, aPlotOpt );
+    itemplotter.SetLayerSet( aLayerMask );
 
     // Build polygons for each pad shape.  The size of the shape on solder mask should be size
     // of pad + clearance around the pad, where clearance = solder mask clearance + extra margin.
     // Extra margin is half the min width for solder mask, which is used to merge too-close shapes
-    // (distance < SolderMaskMinWidth).
+    // (distance < aMinThickness), and will be removed when creating the actual shapes.
 
-    // Will contain exact shapes of all items on solder mask.  We add this back in at the end just
-    // to make sure that any artefacts introduced by the inflate/deflate don't remove parts of the
-    // individual shapes.
-    SHAPE_POLY_SET exactPolys;
+    // Will contain shapes inflated by inflate value that will be merged and deflated by inflate
+    // value to build final polygons
+    SHAPE_POLY_SET areas;
 
-    auto handleFPTextItem =
+    // Will contain exact shapes of all items on solder mask
+    SHAPE_POLY_SET initialPolys;
+
+    auto plotFPTextItem =
             [&]( const PCB_TEXT& aText )
             {
-                if( !aPlotFPText )
+                if( !itemplotter.GetPlotFPText() )
                     return;
 
-                if( !aText.IsVisible() )
+                if( !aText.IsVisible() && !itemplotter.GetPlotInvisibleText()  )
                     return;
 
-                if( aText.GetText() == wxT( "${REFERENCE}" ) && !aPlotReferences )
+                if( aText.GetText() == wxT( "${REFERENCE}" ) && !itemplotter.GetPlotReference() )
                     return;
 
-                if( aText.GetText() == wxT( "${VALUE}" ) && !aPlotValues )
+                if( aText.GetText() == wxT( "${VALUE}" ) && !itemplotter.GetPlotValue() )
                     return;
 
-                if( inflate != 0 )
-                    aText.TransformTextToPolySet( exactPolys, 0, ERROR );
+                // add shapes with their exact mask layer size in initialPolys
+                aText.TransformTextToPolySet( initialPolys, 0, maxError, ERROR_OUTSIDE );
 
-                aText.TransformTextToPolySet( *aResult, inflate, ERROR );
+                // add shapes inflated by aMinThickness/2 in areas
+                aText.TransformTextToPolySet( areas, inflate, maxError, ERROR_OUTSIDE );
             };
 
     // Generate polygons with arcs inside the shape or exact shape to minimize shape changes
@@ -978,37 +933,40 @@ void GenerateLayerPoly( SHAPE_POLY_SET* aResult, BOARD *aBoard, PCB_LAYER_ID aLa
         // Plot footprint pads and graphics
         for( const FOOTPRINT* footprint : aBoard->Footprints() )
         {
-            if( inflate != 0 )
-                footprint->TransformPadsToPolySet( exactPolys, aLayer, 0, ERROR );
-
-            footprint->TransformPadsToPolySet( *aResult, aLayer, inflate, ERROR );
+            // add shapes with their exact mask layer size in initialPolys
+            footprint->TransformPadsToPolySet( initialPolys, layer, 0, maxError, ERROR_OUTSIDE );
+            // add shapes inflated by aMinThickness/2 in areas
+            footprint->TransformPadsToPolySet( areas, layer, inflate, maxError, ERROR_OUTSIDE );
 
             for( const PCB_FIELD* field : footprint->GetFields() )
             {
-                if( field->IsReference() && !aPlotReferences )
+                if( field->IsReference() && !itemplotter.GetPlotReference() )
                     continue;
 
-                if( field->IsValue() && !aPlotValues )
+                if( field->IsValue() && !itemplotter.GetPlotValue() )
                     continue;
 
-                if( field->IsOnLayer( aLayer ) )
-                    handleFPTextItem( static_cast<const PCB_TEXT&>( *field ) );
+                if( field->IsOnLayer( layer ) )
+                    plotFPTextItem( static_cast<const PCB_TEXT&>( *field ) );
             }
 
             for( const BOARD_ITEM* item : footprint->GraphicalItems() )
             {
-                if( item->IsOnLayer( aLayer ) )
+                if( item->IsOnLayer( layer ) )
                 {
                     if( item->Type() == PCB_TEXT_T )
                     {
-                        handleFPTextItem( static_cast<const PCB_TEXT&>( *item ) );
+                        plotFPTextItem( static_cast<const PCB_TEXT&>( *item ) );
                     }
                     else
                     {
-                        if( inflate != 0 )
-                            item->TransformShapeToPolySet( exactPolys, aLayer, 0, ERROR );
+                        // add shapes with their exact mask layer size in initialPolys
+                        item->TransformShapeToPolygon( initialPolys, layer, 0, maxError,
+                                                       ERROR_OUTSIDE );
 
-                        item->TransformShapeToPolySet( *aResult, aLayer, inflate, ERROR );
+                        // add shapes inflated by aMinThickness/2 in areas
+                        item->TransformShapeToPolygon( areas, layer, inflate, maxError,
+                                                       ERROR_OUTSIDE );
                     }
                 }
             }
@@ -1023,67 +981,90 @@ void GenerateLayerPoly( SHAPE_POLY_SET* aResult, BOARD *aBoard, PCB_LAYER_ID aLa
             const PCB_VIA* via = static_cast<const PCB_VIA*>( track );
 
             // Note: IsOnLayer() checks relevant mask layers of untented vias
-            if( !via->IsOnLayer( aLayer ) )
+            if( !via->IsOnLayer( layer ) )
                 continue;
 
             int clearance = via->GetSolderMaskExpansion();
 
-            if( inflate != 0 )
-                via->TransformShapeToPolygon( exactPolys, aLayer, clearance, ERROR );
+            // add shapes with their exact mask layer size in initialPolys
+            via->TransformShapeToPolygon( initialPolys, layer, clearance, maxError, ERROR_OUTSIDE );
 
-            via->TransformShapeToPolygon( *aResult, aLayer, clearance + inflate, ERROR );
+            // add shapes inflated by aMinThickness/2 in areas
+            clearance += inflate;
+            via->TransformShapeToPolygon( areas, layer, clearance, maxError, ERROR_OUTSIDE );
         }
+
+        // Add filled zone areas.
+#if 0   // Set to 1 if a solder mask expansion must be applied to zones on solder mask
+        int zone_margin = aBoard->GetDesignSettings().m_SolderMaskExpansion;
+#else
+        int zone_margin = 0;
+#endif
 
         for( const BOARD_ITEM* item : aBoard->Drawings() )
         {
-            if( item->IsOnLayer( aLayer ) )
+            if( item->IsOnLayer( layer ) )
             {
                 if( item->Type() == PCB_TEXT_T )
                 {
                     const PCB_TEXT* text = static_cast<const PCB_TEXT*>( item );
 
-                    if( inflate != 0 )
-                        text->TransformTextToPolySet( exactPolys, 0, ERROR );
+                    // add shapes with their exact mask layer size in initialPolys
+                    text->TransformTextToPolySet( initialPolys, 0, maxError, ERROR_OUTSIDE );
 
-                    text->TransformTextToPolySet( *aResult, inflate, ERROR );
+                    // add shapes inflated by aMinThickness/2 in areas
+                    text->TransformTextToPolySet( areas, inflate, maxError, ERROR_OUTSIDE );
                 }
                 else
                 {
-                    if( inflate != 0 )
-                        item->TransformShapeToPolygon( exactPolys, aLayer, 0, ERROR );
+                    // add shapes with their exact mask layer size in initialPolys
+                    item->TransformShapeToPolygon( initialPolys, layer, 0, maxError,
+                                                   ERROR_OUTSIDE );
 
-                    item->TransformShapeToPolygon( *aResult, aLayer, inflate, ERROR );
+                    // add shapes inflated by aMinThickness/2 in areas
+                    item->TransformShapeToPolygon( areas, layer, inflate, maxError, ERROR_OUTSIDE );
                 }
             }
         }
 
-        // Add filled zone areas.
         for( ZONE* zone : aBoard->Zones() )
         {
             if( zone->GetIsRuleArea() )
                 continue;
 
-            if( !zone->IsOnLayer( aLayer ) )
+            if( !zone->IsOnLayer( layer ) )
                 continue;
 
-            if( inflate != 0 )
-                zone->TransformSmoothedOutlineToPolygon( exactPolys, 0, ERROR, boardOutline );
+            // add shapes inflated by aMinThickness/2 in areas
+            zone->TransformSmoothedOutlineToPolygon( areas, inflate + zone_margin, maxError,
+                                                     ERROR_OUTSIDE, boardOutline );
 
-            zone->TransformSmoothedOutlineToPolygon( *aResult, inflate, ERROR, boardOutline );
+            // add shapes with their exact mask layer size in initialPolys
+            zone->TransformSmoothedOutlineToPolygon( initialPolys, zone_margin, maxError,
+                                                     ERROR_OUTSIDE, boardOutline );
         }
     }
 
-    // Merge all polygons
-    aResult->Simplify();
+    // Merge all polygons: After deflating, not merged (not overlapping) polygons will have the
+    // initial shape (with perhaps small changes due to deflating transform)
+    areas.Simplify();
+    areas.Deflate( inflate, CORNER_STRATEGY::CHAMFER_ALL_CORNERS, maxError );
 
-    if( inflate != 0 )
-    {
-        aResult->Deflate( inflate, CORNER_STRATEGY::CHAMFER_ALL_CORNERS, maxError );
-        // Add back in the exact polys. This is mandatory because inflate/deflate transform is
-        // not perfect, and we want the initial areas perfectly kept.
-        aResult->BooleanAdd( exactPolys );
-    }
-#undef ERROR
+    // To avoid a lot of code, use a ZONE to handle and plot polygons, because our polygons look
+    // exactly like filled areas in zones.
+    // Note, also this code is not optimized: it creates a lot of copy/duplicate data.
+    // However it is not complex, and fast enough for plot purposes (copy/convert data is only a
+    // very small calculation time for these calculations).
+    ZONE zone( aBoard );
+    zone.SetMinThickness( 0 );      // trace polygons only
+    zone.SetLayer( layer );
+
+    // Combine the current areas to initial areas. This is mandatory because inflate/deflate
+    // transform is not perfect, and we want the initial areas perfectly kept
+    areas.BooleanAdd( initialPolys );
+    areas.Fracture();
+
+    itemplotter.PlotZone( &zone, layer, areas );
 }
 
 
@@ -1315,21 +1296,14 @@ PLOTTER* StartPlotBoard( BOARD *aBoard, const PCB_PLOT_PARAMS *aPlotOpts, int aL
         }
 
         bool startPlotSuccess = false;
-        try
+        if (plotter->GetPlotterType() == PLOT_FORMAT::PDF)
         {
-            if( plotter->GetPlotterType() == PLOT_FORMAT::PDF )
-            {
-                startPlotSuccess =
-                        static_cast<PDF_PLOTTER*>( plotter )->StartPlot( aPageNumber, aPageName );
-            }
-            else
-            {
-                startPlotSuccess = plotter->StartPlot( aPageName );
-            }
+            startPlotSuccess =
+                    static_cast<PDF_PLOTTER*>( plotter )->StartPlot( aPageNumber, aPageName );
         }
-        catch( ... )
+        else
         {
-            startPlotSuccess = false;
+            startPlotSuccess = plotter->StartPlot( aPageName );
         }
 
 

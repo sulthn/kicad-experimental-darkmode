@@ -360,7 +360,7 @@ private:
     bool         m_firstPolygon = true;
     int          m_width = 0;
     PCB_LAYER_ID m_layer = PCB_LAYER_ID::UNDEFINED_LAYER;
-    FILL_T       m_fillMode = FILL_T::NO_FILL;
+    bool         m_filled = false;
 };
 
 class POLYGON_MERGE_ROUTINE : public POLYGON_BOOLEAN_ROUTINE

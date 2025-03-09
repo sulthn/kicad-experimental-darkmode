@@ -75,7 +75,7 @@ public:
      * @retval      true        success.
      * @retval      false       failure.
      */
-    bool SetProject( const PROJECT* aProject, bool* flgChanged = nullptr );
+    bool SetProject( PROJECT* aProject, bool* flgChanged = nullptr );
 
     wxString GetProjectDir() const;
 
@@ -172,7 +172,7 @@ private:
     std::list<SEARCH_PATH> m_paths;         ///< List of base paths to search from.
     int                    m_errflags;
     PGM_BASE*              m_pgm;
-    const PROJECT*         m_project;
+    PROJECT*               m_project;
     wxString               m_curProjDir;
 };
 

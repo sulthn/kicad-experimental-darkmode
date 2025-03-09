@@ -88,7 +88,6 @@ public:
     int TrackWidthDec( const TOOL_EVENT& aEvent );
     int ViaSizeInc( const TOOL_EVENT& aEvent );
     int ViaSizeDec( const TOOL_EVENT& aEvent );
-    int AutoTrackWidth( const TOOL_EVENT& aEvent );
 
     // Zone actions
     int ZoneMerge( const TOOL_EVENT& aEvent );

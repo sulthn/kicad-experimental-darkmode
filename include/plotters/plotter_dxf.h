@@ -25,13 +25,12 @@
 class DXF_PLOTTER : public PLOTTER
 {
 public:
-    DXF_PLOTTER() :
-            m_textAsLines( false )
+    DXF_PLOTTER() : m_textAsLines( false )
     {
         m_textAsLines = true;
         m_currentColor = COLOR4D::BLACK;
         m_currentLineType = LINE_STYLE::SOLID;
-        SetUnits( DXF_UNITS::INCH );
+        SetUnits( DXF_UNITS::INCHES );
     }
 
     virtual PLOT_FORMAT GetPlotterType() const override

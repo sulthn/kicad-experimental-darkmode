@@ -182,7 +182,7 @@ int SYMBOL_SEARCH_HANDLER::Search( const wxString& aQuery )
     frp.searchCurrentSheetOnly = false;
 
     auto search =
-            [&frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
+            [frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
             {
                 if( item && item->Type() == SCH_SYMBOL_T )
                 {
@@ -218,9 +218,9 @@ wxString SYMBOL_SEARCH_HANDLER::getResultCell( const SCH_SEARCH_HIT& aHit, int a
     if( aCol == 0 )
         return sym->GetRef( aHit.sheetPath, true );
     else if( aCol == 1 )
-        return sym->GetField( FIELD_T::VALUE )->GetShownText( aHit.sheetPath, false );
+        return sym->GetField( VALUE_FIELD )->GetShownText( aHit.sheetPath, false );
     else if( aCol == 2 )
-        return sym->GetField( FIELD_T::FOOTPRINT )->GetShownText( aHit.sheetPath, false );
+        return sym->GetField( FOOTPRINT_FIELD )->GetShownText( aHit.sheetPath, false );
     else if( aCol == 3 )
         return aHit.sheetPath->GetPageNumber();
     else if( aCol == 4 )
@@ -263,7 +263,7 @@ int POWER_SEARCH_HANDLER::Search( const wxString& aQuery )
     frp.searchCurrentSheetOnly = false;
 
     auto search =
-            [&frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
+            [frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
             {
                 if( item && item->Type() == SCH_SYMBOL_T )
                 {
@@ -299,7 +299,7 @@ wxString POWER_SEARCH_HANDLER::getResultCell( const SCH_SEARCH_HIT& aHit, int aC
     if( aCol == 0 )
         return sym->GetRef( aHit.sheetPath, true );
     else if( aCol == 1 )
-        return sym->GetField( FIELD_T::VALUE )->GetShownText( aHit.sheetPath, false );
+        return sym->GetField( VALUE_FIELD )->GetShownText( aHit.sheetPath, false );
     else if( aCol == 2 )
         return aHit.sheetPath->GetPageNumber();
     else if( aCol == 3 )
@@ -334,7 +334,7 @@ int TEXT_SEARCH_HANDLER::Search( const wxString& aQuery )
     frp.searchCurrentSheetOnly = false;
 
     auto search =
-            [&frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
+            [frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
             {
                 if( item->Type() == SCH_TEXT_T || item->Type() == SCH_TEXTBOX_T )
                 {
@@ -418,7 +418,7 @@ int LABEL_SEARCH_HANDLER::Search( const wxString& aQuery )
     frp.searchCurrentSheetOnly = false;
 
     auto search =
-            [&frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
+            [frp]( SCH_ITEM* item, SCH_SHEET_PATH* sheet )
             {
                 if( item->IsType( { SCH_LABEL_LOCATE_ANY_T } ) )
                 {

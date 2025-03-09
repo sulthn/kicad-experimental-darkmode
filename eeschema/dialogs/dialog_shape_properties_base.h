@@ -1,5 +1,5 @@
 ///////////////////////////////////////////////////////////////////////////
-// C++ code generated with wxFormBuilder (version 4.2.1-0-g80c4cb6)
+// C++ code generated with wxFormBuilder (version 4.0.0-0-g0efcecf02)
 // http://www.wxformbuilder.org/
 //
 // PLEASE DO *NOT* EDIT THIS FILE!
@@ -27,7 +27,6 @@ class WX_INFOBAR;
 #include <wx/panel.h>
 #include <wx/bmpcbox.h>
 #include <wx/gbsizer.h>
-#include <wx/choice.h>
 #include <wx/radiobut.h>
 #include <wx/statbox.h>
 #include <wx/simplebook.h>
@@ -46,7 +45,7 @@ class DIALOG_SHAPE_PROPERTIES_BASE : public DIALOG_SHIM
 
 		// Private event handlers
 		void _wxFB_onBorderChecked( wxCommandEvent& event ){ onBorderChecked( event ); }
-		void _wxFB_onFillChoice( wxCommandEvent& event ){ onFillChoice( event ); }
+		void _wxFB_onFillChecked( wxCommandEvent& event ){ onFillChecked( event ); }
 		void _wxFB_onFillRadioButton( wxCommandEvent& event ){ onFillRadioButton( event ); }
 
 
@@ -56,7 +55,7 @@ class DIALOG_SHAPE_PROPERTIES_BASE : public DIALOG_SHIM
 			NO_FILL = 1000,
 			FILLED_SHAPE,
 			FILLED_WITH_BG_BODYCOLOR,
-			FILLED_WITH_COLOR,
+			FILLED_WITH_COLOR
 		};
 
 		WX_INFOBAR* m_infoBar;
@@ -74,8 +73,7 @@ class DIALOG_SHAPE_PROPERTIES_BASE : public DIALOG_SHIM
 		wxSimplebook* m_fillBook;
 		wxPanel* m_schematicPage;
 		wxGridBagSizer* m_fillSizer;
-		wxStaticText* m_fillLabel;
-		wxChoice* m_fillCtrl;
+		wxCheckBox* m_filledCtrl;
 		wxStaticText* m_fillColorLabel;
 		wxPanel* m_panelFillColor;
 		COLOR_SWATCH* m_fillColorSwatch;
@@ -96,7 +94,7 @@ class DIALOG_SHAPE_PROPERTIES_BASE : public DIALOG_SHIM
 
 		// Virtual event handlers, override them in your derived class
 		virtual void onBorderChecked( wxCommandEvent& event ) { event.Skip(); }
-		virtual void onFillChoice( wxCommandEvent& event ) { event.Skip(); }
+		virtual void onFillChecked( wxCommandEvent& event ) { event.Skip(); }
 		virtual void onFillRadioButton( wxCommandEvent& event ) { event.Skip(); }
 
 

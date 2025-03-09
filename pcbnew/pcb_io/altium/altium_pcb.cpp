@@ -1329,16 +1329,6 @@ void ALTIUM_PCB::ParseComponents6Data( const ALTIUM_PCB_COMPOUND_FILE& aAltiumPc
 
         footprint->SetReference( reference );
 
-        KIID id( elem.sourceUniqueID );
-        KIID pathid( elem.sourceHierachicalPath );
-        KIID_PATH path;
-        path.push_back( pathid );
-        path.push_back( id );
-
-        footprint->SetPath( path );
-        footprint->SetSheetname( elem.sourceHierachicalPath );
-        footprint->SetSheetfile( elem.sourceHierachicalPath + wxT( ".kicad_sch" ));
-
         footprint->SetLocked( elem.locked );
         footprint->Reference().SetVisible( elem.nameon );
         footprint->Value().SetVisible( elem.commenton );
@@ -1646,11 +1636,18 @@ void ALTIUM_PCB::HelperParseDimensions6Linear( const ADIMENSION6& aElem )
 
     switch( aElem.textunit )
     {
-    case ALTIUM_UNIT::INCH: dimension->SetUnits( EDA_UNITS::INCH );   break;
-    case ALTIUM_UNIT::MILS: dimension->SetUnits( EDA_UNITS::MILS ); break;
-    case ALTIUM_UNIT::MM:   dimension->SetUnits( EDA_UNITS::MM );   break;
-    case ALTIUM_UNIT::CM:   dimension->SetUnits( EDA_UNITS::MM );   break;
-    default:                                                        break;
+    case ALTIUM_UNIT::INCHES:
+        dimension->SetUnits( EDA_UNITS::INCHES );
+        break;
+    case ALTIUM_UNIT::MILS:
+        dimension->SetUnits( EDA_UNITS::MILS );
+        break;
+    case ALTIUM_UNIT::MILLIMETERS:
+    case ALTIUM_UNIT::CENTIMETER:
+        dimension->SetUnits( EDA_UNITS::MILLIMETRES );
+        break;
+    default:
+        break;
     }
 
     m_board->Add( dimension.release(), ADD_MODE::APPEND );
@@ -1697,11 +1694,18 @@ void ALTIUM_PCB::HelperParseDimensions6Radial(const ADIMENSION6 &aElem)
 
     switch( aElem.textunit )
     {
-    case ALTIUM_UNIT::INCH: dimension->SetUnits( EDA_UNITS::INCH );   break;
-    case ALTIUM_UNIT::MILS: dimension->SetUnits( EDA_UNITS::MILS ); break;
-    case ALTIUM_UNIT::MM:   dimension->SetUnits( EDA_UNITS::MM );   break;
-    case ALTIUM_UNIT::CM:   dimension->SetUnits( EDA_UNITS::MM );   break;
-    default:                                                        break;
+    case ALTIUM_UNIT::INCHES:
+        dimension->SetUnits( EDA_UNITS::INCHES );
+        break;
+    case ALTIUM_UNIT::MILS:
+        dimension->SetUnits( EDA_UNITS::MILS );
+        break;
+    case ALTIUM_UNIT::MILLIMETERS:
+    case ALTIUM_UNIT::CENTIMETER:
+        dimension->SetUnits( EDA_UNITS::MILLIMETRES );
+        break;
+    default:
+        break;
     }
 
     if( aElem.textPoint.empty() )
@@ -2066,7 +2070,7 @@ void ALTIUM_PCB::ParseNets6Data( const ALTIUM_PCB_COMPOUND_FILE&     aAltiumPcbF
         checkpoint();
         ANET6 elem( reader );
 
-        NETINFO_ITEM* netInfo = new NETINFO_ITEM( m_board, elem.name, -1 );
+        NETINFO_ITEM* netInfo = new NETINFO_ITEM( m_board, elem.name, 0 );
         m_board->Add( netInfo, ADD_MODE::APPEND );
 
         // needs to be called after m_board->Add() as assign us the NetCode
@@ -2130,15 +2134,15 @@ void ALTIUM_PCB::ParsePolygons6Data( const ALTIUM_PCB_COMPOUND_FILE&     aAltium
             continue;
 
         std::unique_ptr<ZONE> zone = std::make_unique<ZONE>(m_board);
+        m_polygons.emplace_back(zone.get());
 
-        // Be sure to set the zone layer before setting the net code
-        // so that we know that this is a copper zone and so needs a valid net code.
-        HelperSetZoneLayers( *zone, elem.layer );
         zone->SetNetCode( GetNetCode( elem.net ) );
         zone->SetPosition( elem.vertices.at( 0 ).position );
         zone->SetLocked( elem.locked );
         zone->SetAssignedPriority( elem.pourindex > 0 ? elem.pourindex : 0 );
         zone->Outline()->AddOutline( outline.Outline( 0 ) );
+
+        HelperSetZoneLayers( *zone, elem.layer );
 
         if( elem.pourindex > m_highest_pour_index )
             m_highest_pour_index = elem.pourindex;
@@ -2237,7 +2241,6 @@ void ALTIUM_PCB::ParsePolygons6Data( const ALTIUM_PCB_COMPOUND_FILE&     aAltium
         zone->SetBorderDisplayStyle( ZONE_BORDER_DISPLAY_STYLE::DIAGONAL_EDGE,
                                      ZONE::GetDefaultHatchPitch(), true );
 
-        m_polygons.emplace_back( zone.get() );
         m_board->Add( zone.release(), ADD_MODE::APPEND );
     }
 
@@ -3539,7 +3542,7 @@ void ALTIUM_PCB::ConvertPads6ToFootprintItemOnCopper( FOOTPRINT* aFootprint, con
 
     case ALTIUM_LAYER::BOTTOM_LAYER:
         pad->SetLayer( B_Cu );
-        pad->SetLayerSet( PAD::SMDMask().FlipStandardLayers() );
+        pad->SetLayerSet( PAD::SMDMask().Flip() );
         break;
 
     case ALTIUM_LAYER::MULTI_LAYER:

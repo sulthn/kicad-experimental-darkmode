@@ -381,25 +381,10 @@ wxString PATHS::GetStockPlugins3DPath()
         fn.AppendDir( wxT( "PlugIns" ) );
     }
 #else
-    wxString envPath;
-
-    // AppImages have a different path to the plugins, otherwise we end up with host sytem
-    // plugins being loaded.
-    if( wxGetEnv( wxT( "APPDIR" ), &envPath ) )
-    {
-        fn.Assign( envPath, wxEmptyString );
-        fn.AppendDir( wxT( "usr" ) );
-        fn.AppendDir( wxT( "lib" ) );
-        fn.AppendDir( wxT( "x86_64-linux-gnu" ) );
-    }
-    else
-    {
-        // KICAD_PLUGINDIR = CMAKE_INSTALL_FULL_LIBDIR path is the absolute path
-        // corresponding to the install path used for constructing KICAD_USER_PLUGIN
-        wxString tfname = wxString::FromUTF8Unchecked( KICAD_PLUGINDIR );
-        fn.Assign( tfname, "" );
-    }
-
+    // KICAD_PLUGINDIR = CMAKE_INSTALL_FULL_LIBDIR path is the absolute path
+    // corresponding to the install path used for constructing KICAD_USER_PLUGIN
+    wxString tfname = wxString::FromUTF8Unchecked( KICAD_PLUGINDIR );
+    fn.Assign( tfname, "" );
     fn.AppendDir( wxT( "kicad" ) );
     fn.AppendDir( wxT( "plugins" ) );
 #endif

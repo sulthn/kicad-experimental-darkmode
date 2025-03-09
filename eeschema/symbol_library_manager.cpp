@@ -228,7 +228,7 @@ bool SYMBOL_LIBRARY_MANAGER::SaveLibrary( const wxString& aLibrary, const wxStri
 
             try
             {
-                if( symbol->IsDerived() )
+                if( symbol->IsAlias() )
                 {
                     std::shared_ptr< LIB_SYMBOL > oldParent = symbol->GetParent().lock();
 
@@ -285,7 +285,7 @@ bool SYMBOL_LIBRARY_MANAGER::IsLibraryModified( const wxString& aLibrary ) const
 }
 
 
-bool SYMBOL_LIBRARY_MANAGER::IsSymbolModified( const wxString& aSymbolName,
+bool SYMBOL_LIBRARY_MANAGER::IsSymbolModified( const wxString& aAlias,
                                                const wxString& aLibrary ) const
 {
     auto libIt = m_libs.find( aLibrary );
@@ -294,14 +294,13 @@ bool SYMBOL_LIBRARY_MANAGER::IsSymbolModified( const wxString& aSymbolName,
         return false;
 
     const LIB_BUFFER&                    buf = libIt->second;
-    const std::shared_ptr<SYMBOL_BUFFER> symbolBuf = buf.GetBuffer( aSymbolName );
+    const std::shared_ptr<SYMBOL_BUFFER> symbolBuf = buf.GetBuffer( aAlias );
 
     return symbolBuf ? symbolBuf->IsModified() : false;
 }
 
 
-void SYMBOL_LIBRARY_MANAGER::SetSymbolModified( const wxString& aSymbolName,
-                                                const wxString& aLibrary )
+void SYMBOL_LIBRARY_MANAGER::SetSymbolModified( const wxString& aAlias, const wxString& aLibrary )
 {
     auto libIt = m_libs.find( aLibrary );
 
@@ -309,7 +308,7 @@ void SYMBOL_LIBRARY_MANAGER::SetSymbolModified( const wxString& aSymbolName,
         return;
 
     const LIB_BUFFER&              buf = libIt->second;
-    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = buf.GetBuffer( aSymbolName );
+    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = buf.GetBuffer( aAlias );
 
     wxCHECK( symbolBuf, /* void */ );
 
@@ -336,7 +335,7 @@ bool SYMBOL_LIBRARY_MANAGER::ClearLibraryModified( const wxString& aLibrary ) co
 }
 
 
-bool SYMBOL_LIBRARY_MANAGER::ClearSymbolModified( const wxString& aSymbolName,
+bool SYMBOL_LIBRARY_MANAGER::ClearSymbolModified( const wxString& aAlias,
                                                   const wxString& aLibrary ) const
 {
     auto libIt = m_libs.find( aLibrary );
@@ -344,7 +343,7 @@ bool SYMBOL_LIBRARY_MANAGER::ClearSymbolModified( const wxString& aSymbolName,
     if( libIt == m_libs.end() )
         return false;
 
-    auto symbolBuf = libIt->second.GetBuffer( aSymbolName );
+    auto symbolBuf = libIt->second.GetBuffer( aAlias );
     wxCHECK( symbolBuf, false );
 
     symbolBuf->GetScreen()->SetContentModified( false );
@@ -370,7 +369,7 @@ bool SYMBOL_LIBRARY_MANAGER::IsLibraryLoaded( const wxString& aLibrary ) const
 }
 
 
-std::list<LIB_SYMBOL*> SYMBOL_LIBRARY_MANAGER::EnumerateSymbols( const wxString& aLibrary ) const
+std::list<LIB_SYMBOL*> SYMBOL_LIBRARY_MANAGER::GetAliases( const wxString& aLibrary ) const
 {
     std::list<LIB_SYMBOL*> ret;
     wxCHECK_MSG( LibraryExists( aLibrary ), ret,
@@ -385,40 +384,40 @@ std::list<LIB_SYMBOL*> SYMBOL_LIBRARY_MANAGER::EnumerateSymbols( const wxString&
     }
     else
     {
-        std::vector<LIB_SYMBOL*> symbols;
+        std::vector<LIB_SYMBOL*> aliases;
 
         try
         {
-            symTable()->LoadSymbolLib( symbols, aLibrary );
+            symTable()->LoadSymbolLib( aliases, aLibrary );
         }
         catch( const IO_ERROR& e )
         {
             wxLogWarning( e.Problem() );
         }
 
-        std::copy( symbols.begin(), symbols.end(), std::back_inserter( ret ) );
+        std::copy( aliases.begin(), aliases.end(), std::back_inserter( ret ) );
     }
 
     return ret;
 }
 
 
-LIB_SYMBOL* SYMBOL_LIBRARY_MANAGER::GetBufferedSymbol( const wxString& aSymbolName,
+LIB_SYMBOL* SYMBOL_LIBRARY_MANAGER::GetBufferedSymbol( const wxString& aAlias,
                                                        const wxString& aLibrary )
 {
     wxCHECK_MSG( LibraryExists( aLibrary ), nullptr,
-                 wxString::Format( "Library missing: %s, for symbol %s", aLibrary, aSymbolName ) );
+                 wxString::Format( "Library missing: %s, for alias %s", aLibrary, aAlias ) );
 
     // try the library buffers first
     LIB_BUFFER& libBuf = getLibraryBuffer( aLibrary );
-    LIB_SYMBOL* bufferedSymbol = libBuf.GetSymbol( aSymbolName );
+    LIB_SYMBOL* bufferedSymbol = libBuf.GetSymbol( aAlias );
 
     if( !bufferedSymbol ) // no buffer symbol found
     {
         // create a copy of the symbol
         try
         {
-            LIB_SYMBOL* symbol = symTable()->LoadSymbol( aLibrary, aSymbolName );
+            LIB_SYMBOL* symbol = symTable()->LoadSymbol( aLibrary, aAlias );
 
             if( symbol == nullptr )
                 THROW_IO_ERROR( _( "Symbol not found." ) );
@@ -426,7 +425,7 @@ LIB_SYMBOL* SYMBOL_LIBRARY_MANAGER::GetBufferedSymbol( const wxString& aSymbolNa
             LIB_SYMBOL* bufferedParent = nullptr;
 
             // Create parent symbols on demand so parent symbol can be set.
-            if( symbol->IsDerived() )
+            if( symbol->IsAlias() )
             {
                 std::shared_ptr<LIB_SYMBOL> parent = symbol->GetParent().lock();
                 wxCHECK_MSG( parent, nullptr,
@@ -456,9 +455,7 @@ LIB_SYMBOL* SYMBOL_LIBRARY_MANAGER::GetBufferedSymbol( const wxString& aSymbolNa
         {
             wxString msg;
 
-            msg.Printf( _( "Error loading symbol %s from library '%s'." ),
-                        aSymbolName,
-                        aLibrary );
+            msg.Printf( _( "Error loading symbol %s from library '%s'." ), aAlias, aLibrary );
             DisplayErrorMessage( &m_frame, msg, e.What() );
             bufferedSymbol = nullptr;
         }
@@ -468,18 +465,17 @@ LIB_SYMBOL* SYMBOL_LIBRARY_MANAGER::GetBufferedSymbol( const wxString& aSymbolNa
 }
 
 
-SCH_SCREEN* SYMBOL_LIBRARY_MANAGER::GetScreen( const wxString& aSymbolName,
-                                               const wxString& aLibrary )
+SCH_SCREEN* SYMBOL_LIBRARY_MANAGER::GetScreen( const wxString& aAlias, const wxString& aLibrary )
 {
     wxCHECK_MSG( LibraryExists( aLibrary ), nullptr,
-                 wxString::Format( "Library missing: %s, for symbol %s", aLibrary, aSymbolName ) );
-    wxCHECK_MSG( !aSymbolName.IsEmpty(), nullptr,
-                 wxString::Format( "Symbol missing in library: %s", aLibrary ) );
+                 wxString::Format( "Library missing: %s, for alias %s", aLibrary, aAlias ) );
+    wxCHECK_MSG( !aAlias.IsEmpty(), nullptr,
+                 wxString::Format( "Alias missing in library: %s", aLibrary ) );
     auto it = m_libs.find( aLibrary );
     wxCHECK( it != m_libs.end(), nullptr );
 
     LIB_BUFFER&                    buf = it->second;
-    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = buf.GetBuffer( aSymbolName );
+    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = buf.GetBuffer( aAlias );
 
     return symbolBuf ? symbolBuf->GetScreen() : nullptr;
 }
@@ -537,20 +533,20 @@ bool SYMBOL_LIBRARY_MANAGER::UpdateSymbolAfterRename( LIB_SYMBOL* aSymbol, const
 }
 
 
-LIB_ID SYMBOL_LIBRARY_MANAGER::RevertSymbol( const wxString& aSymbolName, const wxString& aLibrary )
+LIB_ID SYMBOL_LIBRARY_MANAGER::RevertSymbol( const wxString& aAlias, const wxString& aLibrary )
 {
     auto it = m_libs.find( aLibrary );
 
     if( it == m_libs.end() )    // no items to flush
-        return LIB_ID( aLibrary, aSymbolName );
+        return LIB_ID( aLibrary, aAlias );
 
-    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = it->second.GetBuffer( aSymbolName );
-    wxCHECK( symbolBuf, LIB_ID( aLibrary, aSymbolName ) );
+    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = it->second.GetBuffer( aAlias );
+    wxCHECK( symbolBuf, LIB_ID( aLibrary, aAlias ) );
     LIB_SYMBOL original( symbolBuf->GetOriginal() );
 
-    if( original.GetName() != aSymbolName )
+    if( original.GetName() != aAlias )
     {
-        UpdateSymbolAfterRename( &original, aSymbolName, aLibrary );
+        UpdateSymbolAfterRename( &original, aAlias, aLibrary );
     }
     else
     {
@@ -603,10 +599,10 @@ bool SYMBOL_LIBRARY_MANAGER::RevertAll()
 }
 
 
-bool SYMBOL_LIBRARY_MANAGER::RemoveSymbol( const wxString& aSymbolName, const wxString& aLibrary )
+bool SYMBOL_LIBRARY_MANAGER::RemoveSymbol( const wxString& aAlias, const wxString& aLibrary )
 {
     LIB_BUFFER&                    libBuf = getLibraryBuffer( aLibrary );
-    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = libBuf.GetBuffer( aSymbolName );
+    std::shared_ptr<SYMBOL_BUFFER> symbolBuf = libBuf.GetBuffer( aAlias );
     wxCHECK( symbolBuf, false );
 
     bool retv = true;
@@ -618,76 +614,57 @@ bool SYMBOL_LIBRARY_MANAGER::RemoveSymbol( const wxString& aSymbolName, const wx
 }
 
 
-LIB_SYMBOL* SYMBOL_LIBRARY_MANAGER::GetSymbol( const wxString& aSymbolName,
-                                               const wxString& aLibrary ) const
+LIB_SYMBOL* SYMBOL_LIBRARY_MANAGER::GetAlias( const wxString& aAlias,
+                                              const wxString& aLibrary ) const
 {
     // Try the library buffers first
     auto libIt = m_libs.find( aLibrary );
 
     if( libIt != m_libs.end() )
     {
-        LIB_SYMBOL* symbol = libIt->second.GetSymbol( aSymbolName );
+        LIB_SYMBOL* symbol = libIt->second.GetSymbol( aAlias );
 
         if( symbol )
             return symbol;
     }
 
     // Get the original symbol
-    LIB_SYMBOL* symbol = nullptr;
+    LIB_SYMBOL* alias = nullptr;
 
     try
     {
-        symbol = symTable()->LoadSymbol( aLibrary, aSymbolName );
+        alias = symTable()->LoadSymbol( aLibrary, aAlias );
     }
     catch( const IO_ERROR& e )
     {
         wxString msg;
 
-        msg.Printf( _( "Cannot load symbol '%s' from library '%s'." ),
-                    aSymbolName,
-                    aLibrary );
+        msg.Printf( _( "Cannot load symbol '%s' from library '%s'." ), aAlias, aLibrary );
         DisplayErrorMessage( &m_frame, msg, e.What() );
     }
 
-    return symbol;
+    return alias;
 }
 
 
-bool SYMBOL_LIBRARY_MANAGER::SymbolExists( const wxString& aSymbolName,
-                                           const wxString& aLibrary ) const
+bool SYMBOL_LIBRARY_MANAGER::SymbolExists( const wxString& aAlias, const wxString& aLibrary ) const
 {
-    auto        libBufIt = m_libs.find( aLibrary );
-    LIB_SYMBOL* symbol = nullptr;
+    auto libBufIt = m_libs.find( aLibrary );
+    LIB_SYMBOL* alias = nullptr;
 
     if( libBufIt != m_libs.end() )
-        return libBufIt->second.GetBuffer( aSymbolName ) != nullptr;
+        return !!libBufIt->second.GetBuffer( aAlias );
 
     try
     {
-        symbol = symTable()->LoadSymbol( aLibrary, aSymbolName );
+        alias = symTable()->LoadSymbol( aLibrary, aAlias );
     }
     catch( IO_ERROR& )
     {
         // checking if certain symbol exists, so its absence is perfectly fine
     }
 
-    return symbol != nullptr;
-}
-
-
-bool SYMBOL_LIBRARY_MANAGER::SymbolNameInUse( const wxString& aName, const wxString& aLibrary )
-{
-    wxArrayString existing;
-
-    GetSymbolNames( aLibrary, existing );
-
-    for( wxString& candidate : existing )
-    {
-        if( candidate.CmpNoCase( aName ) == 0 )
-            return true;
-    }
-
-    return false;
+    return alias != nullptr;
 }
 
 
@@ -764,8 +741,7 @@ bool SYMBOL_LIBRARY_MANAGER::addLibrary( const wxString& aFilePath, bool aCreate
     // try to use path normalized to an environmental variable or project path
     wxString relPath = NormalizePath( aFilePath, &Pgm().GetLocalEnvVariables(), &m_frame.Prj() );
 
-    SCH_IO_MGR::SCH_FILE_T schFileType = SCH_IO_MGR::GuessPluginTypeFromLibPath( aFilePath,
-                    aCreate ? KICTL_CREATE : 0 );
+    SCH_IO_MGR::SCH_FILE_T schFileType = SCH_IO_MGR::GuessPluginTypeFromLibPath( aFilePath );
 
     if( schFileType == SCH_IO_MGR::SCH_FILE_UNKNOWN )
         schFileType = SCH_IO_MGR::SCH_LEGACY;
@@ -808,13 +784,13 @@ std::set<LIB_SYMBOL*> SYMBOL_LIBRARY_MANAGER::getOriginalSymbols( const wxString
 
     try
     {
-        wxArrayString symbolNames;
-        symTable()->EnumerateSymbolLib( aLibrary, symbolNames );
+        wxArrayString aliases;
+        symTable()->EnumerateSymbolLib( aLibrary, aliases );
 
-        for( const auto& symbolName : symbolNames )
+        for( const auto& aliasName : aliases )
         {
-            LIB_SYMBOL* symbol = symTable()->LoadSymbol( aLibrary, symbolName );
-            symbols.insert( symbol );
+            LIB_SYMBOL* alias = symTable()->LoadSymbol( aLibrary, aliasName );
+            symbols.insert( alias );
         }
     }
     catch( const IO_ERROR& e )
@@ -842,7 +818,7 @@ LIB_BUFFER& SYMBOL_LIBRARY_MANAGER::getLibraryBuffer( const wxString& aLibrary )
 
     for( LIB_SYMBOL* symbol : getOriginalSymbols( aLibrary ) )
     {
-        if( symbol->IsDerived() )
+        if( symbol->IsAlias() )
         {
             std::shared_ptr<LIB_SYMBOL> oldParent = symbol->GetParent().lock();
 
@@ -1060,7 +1036,7 @@ bool LIB_BUFFER::SaveBuffer( SYMBOL_BUFFER& aSymbolBuf, const wxString& aFileNam
 
     LIB_SYMBOL* parentSymbol = nullptr;
 
-    if( libSymbol.IsDerived() )
+    if( libSymbol.IsAlias() )
     {
         LIB_SYMBOL*                 newCachedSymbol = new LIB_SYMBOL( libSymbol );
         std::shared_ptr<LIB_SYMBOL> bufferedParent = libSymbol.GetParent().lock();
@@ -1188,11 +1164,11 @@ bool LIB_BUFFER::SaveBuffer( SYMBOL_BUFFER& aSymbolBuf, const wxString& aFileNam
 }
 
 
-std::shared_ptr<SYMBOL_BUFFER> LIB_BUFFER::GetBuffer( const wxString& aSymbolName ) const
+std::shared_ptr<SYMBOL_BUFFER> LIB_BUFFER::GetBuffer( const wxString& aAlias ) const
 {
     for( std::shared_ptr<SYMBOL_BUFFER> entry : m_symbols )
     {
-        if( entry->GetSymbol().GetName() == aSymbolName )
+        if( entry->GetSymbol().GetName() == aAlias )
             return entry;
     }
 
@@ -1204,7 +1180,7 @@ bool LIB_BUFFER::HasDerivedSymbols( const wxString& aParentName ) const
 {
     for( const std::shared_ptr<SYMBOL_BUFFER>& entry : m_symbols )
     {
-        if( entry->GetSymbol().IsDerived() )
+        if( entry->GetSymbol().IsAlias() )
         {
             LIB_SYMBOL_SPTR parent = entry->GetSymbol().GetParent().lock();
 
@@ -1225,7 +1201,7 @@ void LIB_BUFFER::GetSymbolNames( wxArrayString& aSymbolNames, SYMBOL_NAME_FILTER
     for( std::shared_ptr<SYMBOL_BUFFER>& entry : m_symbols )
     {
         const LIB_SYMBOL& symbol = entry->GetSymbol();
-        if( ( symbol.IsDerived() && ( aFilter == SYMBOL_NAME_FILTER::ROOT_ONLY ) )
+        if( ( symbol.IsAlias() && ( aFilter == SYMBOL_NAME_FILTER::ROOT_ONLY ) )
             || ( symbol.IsRoot() && ( aFilter == SYMBOL_NAME_FILTER::DERIVED_ONLY ) ) )
         {
             continue;
@@ -1242,7 +1218,7 @@ size_t LIB_BUFFER::GetDerivedSymbolNames( const wxString& aSymbolName, wxArraySt
     for( std::shared_ptr<SYMBOL_BUFFER>& entry : m_symbols )
     {
         const LIB_SYMBOL& symbol = entry->GetSymbol();
-        if( symbol.IsDerived() )
+        if( symbol.IsAlias() )
         {
             LIB_SYMBOL_SPTR parent = symbol.GetParent().lock();
 

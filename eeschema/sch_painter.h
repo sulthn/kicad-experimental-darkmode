@@ -104,8 +104,6 @@ private:
     void drawPinDanglingIndicator( const SCH_PIN& aPin, const COLOR4D& aColor, bool aDrawingShadows,
                                    bool aBrightened );
 
-    void drawLocalPowerIcon( const VECTOR2D& aPos, double aSize, bool aRotate,
-                             const COLOR4D& aColor, bool aDrawingShadows, bool aBrightened );
     /**
      * Draw the target (an open square) for a wire or label which has no connection or is
      * being moved.

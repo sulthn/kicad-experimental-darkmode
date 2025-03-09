@@ -32,8 +32,6 @@
 class ALTIUM_PCB_COMPOUND_FILE : public ALTIUM_COMPOUND_FILE
 {
 public:
-    ALTIUM_PCB_COMPOUND_FILE() : ALTIUM_COMPOUND_FILE() {}
-
     ALTIUM_PCB_COMPOUND_FILE( const wxString& aFilePath );
     ALTIUM_PCB_COMPOUND_FILE( const void* aBuffer, size_t aLen );
     ~ALTIUM_PCB_COMPOUND_FILE();

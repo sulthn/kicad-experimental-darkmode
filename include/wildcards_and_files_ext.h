@@ -247,7 +247,6 @@ public:
     static wxString CsvFileWildcard();
     static wxString PcbFileWildcard();
     static wxString CadstarArchiveFilesWildcard();
-    static wxString AltiumProjectFilesWildcard();
     static wxString EagleFilesWildcard();
     static wxString EasyEdaArchiveWildcard();
     static wxString EasyEdaProFileWildcard();

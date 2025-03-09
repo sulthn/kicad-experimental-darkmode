@@ -55,6 +55,7 @@ set( PCBNEW_DIALOGS
     dialogs/dialog_footprint_associations_base.cpp
     dialogs/dialog_footprint_checker.cpp
     dialogs/dialog_footprint_checker_base.cpp
+    dialogs/dialog_footprint_chooser.cpp
     dialogs/dialog_footprint_properties.cpp
     dialogs/dialog_footprint_properties_base.cpp
     dialogs/dialog_footprint_properties_fp_editor.cpp
@@ -232,6 +233,7 @@ set( PCBNEW_EXPORTERS
     exporters/export_gencad.cpp
     exporters/export_gencad_writer.cpp
     exporters/export_idf.cpp
+    exporters/export_svg.cpp
     exporters/step/exporter_step.cpp
     exporters/step/step_pcb_model.cpp
     exporters/step/KI_XCAFDoc_AssemblyGraph.cxx
@@ -371,7 +373,6 @@ set( PCBNEW_CLASS_SRCS
         pcb_fields_grid_table.cpp
     toolbars_footprint_editor.cpp
     toolbars_footprint_viewer.cpp
-    toolbars_footprint_wizard.cpp
     toolbars_pcb_editor.cpp
     tracks_cleaner.cpp
     undo_redo.cpp
@@ -394,7 +395,6 @@ set( PCBNEW_CLASS_SRCS
     tools/global_edit_tool.cpp
     tools/group_tool.cpp
     tools/footprint_editor_control.cpp
-    tools/footprint_chooser_selection_tool.cpp
     tools/item_modification_routine.cpp
     tools/pad_tool.cpp
     tools/pcb_control.cpp

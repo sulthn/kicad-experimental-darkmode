@@ -44,8 +44,6 @@
 #include <sch_edit_frame.h>
 #include <sim/sim_model_l_mutual.h>
 #include <sim/spice_circuit_model.h>
-#include <widgets/filedlg_open_embed_file.h>
-#include <wx/filedlg.h>
 #include <wx/log.h>
 
 using CATEGORY = SIM_MODEL::PARAM::CATEGORY;
@@ -69,8 +67,8 @@ DIALOG_SIM_MODEL<T>::DIALOG_SIM_MODEL( wxWindow* aParent, EDA_BASE_FRAME* aFrame
         m_frame( aFrame ),
         m_symbol( aSymbol ),
         m_fields( aFields ),
-        m_libraryModelsMgr( &Prj(), nullptr ),
-        m_builtinModelsMgr( &Prj(), nullptr ),
+        m_libraryModelsMgr( &Prj() ),
+        m_builtinModelsMgr( &Prj() ),
         m_prevModel( nullptr ),
         m_curModelType( SIM_MODEL::TYPE::NONE ),
         m_scintillaTricksCode( nullptr ),
@@ -81,14 +79,6 @@ DIALOG_SIM_MODEL<T>::DIALOG_SIM_MODEL( wxWindow* aParent, EDA_BASE_FRAME* aFrame
 {
     m_browseButton->SetBitmap( KiBitmapBundle( BITMAPS::small_folder ) );
     m_infoBar->AddCloseButton();
-
-    if constexpr (std::is_same_v<T, SCH_SYMBOL>)
-        m_files = aSymbol.Schematic();
-    else
-        m_files = &aSymbol;
-
-    m_libraryModelsMgr.SetFiles( m_files );
-    m_builtinModelsMgr.SetFiles( m_files );
 
     for( SCH_PIN* pin : aSymbol.GetPins() )
     {
@@ -114,7 +104,10 @@ DIALOG_SIM_MODEL<T>::DIALOG_SIM_MODEL( wxWindow* aParent, EDA_BASE_FRAME* aFrame
     m_paramGridMgr->Bind( wxEVT_PG_SELECTED, &DIALOG_SIM_MODEL::onParamGridSelectionChange, this );
 
     wxPropertyGrid* grid = m_paramGrid->GetGrid();
+
+    // In wx 3.0 the color will be wrong sometimes.
     grid->SetCellDisabledTextColour( wxSystemSettings::GetColour( wxSYS_COLOUR_GRAYTEXT ) );
+
     grid->Bind( wxEVT_SET_FOCUS, &DIALOG_SIM_MODEL::onParamGridSetFocus, this );
     grid->Bind( wxEVT_UPDATE_UI, &DIALOG_SIM_MODEL::onUpdateUI, this );
 
@@ -139,6 +132,8 @@ DIALOG_SIM_MODEL<T>::DIALOG_SIM_MODEL( wxWindow* aParent, EDA_BASE_FRAME* aFrame
     m_pinAssignmentsGrid->PushEventHandler( new GRID_TRICKS( m_pinAssignmentsGrid ) );
 
     m_subcktLabel->SetFont( KIUI::GetInfoFont( m_subcktLabel ) );
+
+    // Now all widgets have the size fixed, call FinishDialogSettings
     finishDialogSettings();
 }
 
@@ -178,27 +173,43 @@ bool DIALOG_SIM_MODEL<T>::TransferDataToWindow()
 
     WX_STRING_REPORTER reporter;
 
+    auto setFieldValue =
+            [&]( const wxString& aFieldName, const wxString& aValue )
+            {
+                for( SCH_FIELD& field : m_fields )
+                {
+                    if( field.GetName() == aFieldName )
+                    {
+                        field.SetText( aValue );
+                        return;
+                    }
+                }
+
+                m_fields.emplace_back( &m_symbol, -1, aFieldName );
+                m_fields.back().SetText( aValue );
+            };
+
     // Infer RLC and VI models if they aren't specified
     if( SIM_MODEL::InferSimModel( m_symbol, &m_fields, false, SIM_VALUE_GRAMMAR::NOTATION::SI,
                                   &deviceType, &modelType, &modelParams, &pinMap ) )
     {
-        SetFieldValue( m_fields, SIM_DEVICE_FIELD, deviceType.ToStdString() );
+        setFieldValue( SIM_DEVICE_FIELD, deviceType );
 
         if( !modelType.IsEmpty() )
-            SetFieldValue( m_fields, SIM_DEVICE_SUBTYPE_FIELD, modelType.ToStdString() );
+            setFieldValue( SIM_DEVICE_SUBTYPE_FIELD, modelType );
 
-        SetFieldValue( m_fields, SIM_PARAMS_FIELD, modelParams.ToStdString() );
+        setFieldValue( SIM_PARAMS_FIELD, modelParams );
 
-        SetFieldValue( m_fields, SIM_PINS_FIELD, pinMap.ToStdString() );
+        setFieldValue( SIM_PINS_FIELD, pinMap );
 
         storeInValue = true;
 
         // In case the storeInValue checkbox is turned off (if it's left on then we'll overwrite
         // this field with the actual value):
-        FindField( m_fields, FIELD_T::VALUE )->SetText( wxT( "${SIM.PARAMS}" ) );
+        m_fields[ VALUE_FIELD ].SetText( wxT( "${SIM.PARAMS}" ) );
     }
 
-    wxString libraryFilename = GetFieldValue( &m_fields, SIM_LIBRARY::LIBRARY_FIELD );
+    std::string libraryFilename = SIM_MODEL::GetFieldValue( &m_fields, SIM_LIBRARY::LIBRARY_FIELD );
 
     if( libraryFilename != "" )
     {
@@ -220,7 +231,7 @@ bool DIALOG_SIM_MODEL<T>::TransferDataToWindow()
         }
         else
         {
-            std::string modelName = GetFieldValue( &m_fields, SIM_LIBRARY::NAME_FIELD );
+            std::string modelName = SIM_MODEL::GetFieldValue( &m_fields, SIM_LIBRARY::NAME_FIELD );
             int         modelIdx = m_modelListBox->FindString( modelName );
 
             if( modelIdx == wxNOT_FOUND )
@@ -259,7 +270,8 @@ bool DIALOG_SIM_MODEL<T>::TransferDataToWindow()
 
                 for( const std::pair<std::string, std::string>& strs : ibismodel->GetIbisPins() )
                 {
-                    if( strs.first == GetFieldValue( &m_fields, SIM_LIBRARY_IBIS::PIN_FIELD ) )
+                    if( strs.first
+                        == SIM_MODEL::GetFieldValue( &m_fields, SIM_LIBRARY_IBIS::PIN_FIELD ) )
                     {
                         auto ibisLibrary = static_cast<const SIM_LIBRARY_IBIS*>( library() );
 
@@ -274,10 +286,11 @@ bool DIALOG_SIM_MODEL<T>::TransferDataToWindow()
                 {
                     onPinCombobox( dummyEvent ); // refresh list of models
 
-                    m_pinModelCombobox->SetStringSelection( GetFieldValue( &m_fields, SIM_LIBRARY_IBIS::MODEL_FIELD ) );
+                    m_pinModelCombobox->SetStringSelection(
+                            SIM_MODEL::GetFieldValue( &m_fields, SIM_LIBRARY_IBIS::MODEL_FIELD ) );
                 }
 
-                if( GetFieldValue( &m_fields, SIM_LIBRARY_IBIS::DIFF_FIELD ) == "1" )
+                if( SIM_MODEL::GetFieldValue( &m_fields, SIM_LIBRARY_IBIS::DIFF_FIELD ) == "1" )
                 {
                     ibismodel->SwitchSingleEndedDiff( true );
                     m_differentialCheckbox->SetValue( true );
@@ -290,8 +303,8 @@ bool DIALOG_SIM_MODEL<T>::TransferDataToWindow()
             }
         }
     }
-    else if( !GetFieldValue( &m_fields, SIM_DEVICE_FIELD ).empty()
-                || !GetFieldValue( &m_fields, SIM_DEVICE_SUBTYPE_FIELD ).empty() )
+    else if( !SIM_MODEL::GetFieldValue( &m_fields, SIM_DEVICE_FIELD ).empty()
+                || !SIM_MODEL::GetFieldValue( &m_fields, SIM_DEVICE_SUBTYPE_FIELD ).empty() )
     {
         // The model is sourced from the instance.
         m_rbBuiltinModel->SetValue( true );
@@ -355,20 +368,17 @@ bool DIALOG_SIM_MODEL<T>::TransferDataFromWindow()
         path = m_libraryPathText->GetValue();
         wxFileName fn( path );
 
-        if( !path.starts_with( FILEEXT::KiCadUriPrefix ) && fn.MakeRelativeTo( Prj().GetProjectPath() )
-            && !fn.GetFullPath().StartsWith( ".." ) )
-        {
+        if( fn.MakeRelativeTo( Prj().GetProjectPath() ) && !fn.GetFullPath().StartsWith( ".." ) )
             path = fn.GetFullPath();
-        }
 
         if( m_modelListBox->GetSelection() >= 0 )
             name = m_modelListBox->GetStringSelection().ToStdString();
         else if( dynamic_cast<SIM_MODEL_SPICE_FALLBACK*>( &model ) )
-            name = GetFieldValue( &m_fields, SIM_LIBRARY::NAME_FIELD, false );
+            name = SIM_MODEL::GetFieldValue( &m_fields, SIM_LIBRARY::NAME_FIELD, false );
     }
 
-    SetFieldValue( m_fields, SIM_LIBRARY::LIBRARY_FIELD, path, false );
-    SetFieldValue( m_fields, SIM_LIBRARY::NAME_FIELD, name, false );
+    SIM_MODEL::SetFieldValue( m_fields, SIM_LIBRARY::LIBRARY_FIELD, path, false );
+    SIM_MODEL::SetFieldValue( m_fields, SIM_LIBRARY::NAME_FIELD, name, false );
 
     if( isIbisLoaded() )
     {
@@ -393,9 +403,9 @@ bool DIALOG_SIM_MODEL<T>::TransferDataFromWindow()
             if( ibismodel->CanDifferential() && m_differentialCheckbox->GetValue() )
                 differential = "1";
 
-            SetFieldValue( m_fields, SIM_LIBRARY_IBIS::PIN_FIELD, pins );
-            SetFieldValue( m_fields, SIM_LIBRARY_IBIS::MODEL_FIELD, modelName );
-            SetFieldValue( m_fields, SIM_LIBRARY_IBIS::DIFF_FIELD, differential );
+            SIM_MODEL::SetFieldValue( m_fields, SIM_LIBRARY_IBIS::PIN_FIELD, pins );
+            SIM_MODEL::SetFieldValue( m_fields, SIM_LIBRARY_IBIS::MODEL_FIELD, modelName );
+            SIM_MODEL::SetFieldValue( m_fields, SIM_LIBRARY_IBIS::DIFF_FIELD, differential );
         }
     }
 
@@ -465,7 +475,7 @@ void DIALOG_SIM_MODEL<T>::updateWidgets()
     updateModelCodeTab( model );
     updatePinAssignments( model, model != m_prevModel );
 
-    std::string ref = GetFieldValue( &m_fields, SIM_REFERENCE_FIELD );
+    std::string ref = SIM_MODEL::GetFieldValue( &m_fields, SIM_REFERENCE_FIELD );
 
     m_modelPanel->Layout();
     m_pinAssignmentsPanel->Layout();
@@ -706,7 +716,7 @@ void DIALOG_SIM_MODEL<T>::updateModelCodeTab( SIM_MODEL* aModel )
     item.modelName = m_modelListBox->GetStringSelection();
 
     if( m_rbBuiltinModel->GetValue() || item.modelName == "" )
-        item.modelName = GetFieldValue( &m_fields, FIELD_T::REFERENCE );
+        item.modelName = m_fields.at( REFERENCE_FIELD ).GetText();
 
     text << aModel->SpiceGenerator().Preview( item );
 
@@ -823,7 +833,7 @@ bool DIALOG_SIM_MODEL<T>::loadLibrary( const wxString& aLibraryPath, REPORTER& a
     if( aReporter.HasMessageOfSeverity( RPT_SEVERITY_UNDEFINED | RPT_SEVERITY_ERROR ) )
         return false;
 
-    std::string modelName = GetFieldValue( &m_fields, SIM_LIBRARY::NAME_FIELD );
+    std::string modelName = SIM_MODEL::GetFieldValue( &m_fields, SIM_LIBRARY::NAME_FIELD );
 
     for( const auto& [baseModelName, baseModel] : library()->GetModels() )
     {
@@ -1239,11 +1249,8 @@ void DIALOG_SIM_MODEL<T>::onBrowseButtonClick( wxCommandEvent& aEvent )
 {
     static wxString s_mruPath;
 
-    wxString                path = s_mruPath.IsEmpty() ? Prj().GetProjectPath() : s_mruPath;
-    wxFileDialog            dlg( this, _( "Browse Models" ), path );
-    FILEDLG_OPEN_EMBED_FILE customize( false );
-
-    dlg.SetCustomizeHook( customize );
+    wxString     path = s_mruPath.IsEmpty() ? Prj().GetProjectPath() : s_mruPath;
+    wxFileDialog dlg( this, _( "Browse Models" ), path );
 
     if( dlg.ShowModal() == wxID_CANCEL )
         return;
@@ -1252,14 +1259,10 @@ void DIALOG_SIM_MODEL<T>::onBrowseButtonClick( wxCommandEvent& aEvent )
 
     path = dlg.GetPath();
     wxFileName fn( path );
+
     s_mruPath = fn.GetPath();
 
-    if( customize.GetEmbed() )
-    {
-        EMBEDDED_FILES::EMBEDDED_FILE* result = m_files->AddFile( fn, false );
-        path = result->GetLink();
-    }
-    else if( fn.MakeRelativeTo( Prj().GetProjectPath() ) && !fn.GetFullPath().StartsWith( wxS( ".." ) ) )
+    if( fn.MakeRelativeTo( Prj().GetProjectPath() ) && !fn.GetFullPath().StartsWith( wxS( ".." ) ) )
         path = fn.GetFullPath();
 
     WX_STRING_REPORTER reporter;

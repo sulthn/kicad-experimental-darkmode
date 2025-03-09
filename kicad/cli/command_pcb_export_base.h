@@ -53,12 +53,10 @@ namespace CLI
 #define ARG_EXCLUDE_VALUE "--exclude-value"
 #define ARG_THEME "--theme"
 #define ARG_INCLUDE_BORDER_TITLE "--include-border-title"
-#define ARG_SUBTRACT_SOLDERMASK "--subtract-soldermask"
 #define ARG_MIRROR "--mirror"
 
-#define DEPRECATED_ARG_PLOT_INVISIBLE_TEXT "--plot-invisible-text"
-#define DEPRECATED_ARG_PLOT_INVISIBLE_TEXT_DESC "Deprecated.  Has no effect."
-#define DEPRECATED_ARD_PLOT_INVISIBLE_TEXT_WARNING "--plot-invisible-text has been deprecated as of KiCad 9.0.1.  It will have no effect."
+#define ARG_PLOT_INVISIBLE_TEXT "--plot-invisible-text"
+#define ARG_PLOT_INVISIBLE_TEXT_DESC "Force plotting of invisible values / refs"
 
 #define ARG_FLIP_BOTTOM_PADS "--flip-bottom-pads"
 #define ARG_UNIQUE_PINS "--unique-pins"
@@ -75,7 +73,7 @@ struct PCB_EXPORT_BASE_COMMAND : public COMMAND
 
 protected:
     int  doPerform( KIWAY& aKiway ) override;
-    LSEQ convertLayerStringList( wxString& aLayerString ) const;
+    LSEQ convertLayerStringList( wxString& aLayerString, bool& aLayerArgSet ) const;
     void addLayerArg( bool aRequire );
 
     // The list of canonical layer names used in .kicad_pcb files:

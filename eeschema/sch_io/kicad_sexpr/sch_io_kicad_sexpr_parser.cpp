@@ -309,6 +309,14 @@ LIB_SYMBOL* SCH_IO_KICAD_SEXPR_PARSER::parseLibSymbol( LIB_SYMBOL_MAP& aSymbolLi
 
     symbol->SetUnitCount( 1 );
 
+    m_fieldIDsRead.clear();
+
+    // Make sure the mandatory field IDs are reserved as already read,
+    // the field parser will set the field IDs to the correct value if
+    // the field name matches a mandatory field name
+    for( int fieldId : MANDATORY_FIELDS )
+        m_fieldIDsRead.insert( fieldId );
+
     token = NextTok();
 
     if( !IsSymbol( token ) )
@@ -357,17 +365,7 @@ LIB_SYMBOL* SCH_IO_KICAD_SEXPR_PARSER::parseLibSymbol( LIB_SYMBOL_MAP& aSymbolLi
         switch( token )
         {
         case T_power:
-            symbol->SetGlobalPower();
-            token = NextTok();
-
-            if( token == T_RIGHT )
-                break;
-
-            if( token == T_local )
-                symbol->SetLocalPower();
-            else if( token != T_global )
-                Expecting( "global or local" );
-
+            symbol->SetPower();
             NeedRIGHT();
             break;
 
@@ -670,15 +668,11 @@ void SCH_IO_KICAD_SEXPR_PARSER::parseFill( FILL_PARAMS& aFill )
 
             switch( token )
             {
-            case T_none:          aFill.m_FillType = FILL_T::NO_FILL;                  break;
-            case T_outline:       aFill.m_FillType = FILL_T::FILLED_SHAPE;             break;
-            case T_background:    aFill.m_FillType = FILL_T::FILLED_WITH_BG_BODYCOLOR; break;
-            case T_color:         aFill.m_FillType = FILL_T::FILLED_WITH_COLOR;        break;
-            case T_hatch:         aFill.m_FillType = FILL_T::HATCH;                    break;
-            case T_reverse_hatch: aFill.m_FillType = FILL_T::REVERSE_HATCH;            break;
-            case T_cross_hatch:   aFill.m_FillType = FILL_T::CROSS_HATCH;              break;
-            default:              Expecting( "none, outline, hatch, reverse_hatch, "
-                                             "cross_hatch, color or background" );
+            case T_none:       aFill.m_FillType = FILL_T::NO_FILL;                  break;
+            case T_outline:    aFill.m_FillType = FILL_T::FILLED_SHAPE;             break;
+            case T_background: aFill.m_FillType = FILL_T::FILLED_WITH_BG_BODYCOLOR; break;
+            case T_color:      aFill.m_FillType = FILL_T::FILLED_WITH_COLOR;        break;
+            default:           Expecting( "none, outline, color or background" );
             }
 
             NeedRIGHT();
@@ -961,17 +955,19 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
                  wxT( "Cannot parse " ) + GetTokenString( CurTok() ) + wxT( " as a property." ) );
     wxCHECK( aSymbol, nullptr );
 
-    FIELD_T  fieldId = FIELD_T::USER;
     wxString name;
     wxString value;
-    bool     isPrivate = false;
-    bool     isVisible = true;
+    auto field = std::make_unique<SCH_FIELD>( aSymbol.get(), aSymbol->GetNextAvailableFieldId() );
+
+    // By default, fieds are visible.
+    // Invisible fields have the hide style or keyword specified in file
+    field->SetVisible( true );
 
     T token = NextTok();
 
     if( token == T_private )
     {
-        isPrivate = true;
+        field->SetPrivate( true );
         token = NextTok();
     }
 
@@ -989,19 +985,18 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
                            CurOffset() );
     }
 
+    field->SetName( name );
+
     // Correctly set the ID based on canonical (untranslated) field name
-    for( FIELD_T id : MANDATORY_FIELDS )
+    // If ID is stored in the file (old versions), it will overwrite this
+    for( int fieldId : MANDATORY_FIELDS )
     {
-        if( name.CmpNoCase( GetCanonicalFieldName( id ) ) == 0 )
+        if( name.CmpNoCase( GetCanonicalFieldName( fieldId ) ) == 0 )
         {
-            fieldId = id;
+            field->SetId( fieldId );
             break;
         }
     }
-
-    auto field = std::make_unique<SCH_FIELD>( aSymbol.get(), fieldId, name );
-    field->SetPrivate( isPrivate );
-    field->SetVisible( isVisible );
 
     token = NextTok();
 
@@ -1025,9 +1020,17 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
 
         switch( token )
         {
-        case T_id:  // legacy token; ignore
-            parseInt( "field ID" );
+        // I am not sure we should even support parsing these IDs any more
+        case T_id:
+        {
+            int id = parseInt( "field ID" );
+
+            // Only set an ID that isn't a MANDATORY_FIELD ID
+            if( id >= MANDATORY_FIELD_COUNT )
+                field->SetId( id );
+
             NeedRIGHT();
+        }
             break;
 
         case T_at:
@@ -1036,14 +1039,8 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
             NeedRIGHT();
             break;
 
-        case T_hide:
-            field->SetVisible( !parseBool() );
-            NeedRIGHT();
-            break;
-
         case T_effects:
-            parseEDA_TEXT( static_cast<EDA_TEXT*>( field.get() ),
-                           field->GetId() == FIELD_T::VALUE );
+            parseEDA_TEXT( static_cast<EDA_TEXT*>( field.get() ), field->GetId() == VALUE_FIELD );
             break;
 
         case T_show_name:
@@ -1061,17 +1058,30 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
         }
 
         default:
-            Expecting( "id, at, hide, show_name, do_not_autoplace, or effects" );
+            Expecting( "id, at, show_name, do_not_autoplace, or effects" );
         }
+    }
+
+    // Due to an bug when in #LIB_SYMBOL::Flatten, duplicate ids slipped through when writing
+    // files.  This section replaces duplicate #SCH_FIELD indices on load.
+    if( ( field->GetId() >= MANDATORY_FIELD_COUNT ) && m_fieldIDsRead.count( field->GetId() ) )
+    {
+        int nextAvailableId = field->GetId() + 1;
+
+        while( m_fieldIDsRead.count( nextAvailableId ) )
+            nextAvailableId += 1;
+
+        field->SetId( nextAvailableId );
     }
 
     SCH_FIELD* existingField;
 
     if( field->IsMandatory() )
     {
-        existingField = aSymbol->GetField( field->GetId() );
+        existingField = aSymbol->GetFieldById( field->GetId() );
 
         *existingField = *field;
+        m_fieldIDsRead.insert( field->GetId() );
         return existingField;
     }
     else if( name == "ki_keywords" )
@@ -1111,7 +1121,7 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
     else
     {
         // At this point, a user field is read.
-        existingField = aSymbol->GetField( field->GetCanonicalName() );
+        existingField = aSymbol->FindField( field->GetCanonicalName() );
 
 #if 1   // Enable it to modify the name of the field to add if already existing
         // Disable it to skip the field having the same name as previous field
@@ -1127,7 +1137,7 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
                 wxString newname = base_name;
                 newname << '_' << ii;
 
-                existingField = aSymbol->GetField( newname );
+                existingField = aSymbol->FindField( newname );
 
                 if( !existingField )    // the modified name is not found, use it
                     field->SetName( newname );
@@ -1137,6 +1147,7 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseProperty( std::unique_ptr<LIB_SYMBOL>
         if( !existingField )
         {
             aSymbol->AddDrawItem( field.get(), false );
+            m_fieldIDsRead.insert( field->GetId() );
             return field.release();
         }
         else
@@ -1834,7 +1845,7 @@ SCH_SHAPE* SCH_IO_KICAD_SEXPR_PARSER::parseSymbolRectangle()
 }
 
 
-SCH_ITEM* SCH_IO_KICAD_SEXPR_PARSER::parseSymbolText()
+SCH_TEXT* SCH_IO_KICAD_SEXPR_PARSER::parseSymbolText()
 {
     wxCHECK_MSG( CurTok() == T_text, nullptr,
                  wxT( "Cannot parse " ) + GetTokenString( CurTok() ) + wxT( " as a text token." ) );
@@ -1885,10 +1896,6 @@ SCH_ITEM* SCH_IO_KICAD_SEXPR_PARSER::parseSymbolText()
             Expecting( "at or effects" );
         }
     }
-
-    // Convert hidden symbol text (which is no longer supported) into a hidden field
-    if( !text->IsVisible() )
-        return new SCH_FIELD( text.get(), FIELD_T::USER );
 
     return text.release();
 }
@@ -2213,60 +2220,51 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseSchField( SCH_ITEM* aParent )
     // Empty property values are valid.
     wxString value = FromUTF8();
 
-    FIELD_T fieldId = FIELD_T::USER;
+    int nextFieldId = 0;
+
+    if( aParent->Type() == SCH_SYMBOL_T )
+        nextFieldId = MANDATORY_FIELD_COUNT;
+    else if( aParent->Type() == SCH_SHEET_T )
+        nextFieldId = SHEET_MANDATORY_FIELD_COUNT;
+
+    std::unique_ptr<SCH_FIELD> field = std::make_unique<SCH_FIELD>( VECTOR2I( -1, -1 ), nextFieldId,
+                                                                    aParent, name );
+    field->SetText( value );
+    field->SetVisible( true );
+    field->SetPrivate( is_private );
 
     // Correctly set the ID based on canonical (untranslated) field name
+    // If ID is stored in the file (old versions), it will overwrite this
     if( aParent->Type() == SCH_SYMBOL_T )
     {
-        for( FIELD_T id : MANDATORY_FIELDS )
+        for( int fieldId : MANDATORY_FIELDS )
         {
-            if( name.CmpNoCase( GetCanonicalFieldName( id ) ) == 0 )
+            if( name == GetCanonicalFieldName( fieldId ) )
             {
-                fieldId = id;
+                field->SetId( fieldId );
+                field->SetPrivate( false );
                 break;
             }
         }
     }
     else if( aParent->Type() == SCH_SHEET_T )
     {
-        for( FIELD_T id : SHEET_MANDATORY_FIELDS )
+        for( int fieldId : SHEET_MANDATORY_FIELDS )
         {
-            if( name.CmpNoCase( GetCanonicalFieldName( id ) ) == 0 )
+            if( name == SCH_SHEET::GetDefaultFieldName( fieldId, !DO_TRANSLATE ) )
             {
-                fieldId = id;
+                field->SetId( fieldId );
+                field->SetPrivate( false );
                 break;
             }
         }
 
         // Legacy support for old field names
         if( name.CmpNoCase( wxT( "Sheet name" ) ) == 0 )
-            fieldId = FIELD_T::SHEET_NAME;
+            field->SetId( SHEETNAME );
         else if( name.CmpNoCase( wxT( "Sheet file" ) ) == 0 )
-            fieldId = FIELD_T::SHEET_FILENAME;
+            field->SetId( SHEETFILENAME );
     }
-    else if( aParent->Type() == SCH_GLOBAL_LABEL_T )
-    {
-        for( FIELD_T id : GLOBALLABEL_MANDATORY_FIELDS )
-        {
-            if( name.CmpNoCase( GetCanonicalFieldName( id ) ) == 0 )
-            {
-                fieldId = id;
-                break;
-            }
-        }
-
-        // Legacy support for old field names
-        if( name.CmpNoCase( wxT( "Intersheet References" ) ) == 0 )
-            fieldId = FIELD_T::INTERSHEET_REFS;
-    }
-
-    std::unique_ptr<SCH_FIELD> field = std::make_unique<SCH_FIELD>( VECTOR2I( -1, -1 ), fieldId,
-                                                                    aParent, name );
-    field->SetText( value );
-    field->SetVisible( true );
-
-    if( fieldId == FIELD_T::USER )
-        field->SetPrivate( is_private );
 
     for( token = NextTok(); token != T_RIGHT; token = NextTok() )
     {
@@ -2277,9 +2275,17 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseSchField( SCH_ITEM* aParent )
 
         switch( token )
         {
-        case T_id:  // legacy token; ignore
-            parseInt( "field ID" );
+        // I am not sure we should even support parsing these IDs any more
+        case T_id:
+        {
+            int id = parseInt( "field ID" );
+
+            // Only set an ID that isn't a mandatory field ID
+            if( id >= nextFieldId )
+                field->SetId( id );
+
             NeedRIGHT();
+        }
             break;
 
         case T_at:
@@ -2288,14 +2294,8 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseSchField( SCH_ITEM* aParent )
             NeedRIGHT();
             break;
 
-        case T_hide:
-            field->SetVisible( !parseBool() );
-            NeedRIGHT();
-            break;
-
         case T_effects:
-            parseEDA_TEXT( static_cast<EDA_TEXT*>( field.get() ),
-                           field->GetId() == FIELD_T::VALUE );
+            parseEDA_TEXT( static_cast<EDA_TEXT*>( field.get() ), field->GetId() == VALUE_FIELD );
             break;
 
         case T_show_name:
@@ -2313,7 +2313,7 @@ SCH_FIELD* SCH_IO_KICAD_SEXPR_PARSER::parseSchField( SCH_ITEM* aParent )
         }
 
         default:
-            Expecting( "id, at, hide, show_name, do_not_autoplace or effects" );
+            Expecting( "id, at, show_name, do_not_autoplace or effects" );
         }
     }
 
@@ -2741,6 +2741,7 @@ void SCH_IO_KICAD_SEXPR_PARSER::ParseSchematic( SCH_SHEET* aSheet, bool aIsCopya
                 {
                 case T_symbol:
                     symbol = parseLibSymbol( symbolLibMap );
+                    symbol->UpdateFieldOrdinals();
                     screen->AddLibSymbol( symbol );
                     break;
 
@@ -2967,6 +2968,14 @@ SCH_SYMBOL* SCH_IO_KICAD_SEXPR_PARSER::parseSchematicSymbol()
 
     // We'll reset this if we find a fields_autoplaced token
     symbol->SetFieldsAutoplaced( AUTOPLACE_NONE );
+
+    m_fieldIDsRead.clear();
+
+    // Make sure the mandatory field IDs are reserved as already read,
+    // the field parser will set the field IDs to the correct value if
+    // the field name matches a mandatory field name
+    for( int fieldId : MANDATORY_FIELDS )
+        m_fieldIDsRead.insert( fieldId );
 
     for( token = NextTok(); token != T_RIGHT; token = NextTok() )
     {
@@ -3249,20 +3258,25 @@ SCH_SYMBOL* SCH_IO_KICAD_SEXPR_PARSER::parseSchematicSymbol()
                 break;
             }
 
-            SCH_FIELD* existing;
+            if( ( field->GetId() >= MANDATORY_FIELD_COUNT ) && m_fieldIDsRead.count( field->GetId() ) )
+            {
+                int nextAvailableId = field->GetId() + 1;
 
-            if( field->IsMandatory() )
-                existing = symbol->GetField( field->GetId() );
-            else
-                existing = symbol->GetField( field->GetName() );
+                while( m_fieldIDsRead.count( nextAvailableId ) )
+                    nextAvailableId += 1;
 
-            if( existing )
-                *existing = *field;
+                field->SetId( nextAvailableId );
+            }
+
+            if( symbol->GetFieldById( field->GetId() ) )
+                *symbol->GetFieldById( field->GetId() ) = *field;
             else
                 symbol->AddField( *field );
 
-            if( field->GetId() == FIELD_T::REFERENCE )
+            if( field->GetId() == REFERENCE_FIELD )
                 symbol->UpdatePrefix();
+
+            m_fieldIDsRead.insert( field->GetId() );
 
             delete field;
             break;
@@ -3503,10 +3517,24 @@ SCH_SHEET* SCH_IO_KICAD_SEXPR_PARSER::parseSheet()
                 // Fortunately they only saved the sheetname and sheetfilepath (and always
                 // in that order), so we can hack in a recovery.
                 if( fields.empty() )
-                    field->setId( FIELD_T::SHEET_NAME );
+                    field->SetId( SHEETNAME );
                 else
-                    field->setId( FIELD_T::SHEET_FILENAME );
+                    field->SetId( SHEETFILENAME );
             }
+
+            // It would appear the problem persists past 20200310, but this time with the
+            // earlier ids being re-used for later (user) fields.  The easiest (and most
+            // complete) solution is to disallow multiple instances of the same id (for all
+            // files since the source of the error *might* in fact be hand-edited files).
+            //
+            // While no longer used, -1 is still a valid id for user field.  We convert it to
+            // the first available ID after the mandatory fields
+
+            if( field->GetId() < 0 )
+                field->SetId( SHEET_MANDATORY_FIELD_COUNT );
+
+            while( !fieldIDsRead.insert( field->GetId() ).second )
+                field->SetId( field->GetId() + 1 );
 
             fields.emplace_back( *field );
 
@@ -4313,16 +4341,13 @@ SCH_TEXT* SCH_IO_KICAD_SEXPR_PARSER::parseSchText()
 
         case T_effects:
             parseEDA_TEXT( static_cast<EDA_TEXT*>( text.get() ), true );
-
-            // Hidden schematic text is no longer supported
-            text->SetVisible( true );
             break;
 
         case T_iref:    // legacy format; current is a T_property (aka SCH_FIELD)
             if( text->Type() == SCH_GLOBAL_LABEL_T )
             {
                 SCH_GLOBALLABEL* label = static_cast<SCH_GLOBALLABEL*>( text.get() );
-                SCH_FIELD*       field = label->GetField( FIELD_T::INTERSHEET_REFS );
+                SCH_FIELD*       field = &label->GetFields()[0];
 
                 field->SetTextPos( parseXY() );
                 NeedRIGHT();
@@ -4344,11 +4369,18 @@ SCH_TEXT* SCH_IO_KICAD_SEXPR_PARSER::parseSchText()
 
             SCH_FIELD* field = parseSchField( text.get() );
 
-            // Intersheetrefs is a mandatory field and so will already exist
-            if( text->Type() == SCH_GLOBAL_LABEL_T && field->IsMandatory() )
+            // If the field is a Intersheetrefs it is not handled like other fields:
+            // It always exists and is the first in list
+            if( text->Type() == SCH_GLOBAL_LABEL_T
+                && ( field->GetInternalName() == wxT( "Intersheet References" ) // old name in V6.0
+                     || field->GetInternalName() == wxT( "Intersheetrefs" ) ) ) // Current name
             {
                 SCH_GLOBALLABEL* label = static_cast<SCH_GLOBALLABEL*>( text.get() );
-                *label->GetField( field->GetId() ) = *field;
+                // Ensure the Id of this special and first field is 0, needed by
+                // SCH_FIELD::IsHypertext() test
+                field->SetId( 0 );
+
+                label->GetFields()[0] = *field;
             }
             else
             {

@@ -43,7 +43,6 @@
 #include <api/api_utils.h>
 #include <api/board/board_types.pb.h>
 
-
 static const int INWARD_ARROW_LENGTH_TO_HEAD_RATIO = 2;
 
 static const EDA_ANGLE s_arrowAngle( 27.5, DEGREES_T );
@@ -125,19 +124,7 @@ static void CollectKnockedOutSegments( const SHAPE_POLY_SET& aPoly, const SEG& a
         aSegmentsAfterKnockout.emplace_back( new SHAPE_SEGMENT( aSeg.A, *endpointA ) );
 
     if( endpointB )
-    {
-        bool can_add = true;
-
-        if( endpointA )
-        {
-            if( ( *endpointB == aSeg.A && *endpointA == aSeg.B )
-                || ( *endpointA == *endpointB && aSeg.A == aSeg.B ) )
-                can_add = false;
-        }
-
-        if( can_add )
-            aSegmentsAfterKnockout.emplace_back( new SHAPE_SEGMENT( *endpointB, aSeg.B ) );
-    }
+        aSegmentsAfterKnockout.emplace_back( new SHAPE_SEGMENT( *endpointB, aSeg.B ) );
 
     if( !containsA && !containsB && !endpointA && !endpointB )
         aSegmentsAfterKnockout.emplace_back( new SHAPE_SEGMENT( aSeg ) );
@@ -147,7 +134,7 @@ static void CollectKnockedOutSegments( const SHAPE_POLY_SET& aPoly, const SEG& a
 PCB_DIMENSION_BASE::PCB_DIMENSION_BASE( BOARD_ITEM* aParent, KICAD_T aType ) :
         PCB_TEXT( aParent, aType ),
         m_overrideTextEnabled( false ),
-        m_units( EDA_UNITS::INCH ),
+        m_units( EDA_UNITS::INCHES ),
         m_autoUnits( false ),
         m_unitsFormat( DIM_UNITS_FORMAT::BARE_SUFFIX ),
         m_arrowDirection( DIM_ARROW_DIRECTION::OUTWARD ),
@@ -162,7 +149,6 @@ PCB_DIMENSION_BASE::PCB_DIMENSION_BASE( BOARD_ITEM* aParent, KICAD_T aType ) :
         m_inClearRenderCache( false )
 {
     m_layer = Dwgs_User;
-    m_busy = false;
 }
 
 
@@ -429,10 +415,10 @@ wxString PCB_DIMENSION_BASE::GetValueText() const
     {
         switch( m_units )
         {
-        case EDA_UNITS::INCH: precision = precision - 4;                break;
-        case EDA_UNITS::MILS: precision = std::max( 0, precision - 7 ); break;
-        case EDA_UNITS::MM:   precision = precision - 5;                break;
-        default:              precision = precision - 4;                break;
+        case EDA_UNITS::INCHES:      precision = precision - 4;                break;
+        case EDA_UNITS::MILS:        precision = std::max( 0, precision - 7 ); break;
+        case EDA_UNITS::MILLIMETRES: precision = precision - 5;                break;
+        default:                     precision = precision - 4;                break;
         }
     }
 
@@ -487,9 +473,9 @@ DIM_UNITS_MODE PCB_DIMENSION_BASE::GetUnitsMode() const
         switch( m_units )
         {
         default:
-        case EDA_UNITS::INCH: return DIM_UNITS_MODE::INCH;
-        case EDA_UNITS::MM:   return DIM_UNITS_MODE::MM;
-        case EDA_UNITS::MILS: return DIM_UNITS_MODE::MILS;
+        case EDA_UNITS::INCHES:      return DIM_UNITS_MODE::INCHES;
+        case EDA_UNITS::MILLIMETRES: return DIM_UNITS_MODE::MILLIMETRES;
+        case EDA_UNITS::MILS:        return DIM_UNITS_MODE::MILS;
         }
     }
 }
@@ -499,9 +485,9 @@ void PCB_DIMENSION_BASE::SetUnitsMode( DIM_UNITS_MODE aMode )
 {
     switch( aMode )
     {
-    case DIM_UNITS_MODE::INCH:
+    case DIM_UNITS_MODE::INCHES:
         m_autoUnits = false;
-        m_units = EDA_UNITS::INCH;
+        m_units = EDA_UNITS::INCHES;
         break;
 
     case DIM_UNITS_MODE::MILS:
@@ -509,14 +495,14 @@ void PCB_DIMENSION_BASE::SetUnitsMode( DIM_UNITS_MODE aMode )
         m_units = EDA_UNITS::MILS;
         break;
 
-    case DIM_UNITS_MODE::MM:
+    case DIM_UNITS_MODE::MILLIMETRES:
         m_autoUnits = false;
-        m_units = EDA_UNITS::MM;
+        m_units = EDA_UNITS::MILLIMETRES;
         break;
 
     case DIM_UNITS_MODE::AUTOMATIC:
         m_autoUnits = true;
-        m_units = GetBoard() ? GetBoard()->GetUserUnits() : EDA_UNITS::MM;
+        m_units = GetBoard() ? GetBoard()->GetUserUnits() : EDA_UNITS::MILLIMETRES;
         break;
     }
 }
@@ -634,7 +620,7 @@ void PCB_DIMENSION_BASE::GetMsgPanelInfo( EDA_DRAW_FRAME* aFrame,
 
     // Use our own UNITS_PROVIDER to report dimension info in dimension's units rather than
     // in frame's units.
-    UNITS_PROVIDER unitsProvider( pcbIUScale, EDA_UNITS::MM );
+    UNITS_PROVIDER unitsProvider( pcbIUScale, EDA_UNITS::MILLIMETRES );
     unitsProvider.SetUserUnits( GetUnits() );
 
     aList.emplace_back( _( "Units" ), EDA_UNIT_UTILS::GetLabel( GetUnits() ) );
@@ -906,11 +892,6 @@ void PCB_DIM_ALIGNED::UpdateHeight( const VECTOR2I& aCrossbarStart, const VECTOR
 
 void PCB_DIM_ALIGNED::updateGeometry()
 {
-    if( m_busy )    // Skeep reentrance that happens sometimes after calling updateText()
-        return;
-
-    m_busy = true;
-
     m_shapes.clear();
 
     VECTOR2I dimension( m_end - m_start );
@@ -974,8 +955,6 @@ void PCB_DIM_ALIGNED::updateGeometry()
         drawAnArrow( m_crossBarStart, EDA_ANGLE( dimension ), 0 );
         drawAnArrow( m_crossBarEnd, EDA_ANGLE( dimension ) + EDA_ANGLE( 180 ), 0 );
     }
-
-    m_busy = false;
 }
 
 
@@ -1027,7 +1006,7 @@ void PCB_DIM_ALIGNED::GetMsgPanelInfo( EDA_DRAW_FRAME* aFrame, std::vector<MSG_P
 
     // Use our own UNITS_PROVIDER to report dimension info in dimension's units rather than
     // in frame's units.
-    UNITS_PROVIDER unitsProvider( pcbIUScale, EDA_UNITS::MM );
+    UNITS_PROVIDER unitsProvider( pcbIUScale, EDA_UNITS::MILLIMETRES );
     unitsProvider.SetUserUnits( GetUnits() );
 
     aList.emplace_back( _( "Height" ), unitsProvider.MessageTextFromValue( m_height ) );
@@ -1131,10 +1110,6 @@ BITMAPS PCB_DIM_ORTHOGONAL::GetMenuImage() const
 
 void PCB_DIM_ORTHOGONAL::updateGeometry()
 {
-    if( m_busy )    // Skeep reentrance that happens sometimes after calling updateText()
-        return;
-
-    m_busy = true;
     m_shapes.clear();
 
     int measurement = ( m_orientation == DIR::HORIZONTAL ? m_end.x - m_start.x :
@@ -1212,8 +1187,6 @@ void PCB_DIM_ORTHOGONAL::updateGeometry()
         drawAnArrow( m_crossBarStart, crossBarAngle, 0 );
         drawAnArrow( m_crossBarEnd, crossBarAngle + EDA_ANGLE( 180 ), 0 );
     }
-
-    m_busy = false;
 }
 
 
@@ -1389,11 +1362,6 @@ void PCB_DIM_LEADER::updateText()
 
 void PCB_DIM_LEADER::updateGeometry()
 {
-    if( m_busy )    // Skeep reentrance that happens sometimes after calling updateText()
-        return;
-
-    m_busy = true;
-
     m_shapes.clear();
 
     PCB_DIMENSION_BASE::updateText();
@@ -1469,8 +1437,6 @@ void PCB_DIM_LEADER::updateGeometry()
 
     if( textSegEnd && *arrowSegEnd == m_end )
         m_shapes.emplace_back( new SHAPE_SEGMENT( m_end, *textSegEnd ) );
-
-    m_busy = false;
 }
 
 
@@ -1599,11 +1565,6 @@ void PCB_DIM_RADIAL::updateText()
 
 void PCB_DIM_RADIAL::updateGeometry()
 {
-    if( m_busy )    // Skeep reentrance that happens sometimes after calling updateText()
-        return;
-
-    m_busy = true;
-
     m_shapes.clear();
 
     VECTOR2I center( m_start );
@@ -1643,8 +1604,6 @@ void PCB_DIM_RADIAL::updateGeometry()
     CollectKnockedOutSegments( polyBox, textSeg, m_shapes );
 
     drawAnArrow( m_end, EDA_ANGLE( radial ), 0 );
-
-    m_busy = false;
 }
 
 
@@ -1739,11 +1698,6 @@ const BOX2I PCB_DIM_CENTER::ViewBBox() const
 
 void PCB_DIM_CENTER::updateGeometry()
 {
-    if( m_busy )    // Skeep reentrance that happens sometimes after calling updateText()
-        return;
-
-    m_busy = true;
-
     m_shapes.clear();
 
     VECTOR2I center( m_start );
@@ -1756,8 +1710,6 @@ void PCB_DIM_CENTER::updateGeometry()
     m_shapes.emplace_back( new SHAPE_SEGMENT( center - arm, center + arm ) );
 
     updateText();
-
-    m_busy = false;
 }
 
 
@@ -1783,14 +1735,14 @@ static struct DIMENSION_DESC
                     .Map( DIM_UNITS_FORMAT::PAREN_SUFFIX, _HKI( "1234.0 (mm)" ) );
 
         ENUM_MAP<DIM_UNITS_MODE>::Instance()
-                    .Map( DIM_UNITS_MODE::INCH,      _HKI( "Inches" ) )
-                    .Map( DIM_UNITS_MODE::MILS,      _HKI( "Mils" ) )
-                    .Map( DIM_UNITS_MODE::MM,        _HKI( "Millimeters" ) )
-                    .Map( DIM_UNITS_MODE::AUTOMATIC, _HKI( "Automatic" ) );
+                    .Map( DIM_UNITS_MODE::INCHES,      _HKI( "Inches" ) )
+                    .Map( DIM_UNITS_MODE::MILS,        _HKI( "Mils" ) )
+                    .Map( DIM_UNITS_MODE::MILLIMETRES, _HKI( "Millimeters" ) )
+                    .Map( DIM_UNITS_MODE::AUTOMATIC,   _HKI( "Automatic" ) );
 
         ENUM_MAP<DIM_ARROW_DIRECTION>::Instance()
-                    .Map( DIM_ARROW_DIRECTION::INWARD,  _HKI( "Inward" ) )
-                    .Map( DIM_ARROW_DIRECTION::OUTWARD, _HKI( "Outward" ) );
+                    .Map( DIM_ARROW_DIRECTION::INWARD,      _HKI( "Inward" ) )
+                    .Map( DIM_ARROW_DIRECTION::OUTWARD,     _HKI( "Outward" ) );
 
         PROPERTY_MANAGER& propMgr = PROPERTY_MANAGER::Instance();
         REGISTER_TYPE( PCB_DIMENSION_BASE );
@@ -1918,6 +1870,9 @@ static struct ALIGNED_DIMENSION_DESC
                 groupDimension );
 
         propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_ALIGNED ), TYPE_HASH( EDA_TEXT ),
+                                      _HKI( "Visible" ),
+                                      []( INSPECTABLE* aItem ) { return false; } );
+        propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_ALIGNED ), TYPE_HASH( EDA_TEXT ),
                                       _HKI( "Text" ),
                                       []( INSPECTABLE* aItem ) { return false; } );
         propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_ALIGNED ), TYPE_HASH( EDA_TEXT ),
@@ -1950,6 +1905,9 @@ static struct ORTHOGONAL_DIMENSION_DESC
         propMgr.InheritsAfter( TYPE_HASH( PCB_DIM_ORTHOGONAL ), TYPE_HASH( PCB_DIMENSION_BASE ) );
         propMgr.InheritsAfter( TYPE_HASH( PCB_DIM_ORTHOGONAL ), TYPE_HASH( PCB_DIM_ALIGNED ) );
 
+        propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_ORTHOGONAL ), TYPE_HASH( EDA_TEXT ),
+                                      _HKI( "Visible" ),
+                                      []( INSPECTABLE* aItem ) { return false; } );
         propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_ORTHOGONAL ), TYPE_HASH( EDA_TEXT ),
                                       _HKI( "Text" ),
                                       []( INSPECTABLE* aItem ) { return false; } );
@@ -1988,6 +1946,9 @@ static struct RADIAL_DIMENSION_DESC
                 PROPERTY_DISPLAY::PT_SIZE ),
                 groupDimension );
 
+        propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_RADIAL ), TYPE_HASH( EDA_TEXT ),
+                                      _HKI( "Visible" ),
+                                      []( INSPECTABLE* aItem ) { return false; } );
         propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_RADIAL ), TYPE_HASH( EDA_TEXT ),
                                       _HKI( "Text" ),
                                       []( INSPECTABLE* aItem ) { return false; } );
@@ -2031,6 +1992,9 @@ static struct LEADER_DIMENSION_DESC
                 groupDimension );
 
         propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_LEADER ), TYPE_HASH( EDA_TEXT ),
+                                      _HKI( "Visible" ),
+                                      []( INSPECTABLE* aItem ) { return false; } );
+        propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_LEADER ), TYPE_HASH( EDA_TEXT ),
                                       _HKI( "Text" ),
                                       []( INSPECTABLE* aItem ) { return false; } );
         propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_LEADER ), TYPE_HASH( EDA_TEXT ),
@@ -2064,6 +2028,9 @@ static struct CENTER_DIMENSION_DESC
         propMgr.InheritsAfter( TYPE_HASH( PCB_DIM_CENTER ), TYPE_HASH( PCB_DIMENSION_BASE ) );
 
 
+        propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_CENTER ), TYPE_HASH( EDA_TEXT ),
+                                      _HKI( "Visible" ),
+                                      []( INSPECTABLE* aItem ) { return false; } );
         propMgr.OverrideAvailability( TYPE_HASH( PCB_DIM_CENTER ), TYPE_HASH( EDA_TEXT ),
                                       _HKI( "Text" ),
                                       []( INSPECTABLE* aItem ) { return false; } );

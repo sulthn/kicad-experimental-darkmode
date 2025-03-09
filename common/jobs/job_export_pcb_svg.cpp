@@ -30,15 +30,23 @@ NLOHMANN_JSON_SERIALIZE_ENUM( JOB_EXPORT_PCB_SVG::GEN_MODE,
 
 JOB_EXPORT_PCB_SVG::JOB_EXPORT_PCB_SVG() :
     JOB_EXPORT_PCB_PLOT( JOB_EXPORT_PCB_PLOT::PLOT_FORMAT::SVG, "svg", false ),
-    m_fitPageToBoard( false ),
+    m_pageSizeMode( 0 ),
     m_precision( 4 ),
-    m_genMode( GEN_MODE::SINGLE )   // TODO change to MULTI for V10
+    m_genMode( GEN_MODE::SINGLE )
 {
     m_plotDrawingSheet = true;
 
     m_params.emplace_back( new JOB_PARAM<wxString>( "color_theme", &m_colorTheme, m_colorTheme ) );
+    m_params.emplace_back( new JOB_PARAM<bool>( "mirror", &m_mirror, m_mirror ) );
     m_params.emplace_back(
-            new JOB_PARAM<bool>( "fit_page_to_board", &m_fitPageToBoard, m_fitPageToBoard ) );
+            new JOB_PARAM<bool>( "black_and_white", &m_blackAndWhite, m_blackAndWhite ) );
+    m_params.emplace_back( new JOB_PARAM<bool>( "negative", &m_negative, m_negative ) );
+    m_params.emplace_back( new JOB_PARAM<bool>(
+            "sketch_pads_on_fab_layers", &m_sketchPadsOnFabLayers, m_sketchPadsOnFabLayers ) );
+    m_params.emplace_back(
+            new JOB_PARAM<int>( "page_size_mode", &m_pageSizeMode, m_pageSizeMode ) );
+    m_params.emplace_back(
+            new JOB_PARAM<DRILL_MARKS>( "drill_shape", &m_drillShapeOption, m_drillShapeOption ) );
     m_params.emplace_back( new JOB_PARAM<unsigned int>( "precision", &m_precision, m_precision ) );
     m_params.emplace_back( new JOB_PARAM<GEN_MODE>( "gen_mode", &m_genMode, m_genMode ) );
 }

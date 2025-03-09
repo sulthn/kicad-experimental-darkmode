@@ -54,9 +54,6 @@ void to_json( json& j, const PACKAGE_VERSION& v )
     if( v.install_size )
         j["install_size"] = *v.install_size;
 
-    if( v.runtime )
-        j["runtime"] = *v.runtime;
-
     if( v.platforms.size() > 0 )
         nlohmann::to_json( j["platforms"], v.platforms );
 
@@ -80,7 +77,6 @@ void from_json( const json& j, PACKAGE_VERSION& v )
     to_optional( j, "download_size", v.download_size );
     to_optional( j, "install_size", v.install_size );
     to_optional( j, "kicad_version_max", v.kicad_version_max );
-    to_optional( j, "runtime", v.runtime );
 
     if( j.contains( "platforms" ) )
         j.at( "platforms" ).get_to( v.platforms );

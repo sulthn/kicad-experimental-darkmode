@@ -49,6 +49,7 @@ class GENERAL_COLLECTORS_GUIDE;
 class SELECTION;
 class PCB_MARKER;
 class BOARD_ITEM;
+class PCB_LAYER_BOX_SELECTOR;
 class NETLIST;
 class REPORTER;
 struct PARSE_ERROR;
@@ -158,12 +159,16 @@ public:
      */
     void ToPlotter( int aID );
 
+    // User interface update command event handlers.
+    void OnUpdateLayerSelectBox( wxUpdateUIEvent& aEvent );
+
     bool LayerManagerShown();
     bool PropertiesShown();
     bool NetInspectorShown();
 
     void OnUpdateSelectViaSize( wxUpdateUIEvent& aEvent );
     void OnUpdateSelectTrackWidth( wxUpdateUIEvent& aEvent );
+    void OnUpdateSelectAutoWidth( wxUpdateUIEvent& aEvent );
 
     void RunEeschema();
 
@@ -246,7 +251,11 @@ public:
     void Process_Special_Functions( wxCommandEvent& event );
     void Tracks_and_Vias_Size_Event( wxCommandEvent& event );
 
-
+    void ReCreateHToolbar() override;
+    void ReCreateAuxiliaryToolbar() override;
+    void ReCreateVToolbar() override;
+    void ReCreateOptToolbar() override;
+    void UpdateToolbarControlSizes() override;
 
     /**
      * Recreate the layer box by clearing the old list and building a new one from the new
@@ -270,17 +279,7 @@ public:
     /**
      * Change the currently active layer to \a aLayer and also update the #APPEARANCE_CONTROLS.
      */
-    void SetActiveLayer( PCB_LAYER_ID aLayer ) override
-    {
-        SetActiveLayer( aLayer, false );
-    }
-
-    /**
-     * @param aLayer is the layer to set active
-     * @param aForceRedraw will repaint things that depend on layer switch even if the new active
-     *                     layer is the same as the previous one
-     */
-    void SetActiveLayer( PCB_LAYER_ID aLayer, bool aForceRedraw );
+    void SetActiveLayer( PCB_LAYER_ID aLayer ) override;
 
     void OnDisplayOptionsChanged() override;
 
@@ -314,9 +313,6 @@ public:
     void ToggleNetInspector();
 
     void ToggleSearch();
-
-    bool IsSearchPaneShown() { return m_auimgr.GetPane( SearchPaneName() ).IsShown(); }
-    void FocusSearch();
 
     /**
      * Create an ASCII footprint position file.
@@ -761,8 +757,6 @@ protected:
 
     void doReCreateMenuBar() override;
 
-    void configureToolbars() override;
-
     // The Tool Framework initialization
     void setupTools();
     void setupUIConditions() override;
@@ -780,9 +774,9 @@ protected:
     void buildActionPluginMenus( ACTION_MENU* aActionMenu );
 
     /**
-     * Append action plugin buttons to given toolbar
+     * Append action plugin buttons to main toolbar
      */
-    void addActionPluginTools( ACTION_TOOLBAR* aToolbar );
+    void AddActionPluginTools();
 
     /**
      * Execute action plugin's Run() method and updates undo buffer.
@@ -850,6 +844,8 @@ protected:
 #endif
 
 public:
+    PCB_LAYER_BOX_SELECTOR* m_SelLayerBox; // a combo box to display and select active layer
+
     wxChoice* m_SelTrackWidthBox;        // a choice box to display and select current track width
     wxChoice* m_SelViaSizeBox;           // a choice box to display and select current via diameter
 

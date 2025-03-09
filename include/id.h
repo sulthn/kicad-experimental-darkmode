@@ -93,6 +93,12 @@ enum main_id
     ID_GEN_PLOT_DXF,
     ID_GEN_PLOT_PDF,
 
+    // id for toolbars
+    ID_H_TOOLBAR,
+    ID_V_TOOLBAR,
+    ID_OPT_TOOLBAR,
+    ID_AUX_TOOLBAR,
+
     ID_LANGUAGE_CHOICE,
     ID_LANGUAGE_DANISH,
     ID_LANGUAGE_DEFAULT,

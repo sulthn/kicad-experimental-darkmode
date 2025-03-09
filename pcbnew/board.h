@@ -40,7 +40,6 @@
 #include <title_block.h>
 #include <tools/pcb_selection.h>
 #include <shared_mutex>
-#include <project.h>
 #include <list>
 
 class BOARD_DESIGN_SETTINGS;
@@ -292,7 +291,7 @@ enum class BOARD_USE
 /**
  * Information pertinent to a Pcbnew printed circuit board.
  */
-class BOARD : public BOARD_ITEM_CONTAINER, public EMBEDDED_FILES, public PROJECT::_ELEM
+class BOARD : public BOARD_ITEM_CONTAINER, public EMBEDDED_FILES
 {
 public:
     static inline bool ClassOf( const EDA_ITEM* aItem )
@@ -426,12 +425,6 @@ public:
                                                               PCB_TRACE_T, PCB_SHAPE_T } );
 
     /**
-     * Remove all teardrop zones with the STRUCT_DELETED flag set.  This avoids O(n^2) traversal
-     * over the zone list.
-     */
-    void BulkRemoveStaleTeardrops( BOARD_COMMIT& aCommit );
-
-    /**
      * Must be used if Add() is used using a BULK_x ADD_MODE to generate a change event for
      * listeners.
      */
@@ -469,11 +462,6 @@ public:
      * Remove all footprints from the deque and free the memory associated with them.
      */
     void DeleteAllFootprints();
-
-    /**
-     * Remove all footprints without deleting.  Footprint lifecycle MUST be managed elsewhere.
-     */
-    void DetachAllFootprints();
 
     /**
      * @return null if aID is null. Returns an object of Type() == NOT_USED if the aID is not found.
@@ -1301,8 +1289,6 @@ public:
      * Gets the component class manager
      */
     COMPONENT_CLASS_MANAGER& GetComponentClassManager() { return m_componentClassManager; }
-
-    PROJECT::ELEM ProjectElementType() override { return PROJECT::ELEM::BOARD; }
 
     // --------- Item order comparators ---------
 

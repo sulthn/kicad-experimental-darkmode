@@ -103,7 +103,7 @@ public:
 class KICOMMON_API JOB_EXPORT_SCH_PLOT_PDF : public JOB_EXPORT_SCH_PLOT
 {
 public:
-    JOB_EXPORT_SCH_PLOT_PDF( bool aOutputIsDirectory = true );
+    JOB_EXPORT_SCH_PLOT_PDF();
     wxString GetDefaultDescription() const override;
     wxString GetSettingsDialogTitle() const override;
 };

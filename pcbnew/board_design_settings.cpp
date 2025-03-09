@@ -222,16 +222,6 @@ BOARD_DESIGN_SETTINGS::BOARD_DESIGN_SETTINGS( JSON_SETTINGS* aParent, const std:
     m_TentViasFront = true;
     m_TentViasBack = true;
 
-    m_CoverViasFront = false;
-    m_CoverViasBack = false;
-
-    m_PlugViasFront = false;
-    m_PlugViasBack = false;
-
-    m_CapVias = false;
-
-    m_FillVias = false;
-
     // Layer thickness for 3D viewer
     m_boardThickness = pcbIUScale.mmToIU( DEFAULT_BOARD_THICKNESS_MM );
 
@@ -813,7 +803,7 @@ BOARD_DESIGN_SETTINGS::BOARD_DESIGN_SETTINGS( JSON_SETTINGS* aParent, const std:
             &m_TextUpright[LAYER_CLASS_OTHERS], true ) );
 
     m_params.emplace_back( new PARAM_ENUM<DIM_UNITS_MODE>( "defaults.dimension_units",
-            &m_DimensionUnitsMode, DIM_UNITS_MODE::AUTOMATIC, DIM_UNITS_MODE::INCH,
+            &m_DimensionUnitsMode, DIM_UNITS_MODE::AUTOMATIC, DIM_UNITS_MODE::INCHES,
             DIM_UNITS_MODE::AUTOMATIC ) );
 
     m_params.emplace_back( new PARAM_ENUM<DIM_PRECISION>( "defaults.dimension_precision",
@@ -1484,13 +1474,8 @@ void BOARD_DESIGN_SETTINGS::SetEnabledLayers( LSET aMask )
     m_enabledLayers = aMask;
 
     // update layer counts to ensure their consistency with m_EnabledLayers
-    LSET copperLayers = aMask;
-    copperLayers.ClearNonCopperLayers();
-
-    LSET userLayers = aMask & LSET::UserDefinedLayersMask();
-
-    m_copperLayerCount      = (int) copperLayers.count();
-    m_userDefinedLayerCount = (int) userLayers.count();
+    m_copperLayerCount      = (int) aMask.ClearNonCopperLayers().count();
+    m_userDefinedLayerCount = (int) ( aMask & LSET::UserDefinedLayersMask() ).count();
 }
 
 

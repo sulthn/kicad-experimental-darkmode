@@ -24,7 +24,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
-#include "kicad_manager_frame.h"
 #include <eda_base_frame.h>
 
 #include <advanced_config.h>
@@ -57,7 +56,6 @@
 #include <tool/common_control.h>
 #include <tool/tool_manager.h>
 #include <tool/tool_dispatcher.h>
-#include <tool/ui/toolbar_configuration.h>
 #include <trace_helpers.h>
 #include <widgets/paged_dialog.h>
 #include <widgets/wx_busy_indicator.h>
@@ -71,7 +69,6 @@
 #include <wx/stdpaths.h>
 #include <wx/string.h>
 #include <wx/msgdlg.h>
-#include <wx/wupdlock.h>
 #include <kiplatform/app.h>
 #include <kiplatform/io.h>
 #include <kiplatform/ui.h>
@@ -176,13 +173,8 @@ EDA_BASE_FRAME::EDA_BASE_FRAME( wxWindow* aParent, FRAME_T aFrameType, const wxS
         wxFrame( aParent, wxID_ANY, aTitle, aPos, aSize, aStyle, aFrameName ),
         TOOLS_HOLDER(),
         KIWAY_HOLDER( aKiway, KIWAY_HOLDER::FRAME ),
-        UNITS_PROVIDER( aIuScale, EDA_UNITS::MM )
+        UNITS_PROVIDER( aIuScale, EDA_UNITS::MILLIMETRES )
 {
-    m_tbTopMain      = nullptr;
-    m_tbTopAux = nullptr;
-    m_tbRight      = nullptr;
-    m_tbLeft   = nullptr;
-
     commonInit( aFrameType );
 }
 
@@ -493,135 +485,6 @@ void EDA_BASE_FRAME::setupUIConditions()
 }
 
 
-void EDA_BASE_FRAME::RegisterCustomToolbarControlFactory( const ACTION_TOOLBAR_CONTROL& aControlDesc,
-                                                          const ACTION_TOOLBAR_CONTROL_FACTORY& aControlFactory )
-{
-    m_toolbarControlFactories.emplace( aControlDesc.GetName(), aControlFactory );
-}
-
-
-ACTION_TOOLBAR_CONTROL_FACTORY* EDA_BASE_FRAME::GetCustomToolbarControlFactory( const std::string& aName )
-{
-    for( auto& control : m_toolbarControlFactories )
-    {
-        if( control.first == aName )
-            return &control.second;
-    }
-
-    return nullptr;
-}
-
-
-void EDA_BASE_FRAME::configureToolbars()
-{
-}
-
-
-void EDA_BASE_FRAME::RecreateToolbars()
-{
-    wxWindowUpdateLocker dummy( this );
-
-    wxASSERT( m_toolbarSettings );
-
-    std::optional<TOOLBAR_CONFIGURATION> tbConfig;
-
-    // Drawing tools (typically on right edge of window)
-    tbConfig = m_toolbarSettings->GetToolbarConfig( TOOLBAR_LOC::RIGHT, config()->m_CustomToolbars );
-
-    if( tbConfig.has_value() )
-    {
-        if( !m_tbRight )
-        {
-            m_tbRight = new ACTION_TOOLBAR( this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                                                KICAD_AUI_TB_STYLE | wxAUI_TB_VERTICAL );
-            m_tbRight->SetAuiManager( &m_auimgr );
-        }
-
-        m_tbRight->ApplyConfiguration( tbConfig.value() );
-    }
-
-    // Options (typically on left edge of window)
-    tbConfig = m_toolbarSettings->GetToolbarConfig( TOOLBAR_LOC::LEFT, config()->m_CustomToolbars );
-
-    if( tbConfig.has_value() )
-    {
-        if( !m_tbLeft )
-        {
-            m_tbLeft = new ACTION_TOOLBAR( this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                                                   KICAD_AUI_TB_STYLE | wxAUI_TB_VERTICAL );
-            m_tbLeft->SetAuiManager( &m_auimgr );
-        }
-
-        m_tbLeft->ApplyConfiguration( tbConfig.value() );
-    }
-
-    // Top main toolbar (the top one)
-    tbConfig = m_toolbarSettings->GetToolbarConfig( TOOLBAR_LOC::TOP_MAIN, config()->m_CustomToolbars );
-
-    if( tbConfig.has_value() )
-    {
-        if( !m_tbTopMain )
-        {
-            m_tbTopMain = new ACTION_TOOLBAR( this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                                                KICAD_AUI_TB_STYLE | wxAUI_TB_HORZ_LAYOUT | wxAUI_TB_HORIZONTAL );
-            m_tbTopMain->SetAuiManager( &m_auimgr );
-        }
-
-        m_tbTopMain->ApplyConfiguration( tbConfig.value() );
-    }
-
-    // Top aux toolbar (the bottom one)
-    tbConfig = m_toolbarSettings->GetToolbarConfig( TOOLBAR_LOC::TOP_AUX, config()->m_CustomToolbars );
-
-    if( tbConfig.has_value() )
-    {
-        if( !m_tbTopAux )
-        {
-            m_tbTopAux = new ACTION_TOOLBAR( this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                                                     KICAD_AUI_TB_STYLE | wxAUI_TB_HORZ_LAYOUT | wxAUI_TB_HORIZONTAL );
-            m_tbTopAux->SetAuiManager( &m_auimgr );
-        }
-
-        m_tbTopAux->ApplyConfiguration( tbConfig.value() );
-    }
-}
-
-
-void EDA_BASE_FRAME::UpdateToolbarControlSizes()
-{
-    if( m_tbTopMain )
-        m_tbTopMain->UpdateControlWidths();
-
-    if( m_tbRight )
-        m_tbRight->UpdateControlWidths();
-
-    if( m_tbLeft )
-        m_tbLeft->UpdateControlWidths();
-
-    if( m_tbTopAux )
-        m_tbTopAux->UpdateControlWidths();
-
-}
-
-
-void EDA_BASE_FRAME::OnToolbarSizeChanged()
-{
-    if( m_tbTopMain )
-        m_auimgr.GetPane( m_tbTopMain ).MaxSize( m_tbTopMain->GetSize() );
-
-    if( m_tbRight )
-        m_auimgr.GetPane( m_tbRight ).MaxSize( m_tbRight->GetSize() );
-
-    if( m_tbLeft )
-        m_auimgr.GetPane( m_tbLeft ).MaxSize( m_tbLeft->GetSize() );
-
-    if( m_tbTopAux )
-        m_auimgr.GetPane( m_tbTopAux ).MaxSize( m_tbTopAux->GetSize() );
-
-    m_auimgr.Update();
-}
-
-
 void EDA_BASE_FRAME::ReCreateMenuBar()
 {
     /**
@@ -722,9 +585,6 @@ void EDA_BASE_FRAME::CommonSettingsChanged( int aFlags )
         ReCreateMenuBar();
         GetMenuBar()->Refresh();
     }
-
-    // Update the toolbars
-    RecreateToolbars();
 }
 
 
@@ -1228,15 +1088,7 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
         KIFACE*                 kiface = nullptr;
         std::vector<int>        expand;
 
-        wxWindow* kicadMgr_window = wxWindow::FindWindowByName( KICAD_MANAGER_FRAME_NAME );
-
-        if( KICAD_MANAGER_FRAME* kicadMgr = static_cast<KICAD_MANAGER_FRAME*>( kicadMgr_window ) )
-        {
-            ACTION_MANAGER* actionMgr = kicadMgr->GetToolManager()->GetActionManager();
-
-            for( const auto& [name, action] : actionMgr->GetActions() )
-                hotkeysPanel->ActionsList().push_back( action );
-        }
+        Kiway().GetActions( hotkeysPanel->ActionsList() );
 
         book->AddLazyPage(
                 []( wxWindow* aParent ) -> wxWindow*
@@ -1298,9 +1150,6 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
             book->AddLazySubPage( LAZY_CTOR( PANEL_SYM_EDIT_OPTIONS ), _( "Editing Options" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_SYM_COLORS ), _( "Colors" ) );
 
-            if( ADVANCED_CFG::GetCfg().m_ConfigurableToolbars )
-                book->AddLazySubPage( LAZY_CTOR( PANEL_SYM_TOOLBARS ), _( "Toolbars" ) );
-
             if( GetFrameType() == FRAME_SCH )
                 expand.push_back( (int) book->GetPageCount() );
 
@@ -1310,10 +1159,6 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
             book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_EDIT_OPTIONS ), _( "Editing Options" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_ANNO_OPTIONS ), _( "Annotation Options" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_COLORS ), _( "Colors" ) );
-
-            if( ADVANCED_CFG::GetCfg().m_ConfigurableToolbars )
-                book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_TOOLBARS ), _( "Toolbars" ) );
-
             book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_FIELD_NAME_TEMPLATES ),
                                   _( "Field Name Templates" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_SCH_SIMULATOR ), _( "Simulator" ) );
@@ -1340,10 +1185,6 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
             book->AddLazySubPage( LAZY_CTOR( PANEL_FP_ORIGINS_AXES ), _( "Origins & Axes" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_FP_EDIT_OPTIONS ), _( "Editing Options" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_FP_COLORS ), _( "Colors" ) );
-
-            if( ADVANCED_CFG::GetCfg().m_ConfigurableToolbars )
-                book->AddLazySubPage( LAZY_CTOR( PANEL_FP_TOOLBARS ), _( "Toolbars" ) );
-
             book->AddLazySubPage( LAZY_CTOR( PANEL_FP_DEFAULT_FIELDS ), _( "Footprint Defaults" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_FP_DEFAULT_GRAPHICS_VALUES ),
                                   _( "Graphics Defaults" ) );
@@ -1357,10 +1198,6 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
             book->AddLazySubPage( LAZY_CTOR( PANEL_PCB_ORIGINS_AXES ), _( "Origins & Axes" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_PCB_EDIT_OPTIONS ), _( "Editing Options" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_PCB_COLORS ), _( "Colors" ) );
-
-            if( ADVANCED_CFG::GetCfg().m_ConfigurableToolbars )
-                book->AddLazySubPage( LAZY_CTOR( PANEL_PCB_TOOLBARS ), _( "Toolbars" ) );
-
             book->AddLazySubPage( LAZY_CTOR( PANEL_PCB_ACTION_PLUGINS ), _( "Plugins" ) );
 
             if( GetFrameType() == FRAME_PCB_DISPLAY3D )
@@ -1368,10 +1205,6 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
 
             book->AddPage( new wxPanel( book ), _( "3D Viewer" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_3DV_DISPLAY_OPTIONS ), _( "General" ) );
-
-            if( ADVANCED_CFG::GetCfg().m_ConfigurableToolbars )
-                book->AddLazySubPage( LAZY_CTOR( PANEL_3DV_TOOLBARS ), _( "Toolbars" ) );
-
             book->AddLazySubPage( LAZY_CTOR( PANEL_3DV_OPENGL ), _( "Realtime Renderer" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_3DV_RAYTRACING ), _( "Raytracing Renderer" ) );
         }
@@ -1394,10 +1227,6 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
             book->AddPage( new wxPanel( book ), _( "Gerber Viewer" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_GBR_DISPLAY_OPTIONS ), _( "Display Options" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_GBR_COLORS ), _( "Colors" ) );
-
-            if( ADVANCED_CFG::GetCfg().m_ConfigurableToolbars )
-                book->AddLazySubPage( LAZY_CTOR( PANEL_GBR_TOOLBARS ), _( "Toolbars" ) );
-
             book->AddLazySubPage( LAZY_CTOR( PANEL_GBR_GRIDS ), _( "Grids" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_GBR_EXCELLON_OPTIONS ),
                                   _( "Excellon Options" ) );
@@ -1422,9 +1251,6 @@ void EDA_BASE_FRAME::ShowPreferences( wxString aStartPage, wxString aStartParent
             book->AddLazySubPage( LAZY_CTOR( PANEL_DS_DISPLAY_OPTIONS ), _( "Display Options" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_DS_GRIDS ), _( "Grids" ) );
             book->AddLazySubPage( LAZY_CTOR( PANEL_DS_COLORS ), _( "Colors" ) );
-
-            if( ADVANCED_CFG::GetCfg().m_ConfigurableToolbars )
-                book->AddLazySubPage( LAZY_CTOR( PANEL_DS_TOOLBARS ), _( "Toolbars" ) );
 
             book->AddLazyPage(
                     []( wxWindow* aParent ) -> wxWindow*

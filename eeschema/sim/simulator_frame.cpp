@@ -57,8 +57,6 @@
 #include <sim/simulator_reporter.h>
 #include <eeschema_settings.h>
 #include <advanced_config.h>
-#include <sim/toolbars_simulator_frame.h>
-#include <settings/settings_manager.h>
 
 #include <memory>
 
@@ -136,10 +134,10 @@ SIMULATOR_FRAME::SIMULATOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     m_infoBar = new WX_INFOBAR( this );
     mainSizer->Add( m_infoBar, 0, wxEXPAND, 0 );
 
-    m_tbTopMain = new ACTION_TOOLBAR( this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                                        wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_HORZ_LAYOUT|wxAUI_TB_PLAIN_BACKGROUND );
-    m_tbTopMain->Realize();
-    mainSizer->Add( m_tbTopMain, 0, wxEXPAND, 5 );
+    m_toolBar = new ACTION_TOOLBAR( this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                                    wxAUI_TB_DEFAULT_STYLE|wxAUI_TB_HORZ_LAYOUT|wxAUI_TB_PLAIN_BACKGROUND );
+   	m_toolBar->Realize();
+    mainSizer->Add( m_toolBar, 0, wxEXPAND, 5 );
 
     m_ui = new SIMULATOR_FRAME_UI( this, m_schematicFrame );
     mainSizer->Add( m_ui, 1, wxEXPAND, 5 );
@@ -166,13 +164,7 @@ SIMULATOR_FRAME::SIMULATOR_FRAME( KIWAY* aKiway, wxWindow* aParent ) :
     setupTools();
     setupUIConditions();
 
-    // Set the tool manager for the toolbar here, since the tool manager didn't exist when the toolbar
-    // was created.
-    m_tbTopMain->SetToolManager( m_toolManager );
-
-    m_toolbarSettings = Pgm().GetSettingsManager().GetToolbarSettings<SIMULATOR_TOOLBAR_SETTINGS>( "sim-toolbars" );
-    configureToolbars();
-    RecreateToolbars();
+    ReCreateHToolbar();
     ReCreateMenuBar();
 
     Bind( wxEVT_COMMAND_MENU_SELECTED, wxCommandEventHandler( SIMULATOR_FRAME::onExit ), this,
@@ -588,18 +580,6 @@ bool SIMULATOR_FRAME::SaveWorkbook( const wxString& aPath )
 }
 
 
-void SIMULATOR_FRAME::ToggleConsole()
-{
-    m_ui->ToggleConsole();
-}
-
-
-void SIMULATOR_FRAME::ToggleSimulationSidePanel()
-{
-    m_ui->ToggleSimulationSidePanel();
-}
-
-
 void SIMULATOR_FRAME::ToggleDarkModePlots()
 {
     m_ui->ToggleDarkModePlots();
@@ -748,32 +728,10 @@ void SIMULATOR_FRAME::setupUIConditions()
             };
 
     auto haveZoomRedo =
-            [this]( const SELECTION& aSel )
+    [this]( const SELECTION& aSel )
             {
                 SIM_PLOT_TAB* plotTab = dynamic_cast<SIM_PLOT_TAB*>( GetCurrentSimTab() );
                 return plotTab && plotTab->GetPlotWin()->RedoZoomStackSize() > 0;
-            };
-
-    auto isConsoleShown =
-            [this]( const SELECTION& aSel )
-            {
-                bool aBool = false;
-
-                if( m_simulator )
-                    return m_ui->IsConsoleShown();
-
-                return aBool;
-            };
-
-    auto isSidePanelShown =
-            [this]( const SELECTION& aSel )
-            {
-                bool aBool = false;
-
-                if( m_simulator )
-                    return m_ui->IsSidePanelShown();
-
-                return aBool;
             };
 
 #define ENABLE( x ) ACTION_CONDITIONS().Enable( x )
@@ -787,9 +745,6 @@ void SIMULATOR_FRAME::setupUIConditions()
     mgr->SetConditions( EE_ACTIONS::exportPlotAsCSV,       ENABLE( havePlot ) );
     mgr->SetConditions( EE_ACTIONS::exportPlotToClipboard, ENABLE( havePlot ) );
     mgr->SetConditions( EE_ACTIONS::exportPlotToSchematic, ENABLE( havePlot ) );
-
-    mgr->SetConditions( ACTIONS::toggleSimulationSidePanel,   CHECK( isSidePanelShown ) );
-    mgr->SetConditions( ACTIONS::toggleConsole,   CHECK( isConsoleShown ) );
 
     mgr->SetConditions( ACTIONS::zoomUndo,                 ENABLE( haveZoomUndo ) );
     mgr->SetConditions( ACTIONS::zoomRedo,                 ENABLE( haveZoomRedo ) );

@@ -36,13 +36,13 @@
 #include <zone.h>
 #include <footprint.h>
 #include <string_utils.h>
+#include <math_for_graphics.h>
 #include <properties/property_validators.h>
 #include <settings/color_settings.h>
 #include <settings/settings_manager.h>
 #include <trigo.h>
 #include <i18n_utility.h>
 #include <mutex>
-#include <magic_enum.hpp>
 
 #include <google/protobuf/any.pb.h>
 #include <api/api_enums.h>
@@ -85,8 +85,7 @@ ZONE::ZONE( BOARD_ITEM_CONTAINER* aParent ) :
         SetIsRuleArea( true );        // Zones living in footprints have the rule area option
 
     if( aParent->GetBoard() )
-        aParent->GetBoard()->GetDesignSettings().GetDefaultZoneSettings().ExportSetting( *this,
-                                                                                         false );
+        aParent->GetBoard()->GetDesignSettings().GetDefaultZoneSettings().ExportSetting( *this );
     else
         ZONE_SETTINGS().ExportSetting( *this );
 
@@ -193,11 +192,6 @@ void ZONE::InitDataFromSrcInCopyCtor( const ZONE& aZone )
                 m_insulatedIslands[layer] = aZone.m_insulatedIslands.at( layer );
             } );
 
-    m_layerProperties.clear();
-
-    std::ranges::copy( aZone.LayerProperties(),
-                       std::inserter( m_layerProperties, std::end( m_layerProperties ) ) );
-
     m_borderStyle             = aZone.m_borderStyle;
     m_borderHatchPitch        = aZone.m_borderHatchPitch;
     m_borderHatchLines        = aZone.m_borderHatchLines;
@@ -220,7 +214,6 @@ void ZONE::Serialize( google::protobuf::Any& aContainer ) const
 {
     using namespace kiapi::board;
     types::Zone zone;
-    using kiapi::common::PackVector2;
 
     zone.mutable_id()->set_value( m_Uuid.AsStdString() );
     PackLayerSet( *zone.mutable_layers(), GetLayerSet() );
@@ -300,18 +293,6 @@ void ZONE::Serialize( google::protobuf::Any& aContainer ) const
         kiapi::common::PackPolySet( *filledLayer->mutable_shapes(), *shape );
     }
 
-    for( const auto& [layer, properties] : m_layerProperties )
-    {
-        types::ZoneLayerProperties* layerProperties = zone.add_layer_properties();
-        layerProperties->set_layer( ToProtoEnum<PCB_LAYER_ID, types::BoardLayer>( layer ) );
-
-        if( properties.hatching_offset.has_value() )
-        {
-            PackVector2( *layerProperties->mutable_hatching_offset(),
-                         properties.hatching_offset.value() );
-        }
-    }
-
     zone.mutable_border()->set_style(
             ToProtoEnum<ZONE_BORDER_DISPLAY_STYLE, types::ZoneBorderStyle>( m_borderStyle ) );
     zone.mutable_border()->mutable_pitch()->set_value_nm( m_borderHatchPitch );
@@ -324,7 +305,6 @@ bool ZONE::Deserialize( const google::protobuf::Any& aContainer )
 {
     using namespace kiapi::board;
     types::Zone zone;
-    using kiapi::common::UnpackVector2;
 
     if( !aContainer.UnpackTo( &zone ) )
         return false;
@@ -387,20 +367,6 @@ bool ZONE::Deserialize( const google::protobuf::Any& aContainer )
 
         SetNetCode( cu.net().code().value() );
         m_teardropType = FromProtoEnum<TEARDROP_TYPE>( cu.teardrop().type() );
-
-        for( const auto& properties : zone.layer_properties() )
-        {
-            PCB_LAYER_ID layer = FromProtoEnum<PCB_LAYER_ID>( properties.layer() );
-
-            ZONE_LAYER_PROPERTIES layerProperties;
-
-            if( properties.has_hatching_offset() )
-            {
-                layerProperties.hatching_offset = UnpackVector2( properties.hatching_offset() );
-            }
-
-            m_layerProperties[layer] = layerProperties;
-        }
     }
 
     m_borderStyle = FromProtoEnum<ZONE_BORDER_DISPLAY_STYLE>( zone.border().style() );
@@ -545,46 +511,9 @@ void ZONE::SetLayerSet( const LSET& aLayerSet )
                     m_filledPolysHash[layer]  = {};
                     m_insulatedIslands[layer] = {};
                 } );
-
-        std::erase_if( m_layerProperties,
-                       [&]( const auto& item )
-                       {
-                           return !aLayerSet.Contains( item.first );
-                       } );
     }
 
     m_layerSet = aLayerSet;
-}
-
-
-const ZONE_LAYER_PROPERTIES& ZONE::LayerProperties( PCB_LAYER_ID aLayer ) const
-{
-    wxCHECK_MSG( m_layerProperties.contains( aLayer ), m_layerProperties.at( GetFirstLayer() ),
-                 "Attempt to retrieve properties for layer "
-                         + std::string( magic_enum::enum_name( aLayer ) )
-                         + " from a "
-                           "zone that does not contain it" );
-    return m_layerProperties.at( aLayer );
-}
-
-
-void ZONE::SetLayerProperties( const std::map<PCB_LAYER_ID, ZONE_LAYER_PROPERTIES>& aOther )
-{
-    m_layerProperties.clear();
-
-    std::ranges::copy( aOther, std::inserter( m_layerProperties, std::end( m_layerProperties ) ) );
-}
-
-
-const std::optional<VECTOR2I>& ZONE::HatchingOffset( PCB_LAYER_ID aLayer ) const
-{
-    wxCHECK_MSG( m_layerProperties.contains( aLayer ),
-                 m_layerProperties.at( GetFirstLayer() ).hatching_offset,
-                 "Attempt to retrieve properties for layer "
-                         + std::string( magic_enum::enum_name( aLayer ) )
-                         + " from a "
-                           "zone that does not contain it" );
-    return m_layerProperties.at( aLayer ).hatching_offset;
 }
 
 
@@ -1035,23 +964,7 @@ void ZONE::Flip( const VECTOR2I& aCentre, FLIP_DIRECTION aFlipDirection )
         fillsCopy[oldLayer] = *shapePtr;
     }
 
-    std::map<PCB_LAYER_ID, ZONE_LAYER_PROPERTIES> layerPropertiesCopy;
-
-    std::ranges::copy( m_layerProperties,
-                       std::inserter( layerPropertiesCopy, std::end( layerPropertiesCopy ) ) );
-
-    LSET flipped;
-
-    for( PCB_LAYER_ID layer : GetLayerSet() )
-        flipped.set( GetBoard()->FlipLayer( layer ) );
-
-    SetLayerSet( flipped );
-
-    for( auto& [oldLayer, properties] : layerPropertiesCopy )
-    {
-        PCB_LAYER_ID newLayer = GetBoard()->FlipLayer( oldLayer );
-        m_layerProperties[newLayer] = properties;
-    }
+    SetLayerSet( GetLayerSet().Flip( GetBoard()->GetCopperLayerCount() ) );
 
     for( auto& [oldLayer, shape] : fillsCopy )
     {
@@ -1221,6 +1134,14 @@ void ZONE::UnHatchBorder()
 }
 
 
+// Creates hatch lines inside the outline of the complex polygon
+// sort function used in ::HatchBorder to sort points by descending VECTOR2I.x values
+bool sortEndsByDescendingX( const VECTOR2I& ref, const VECTOR2I& tst )
+{
+    return tst.x < ref.x;
+}
+
+
 void ZONE::HatchBorder()
 {
     UnHatchBorder();
@@ -1230,6 +1151,27 @@ void ZONE::HatchBorder()
             || m_Poly->IsEmpty() )
     {
         return;
+    }
+
+    // define range for hatch lines
+    int min_x = m_Poly->CVertex( 0 ).x;
+    int max_x = m_Poly->CVertex( 0 ).x;
+    int min_y = m_Poly->CVertex( 0 ).y;
+    int max_y = m_Poly->CVertex( 0 ).y;
+
+    for( auto iterator = m_Poly->IterateWithHoles(); iterator; iterator++ )
+    {
+        if( iterator->x < min_x )
+            min_x = iterator->x;
+
+        if( iterator->x > max_x )
+            max_x = iterator->x;
+
+        if( iterator->y < min_y )
+            min_y = iterator->y;
+
+        if( iterator->y > max_y )
+            max_y = iterator->y;
     }
 
     // Calculate spacing between 2 hatch lines
@@ -1244,17 +1186,100 @@ void ZONE::HatchBorder()
     int  hatch_line_len = m_borderHatchPitch;
 
     // To have a better look, give a slope depending on the layer
-    int                 layer = GetFirstLayer();
-    std::vector<double> slopes;
+    int              layer = GetFirstLayer();
+    std::vector<int> slope_flags;
 
     if( IsTeardropArea() )
-        slopes = { 0.7, -0.7 };
+        slope_flags = { 1, -1 };
     else if( layer & 1 )
-        slopes = { 1 };
+        slope_flags = { 1 };
     else
-        slopes = { -1 };
+        slope_flags = { -1 };
 
-    m_borderHatchLines = m_Poly->GenerateHatchLines( slopes, spacing, hatch_line_len );
+    for( int slope_flag : slope_flags )
+    {
+        double  slope = 0.707106 * slope_flag;      // 45 degrees slope
+        int64_t max_a, min_a;
+
+        if( slope_flag == 1 )
+        {
+            max_a = KiROUND<double, int64_t>( max_y - slope * min_x );
+            min_a = KiROUND<double, int64_t>( min_y - slope * max_x );
+        }
+        else
+        {
+            max_a = KiROUND<double, int64_t>( max_y - slope * max_x );
+            min_a = KiROUND<double, int64_t>( min_y - slope * min_x );
+        }
+
+        min_a = (min_a / spacing) * spacing;
+
+        // calculate an offset depending on layer number,
+        // for a better look of hatches on a multilayer board
+        int offset = (layer * 7) / 8;
+        min_a += offset;
+
+        // loop through hatch lines
+        std::vector<VECTOR2I> pointbuffer;
+        pointbuffer.reserve( 256 );
+
+        for( int64_t a = min_a; a < max_a; a += spacing )
+        {
+            pointbuffer.clear();
+
+            // Iterate through all vertices
+            for( auto iterator = m_Poly->IterateSegmentsWithHoles(); iterator; iterator++ )
+            {
+                const SEG seg = *iterator;
+                double    x, y;
+
+                if( FindLineSegmentIntersection( a, slope, seg.A.x, seg.A.y, seg.B.x, seg.B.y, x, y ) )
+                    pointbuffer.emplace_back( KiROUND( x ), KiROUND( y ) );
+            }
+
+            // sort points in order of descending x (if more than 2) to
+            // ensure the starting point and the ending point of the same segment
+            // are stored one just after the other.
+            if( pointbuffer.size() > 2 )
+                sort( pointbuffer.begin(), pointbuffer.end(), sortEndsByDescendingX );
+
+            // creates lines or short segments inside the complex polygon
+            for( size_t ip = 0; ip + 1 < pointbuffer.size(); ip += 2 )
+            {
+                int dx = pointbuffer[ip + 1].x - pointbuffer[ip].x;
+
+                // Push only one line for diagonal hatch,
+                // or for small lines < twice the line length
+                // else push 2 small lines
+                if( m_borderStyle == ZONE_BORDER_DISPLAY_STYLE::DIAGONAL_FULL
+                    || std::abs( dx ) < 2 * hatch_line_len )
+                {
+                    m_borderHatchLines.emplace_back( SEG( pointbuffer[ip], pointbuffer[ ip + 1] ) );
+                }
+                else
+                {
+                    double dy = pointbuffer[ip + 1].y - pointbuffer[ip].y;
+                    slope = dy / dx;
+
+                    if( dx > 0 )
+                        dx = hatch_line_len;
+                    else
+                        dx = -hatch_line_len;
+
+                    int x1 = KiROUND( pointbuffer[ip].x + dx );
+                    int x2 = KiROUND( pointbuffer[ip + 1].x - dx );
+                    int y1 = KiROUND( pointbuffer[ip].y + dx * slope );
+                    int y2 = KiROUND( pointbuffer[ip + 1].y - dx * slope );
+
+                    m_borderHatchLines.emplace_back( SEG( pointbuffer[ip].x, pointbuffer[ip].y,
+                                                          x1, y1 ) );
+
+                    m_borderHatchLines.emplace_back( SEG( pointbuffer[ip+1].x, pointbuffer[ip+1].y,
+                                                          x2, y2 ) );
+                }
+            }
+        }
+    }
 }
 
 
@@ -1975,7 +2000,7 @@ static struct ZONE_DESC
                     groupFill )
                 .SetAvailableFunc( isCopperZone );
 
-        propMgr.AddProperty( new PROPERTY<ZONE, EDA_ANGLE>( _HKI( "Hatch Orientation" ),
+        propMgr.AddProperty( new PROPERTY<ZONE, EDA_ANGLE>( _HKI( "Orientation" ),
                     &ZONE::SetHatchOrientation, &ZONE::GetHatchOrientation,
                     PROPERTY_DISPLAY::PT_DEGREE ),
                     groupFill )

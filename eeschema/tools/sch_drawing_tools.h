@@ -65,7 +65,6 @@ public:
     int ImportGraphics( const TOOL_EVENT& aEvent );
     int SyncSheetsPins( const TOOL_EVENT& aEvent );
     int SyncAllSheetsPins( const TOOL_EVENT& aEvent );
-    int AutoPlaceAllSheetPins( const TOOL_EVENT& aEvent );
 
 private:
     SCH_LINE* findWire( const VECTOR2I& aPosition );
@@ -73,10 +72,7 @@ private:
     ///< Gets the (global) label name driving this wire, if it is driven by a label
     wxString findWireLabelDriverName( SCH_LINE* aWire );
 
-    SCH_TEXT* createNewText( const VECTOR2I& aPosition );
-
-    bool createNewLabel( const VECTOR2I& aPosition, int aType,
-                        std::list<std::unique_ptr<SCH_LABEL_BASE>>& aLabelList );
+    SCH_TEXT* createNewText( const VECTOR2I& aPosition, int aType );
 
     SCH_SHEET_PIN* createNewSheetPin( SCH_SHEET* aSheet, const VECTOR2I& aPosition );
 
@@ -92,8 +88,6 @@ private:
 
     ///< Try finding any hierlabel that does not have a sheet pin associated with it
     SCH_HIERLABEL* importHierLabel( SCH_SHEET* aSheet );
-
-    std::vector<SCH_HIERLABEL*> importHierLabels( SCH_SHEET* aSheet );
 
     std::vector<PICKED_SYMBOL> m_symbolHistoryList;
     std::vector<PICKED_SYMBOL> m_powerHistoryList;

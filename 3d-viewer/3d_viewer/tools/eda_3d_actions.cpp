@@ -23,7 +23,6 @@
 #include <bitmaps.h>
 #include <3d_viewer_id.h>
 #include <3d_enums.h>
-#include <3d-viewer/3d_viewer/eda_3d_viewer_frame.h>
 #include "eda_3d_actions.h"
 #include "tool/tool_action.h"
 
@@ -39,47 +38,7 @@
 TOOL_ACTION EDA_3D_ACTIONS::controlActivate( TOOL_ACTION_ARGS()
         .Name( "3DViewer.Control" )
         .Scope( AS_GLOBAL )
-        .Flags( AF_ACTIVATE )
-        .ToolbarState( TOOLBAR_STATE::HIDDEN) );
-
-TOOL_ACTION EDA_3D_ACTIONS:: reloadBoard( TOOL_ACTION_ARGS()
-        .Name( "3DViewer.Control.reloadBoard" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Reload board" ) )
-        .Tooltip( _( "Reload board and refresh 3D view" ) )
-        .Icon( BITMAPS::import3d ) );
-
-TOOL_ACTION EDA_3D_ACTIONS::toggleRaytacing( TOOL_ACTION_ARGS()
-        .Name( "3DViewer.Control.toggleRaytacing" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Use raytracing" ) )
-        .Tooltip( _( "Render current view using Raytracing" ) )
-        .Icon( BITMAPS::ray_tracing )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE) );
-
-TOOL_ACTION EDA_3D_ACTIONS::copyToClipboard( TOOL_ACTION_ARGS()
-        .Name( "3DViewer.Control.copyToClipboard" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Copy 3D image to clipboard" ) )
-        .Tooltip( _( "Copy the current 3D image to the clipboard" ) )
-        .Icon( BITMAPS::copy )
-        .Parameter<EDA_3D_VIEWER_EXPORT_FORMAT>( EDA_3D_VIEWER_EXPORT_FORMAT::CLIPBOARD ) );
-
-TOOL_ACTION EDA_3D_ACTIONS::exportAsPNG( TOOL_ACTION_ARGS()
-        .Name( "3DViewer.Control.exportAsPNG" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Export Current View as PNG..." ) )
-        .Tooltip( _( "Export the Current View as a PNG image" ) )
-        .Icon( BITMAPS::export_png )
-        .Parameter<EDA_3D_VIEWER_EXPORT_FORMAT>( EDA_3D_VIEWER_EXPORT_FORMAT::PNG ) );
-
-TOOL_ACTION EDA_3D_ACTIONS::exportAsJPEG( TOOL_ACTION_ARGS()
-        .Name( "3DViewer.Control.exportAsJPEG" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Export Current View as JPEG..." ) )
-        .Tooltip( _( "Export the Current View as a JPEG image" ) )
-        .Icon( BITMAPS::export_file )
-        .Parameter<EDA_3D_VIEWER_EXPORT_FORMAT>( EDA_3D_VIEWER_EXPORT_FORMAT::JPEG ) );
+        .Flags( AF_ACTIVATE ) );
 
 TOOL_ACTION EDA_3D_ACTIONS::pivotCenter( TOOL_ACTION_ARGS()
         .Name( "3DViewer.Control.pivotCenter" )
@@ -198,8 +157,7 @@ TOOL_ACTION EDA_3D_ACTIONS::toggleOrtho( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Toggle Orthographic Projection" ) )
         .Tooltip( _( "Enable/disable orthographic projection" ) )
-        .Icon( BITMAPS::ortho )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Icon( BITMAPS::ortho ) );
 
 TOOL_ACTION EDA_3D_ACTIONS::viewFront( TOOL_ACTION_ARGS()
         .Name( "3DViewer.Control.viewFront" )
@@ -379,6 +337,5 @@ TOOL_ACTION EDA_3D_ACTIONS::showLayersManager( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .FriendlyName( _( "Show Appearance Manager" ) )
         .Tooltip( _( "Show/hide the appearance manager" ) )
-        .Icon( BITMAPS::layers_manager )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE ) );
+        .Icon( BITMAPS::layers_manager ) );
 

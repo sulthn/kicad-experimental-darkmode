@@ -135,6 +135,7 @@ DIALOG_PLOT::DIALOG_PLOT( PCB_EDIT_FRAME* aEditFrame, wxWindow* aParent,
     m_hash_key = TO_UTF8( GetTitle() );
 
     int                       order = 0;
+    LSET                      plotOnAllLayersSelection = m_plotOpts.GetPlotOnAllLayersSelection();
     wxArrayInt                plotAllLayersOrder;
     wxArrayString             plotAllLayersChoicesStrings;
     std::vector<PCB_LAYER_ID> layersIdChoiceList;
@@ -150,7 +151,9 @@ DIALOG_PLOT::DIALOG_PLOT( PCB_EDIT_FRAME* aEditFrame, wxWindow* aParent,
         plotAllLayersChoicesStrings.Add( layerName );
         layersIdChoiceList.push_back( layer );
 
-        if( alg::contains( m_plotOpts.GetPlotOnAllLayersSequence(), layer ) )
+        size_t size = plotOnAllLayersSelection.size();
+
+        if( ( static_cast<size_t>( layer ) <= size ) && plotOnAllLayersSelection.test( layer ) )
             plotAllLayersOrder.push_back( order );
         else
             plotAllLayersOrder.push_back( ~order );
@@ -357,8 +360,8 @@ void DIALOG_PLOT::init_Dialog()
 
     // SVG precision and units for coordinates
     m_svgPrecsision->SetValue( m_plotOpts.GetSvgPrecision() );
-    m_SVG_fitPageToBoard->SetValue( m_plotOpts.GetSvgFitPagetoBoard() );
 
+    // Option to exclude pads from silkscreen layers
     m_sketchPadsOnFabLayers->SetValue( m_plotOpts.GetSketchPadsOnFabLayers() );
     m_plotPadNumbers->SetValue( m_plotOpts.GetPlotPadNumbers() );
     m_plotPadNumbers->Enable( m_plotOpts.GetSketchPadsOnFabLayers() );
@@ -378,11 +381,17 @@ void DIALOG_PLOT::init_Dialog()
     m_hideDNP->Enable( m_plotDNP->GetValue() );
     m_crossoutDNP->Enable( m_plotDNP->GetValue() );
 
+    // Option to tent vias
     m_subtractMaskFromSilk->SetValue( m_plotOpts.GetSubtractMaskFromSilk() );
 
+    // Option to use aux origin
     m_useAuxOriginCheckBox->SetValue( m_plotOpts.GetUseAuxOrigin() );
 
+    // Option to plot page references:
     m_plotSheetRef->SetValue( m_plotOpts.GetPlotFrameRef() );
+
+    // Option to force ploting of hidden text in footprints
+    m_plotInvisibleText->SetValue( m_plotOpts.GetPlotInvisibleText() );
 
     // Options to plot pads and vias holes
     m_drillShapeOpt->SetSelection( (int) m_plotOpts.GetDrillMarksType() );
@@ -401,7 +410,7 @@ void DIALOG_PLOT::init_Dialog()
                                             == PLOT_TEXT_MODE::DEFAULT );
 
     // DXF units selection
-    m_DXF_plotUnits->SetSelection( m_plotOpts.GetDXFPlotUnits() == DXF_UNITS::INCH ? 0 : 1 );
+    m_DXF_plotUnits->SetSelection( m_plotOpts.GetDXFPlotUnits() == DXF_UNITS::INCHES ? 0 : 1 );
 
     // Plot mirror option
     m_plotMirrorOpt->SetValue( m_plotOpts.GetMirror() );
@@ -436,6 +445,7 @@ void DIALOG_PLOT::transferPlotParamsToJob()
         gJob->m_includeNetlistAttributes = m_plotOpts.GetIncludeGerberNetlistInfo();
         gJob->m_createJobsFile = m_plotOpts.GetCreateGerberJobFile();
         gJob->m_precision = m_plotOpts.GetGerberPrecision();
+        gJob->m_subtractSolderMaskFromSilk = m_plotOpts.GetSubtractMaskFromSilk();
         gJob->m_useBoardPlotParams = false;
     }
 
@@ -444,15 +454,14 @@ void DIALOG_PLOT::transferPlotParamsToJob()
         JOB_EXPORT_PCB_SVG* svgJob = static_cast<JOB_EXPORT_PCB_SVG*>( m_job );
         svgJob->m_precision = m_plotOpts.GetSvgPrecision();
         svgJob->m_genMode = JOB_EXPORT_PCB_SVG::GEN_MODE::MULTI;
-        svgJob->m_fitPageToBoard = m_plotOpts.GetSvgFitPagetoBoard();
     }
 
     if( m_job->m_plotFormat == JOB_EXPORT_PCB_PLOT::PLOT_FORMAT::DXF )
     {
         JOB_EXPORT_PCB_DXF* dxfJob = static_cast<JOB_EXPORT_PCB_DXF*>( m_job );
-        dxfJob->m_dxfUnits = m_plotOpts.GetDXFPlotUnits() == DXF_UNITS::INCH
-                                                             ? JOB_EXPORT_PCB_DXF::DXF_UNITS::INCH
-                                                             : JOB_EXPORT_PCB_DXF::DXF_UNITS::MM;
+        dxfJob->m_dxfUnits = m_plotOpts.GetDXFPlotUnits() == DXF_UNITS::INCHES
+                                     ? JOB_EXPORT_PCB_DXF::DXF_UNITS::INCHES
+                                     : JOB_EXPORT_PCB_DXF::DXF_UNITS::MILLIMETERS;
         dxfJob->m_plotGraphicItemsUsingContours = m_plotOpts.GetPlotMode() == OUTLINE_MODE::SKETCH;
         dxfJob->m_polygonMode = m_plotOpts.GetDXFPlotPolygonMode();
         dxfJob->m_genMode = JOB_EXPORT_PCB_DXF::GEN_MODE::MULTI;
@@ -477,7 +486,6 @@ void DIALOG_PLOT::transferPlotParamsToJob()
         }
     }
 
-    m_job->m_subtractSolderMaskFromSilk = m_plotOpts.GetSubtractMaskFromSilk();
     m_job->m_useDrillOrigin = m_plotOpts.GetUseAuxOrigin();
     m_job->m_crossoutDNPFPsOnFabLayers = m_plotOpts.GetCrossoutDNPFPsOnFabLayers();
     m_job->m_hideDNPFPsOnFabLayers = m_plotOpts.GetHideDNPFPsOnFabLayers();
@@ -486,12 +494,13 @@ void DIALOG_PLOT::transferPlotParamsToJob()
 
     m_job->m_plotDrawingSheet = m_plotOpts.GetPlotFrameRef();
     m_job->m_plotPadNumbers = m_plotOpts.GetPlotPadNumbers();
+    m_job->m_plotInvisibleText = m_plotOpts.GetPlotInvisibleText();
 
     m_job->m_blackAndWhite = m_plotOpts.GetBlackAndWhite();
     m_job->m_mirror = m_plotOpts.GetMirror();
     m_job->m_negative = m_plotOpts.GetNegative();
-    m_job->m_plotLayerSequence = m_plotOpts.GetLayerSelection().SeqStackupForPlotting();
-    m_job->m_plotOnAllLayersSequence = m_plotOpts.GetPlotOnAllLayersSequence();
+    m_job->m_printMaskLayer = m_plotOpts.GetLayerSelection().UIOrder();
+    m_job->m_printMaskLayersToIncludeOnAllLayers = m_plotOpts.GetPlotOnAllLayersSelection().UIOrder();
 
     if( m_job->m_plotFormat == JOB_EXPORT_PCB_PLOT::PLOT_FORMAT::SVG ||
         m_job->m_plotFormat == JOB_EXPORT_PCB_PLOT::PLOT_FORMAT::PDF )
@@ -1042,6 +1051,7 @@ void DIALOG_PLOT::applyPlotSettings()
     tempOptions.SetCrossoutDNPFPsOnFabLayers( m_plotDNP->GetValue()
                                             && m_crossoutDNP->GetValue() );
     tempOptions.SetUseAuxOrigin( m_useAuxOriginCheckBox->GetValue() );
+    tempOptions.SetPlotInvisibleText( m_plotInvisibleText->GetValue() );
     tempOptions.SetScaleSelection( m_scaleOpt->GetSelection() );
 
     int sel = m_drillShapeOpt->GetSelection();
@@ -1052,7 +1062,7 @@ void DIALOG_PLOT::applyPlotSettings()
     tempOptions.SetDXFPlotPolygonMode( m_DXF_plotModeOpt->GetValue() );
 
     sel = m_DXF_plotUnits->GetSelection();
-    tempOptions.SetDXFPlotUnits( sel == 0 ? DXF_UNITS::INCH : DXF_UNITS::MM );
+    tempOptions.SetDXFPlotUnits( sel == 0 ? DXF_UNITS::INCHES : DXF_UNITS::MILLIMETERS );
 
     if( !m_DXF_plotTextStrokeFontOpt->IsEnabled() ) // Currently, only DXF supports this option
         tempOptions.SetTextMode( PLOT_TEXT_MODE::DEFAULT );
@@ -1156,7 +1166,6 @@ void DIALOG_PLOT::applyPlotSettings()
 
     tempOptions.SetGerberPrecision( m_coordFormatCtrl->GetSelection() == 0 ? 5 : 6 );
     tempOptions.SetSvgPrecision( m_svgPrecsision->GetValue() );
-    tempOptions.SetSvgFitPageToBoard( m_SVG_fitPageToBoard->GetValue() );
 
     LSET selectedLayers;
 
@@ -1169,24 +1178,27 @@ void DIALOG_PLOT::applyPlotSettings()
     // Get a list of copper layers that aren't being used by inverting enabled layers.
     LSET disabledCopperLayers = LSET::AllCuMask() & ~m_editFrame->GetBoard()->GetEnabledLayers();
 
+    LSET plotOnAllLayers;
+
     // Add selected layers from plot on all layers list in order set by user.
-    wxArrayInt plotOnAllLayers;
-    LSEQ commonLayers;
+    wxArrayInt plotOnAllLayersSelections;
 
-    if( m_plotAllLayersList->GetCheckedItems( plotOnAllLayers ) )
+    m_plotAllLayersList->GetCheckedItems( plotOnAllLayersSelections );
+
+    size_t count = plotOnAllLayersSelections.GetCount();
+
+    for( size_t i = 0; i < count; i++ )
     {
-        size_t count = plotOnAllLayers.GetCount();
+        int index = plotOnAllLayersSelections.Item( i );
+        wxClientData* tmp = m_plotAllLayersList->GetClientObject( index );
+        PCB_LAYER_ID_CLIENT_DATA* layerId = dynamic_cast<PCB_LAYER_ID_CLIENT_DATA*>( tmp );
 
-        for( size_t i = 0; i < count; i++ )
-        {
-            int          index = plotOnAllLayers.Item( i );
-            PCB_LAYER_ID client_layer = getLayerClientData( m_plotAllLayersList, index )->Layer();
+        wxCHECK2( layerId, continue );
 
-            commonLayers.push_back( client_layer );
-        }
+        plotOnAllLayers.set( layerId->Layer() );
     }
 
-    tempOptions.SetPlotOnAllLayersSequence( commonLayers );
+    tempOptions.SetPlotOnAllLayersSelection( plotOnAllLayers );
 
     // Enable all of the disabled copper layers.
     // If someone enables more copper layers they will be selected by default.

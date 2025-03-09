@@ -41,8 +41,8 @@ class WX_HTML_REPORT_PANEL;
 
 ///////////////////////////////////////////////////////////////////////////
 
-#define ID_ALLOW_PRINT_PAD_ON_SILKSCREEN 6000
-#define ID_MIROR_OPT 6001
+#define ID_ALLOW_PRINT_PAD_ON_SILKSCREEN 1000
+#define ID_MIROR_OPT 1001
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Class DIALOG_PLOT_BASE
@@ -64,10 +64,10 @@ class DIALOG_PLOT_BASE : public DIALOG_SHIM
 		wxCheckListBox* m_layerCheckListBox;
 		wxBoxSizer* m_PlotOptionsSizer;
 		wxCheckBox* m_plotSheetRef;
-		wxCheckBox* m_subtractMaskFromSilk;
 		wxCheckBox* m_plotDNP;
 		wxRadioButton* m_hideDNP;
 		wxRadioButton* m_crossoutDNP;
+		wxCheckBox* m_plotInvisibleText;
 		wxCheckBox* m_sketchPadsOnFabLayers;
 		wxCheckBox* m_plotPadNumbers;
 		wxCheckBox* m_zoneFillCheck;
@@ -88,6 +88,7 @@ class DIALOG_PLOT_BASE : public DIALOG_SHIM
 		wxStaticBoxSizer* m_GerberOptionsSizer;
 		wxCheckBox* m_useGerberExtensions;
 		wxCheckBox* m_generateGerberJobFile;
+		wxCheckBox* m_subtractMaskFromSilk;
 		wxStaticText* coordFormatLabel;
 		wxChoice* m_coordFormatCtrl;
 		wxCheckBox* m_useGerberX2Format;
@@ -116,7 +117,6 @@ class DIALOG_PLOT_BASE : public DIALOG_SHIM
 		wxSpinCtrl* m_svgPrecsision;
 		wxStaticText* m_staticText18;
 		wxChoice* m_SVGColorChoice;
-		wxCheckBox* m_SVG_fitPageToBoard;
 		wxStaticBoxSizer* m_PDFOptionsSizer;
 		wxStaticText* m_staticText19;
 		wxChoice* m_PDFColorChoice;

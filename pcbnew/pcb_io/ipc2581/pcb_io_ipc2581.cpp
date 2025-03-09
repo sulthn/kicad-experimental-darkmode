@@ -616,6 +616,9 @@ void PCB_IO_IPC2581::addKnockoutText( wxXmlNode* aContentNode, PCB_TEXT* aText )
 void PCB_IO_IPC2581::addText( wxXmlNode* aContentNode, EDA_TEXT* aText,
                               const KIFONT::METRICS& aFontMetrics )
 {
+    if( !aText->IsVisible() )
+        return;
+
     KIGFX::GAL_DISPLAY_OPTIONS empty_opts;
     KIFONT::FONT*              font = aText->GetFont();
     TEXT_ATTRIBUTES            attrs = aText->GetAttributes();
@@ -1364,8 +1367,7 @@ wxXmlNode* PCB_IO_IPC2581::generateEcadSection()
 
     wxXmlNode* cadDataNode = appendNode( ecadNode, "CadData" );
     generateCadLayers( cadDataNode );
-    generateDrillLayers( cadDataNode );
-    generateAuxilliaryLayers( cadDataNode );
+    generateDrillLayers( cadDataNode);
     generateStackup( cadDataNode );
     generateStepSection( cadDataNode );
 
@@ -1757,136 +1759,6 @@ void PCB_IO_IPC2581::generateDrillLayers( wxXmlNode* aCadLayerNode )
 }
 
 
-void PCB_IO_IPC2581::generateAuxilliaryLayers( wxXmlNode* aCadLayerNode )
-{
-    for( BOARD_ITEM* item : m_board->Tracks() )
-    {
-        if( item->Type() != PCB_VIA_T )
-            continue;
-
-        PCB_VIA* via = static_cast<PCB_VIA*>( item );
-
-        std::vector<std::tuple<auxLayerType, PCB_LAYER_ID, PCB_LAYER_ID>> new_layers;
-
-        if( via->Padstack().IsFilled().value_or( false ) )
-        {
-            new_layers.emplace_back( auxLayerType::FILLING, via->TopLayer(), via->BottomLayer() );
-        }
-
-        if( via->Padstack().IsCapped().value_or( false ) )
-        {
-            new_layers.emplace_back( auxLayerType::CAPPING, via->TopLayer(), via->BottomLayer() );
-        }
-
-        for( PCB_LAYER_ID layer : { via->TopLayer(), via->BottomLayer() } )
-        {
-            if( via->Padstack().IsPlugged( layer ).value_or( false ) )
-            {
-                new_layers.emplace_back( auxLayerType::PLUGGING, layer, UNDEFINED_LAYER );
-            }
-
-            if( via->Padstack().IsCovered( layer ).value_or( false ) )
-            {
-                new_layers.emplace_back( auxLayerType::COVERING, layer, UNDEFINED_LAYER );
-            }
-
-            if( via->Padstack().IsTented( layer ).value_or( false ) )
-            {
-                new_layers.emplace_back( auxLayerType::TENTING, layer, UNDEFINED_LAYER );
-            }
-        }
-
-        for( auto& tuple : new_layers )
-        {
-            m_auxilliary_Layers[tuple].push_back( via );
-        }
-    }
-
-    for( const auto& [layers, vec] : m_auxilliary_Layers )
-    {
-        bool add_node = true;
-
-        wxString name;
-        wxString layerFunction;
-
-        // clang-format off: suggestion is inconsitent
-        switch( std::get<0>(layers) )
-        {
-        case auxLayerType::COVERING:
-            name = "COVERING";
-            layerFunction = "COATINGNONCOND";
-            break;
-        case auxLayerType::PLUGGING:
-            name = "PLUGGING";
-            layerFunction = "HOLEFILL";
-            break;
-        case auxLayerType::TENTING:
-            name = "TENTING";
-            layerFunction = "COATINGNONCOND";
-            break;
-        case auxLayerType::FILLING:
-            name = "FILLING";
-            layerFunction = "HOLEFILL";
-            break;
-        case auxLayerType::CAPPING:
-            name = "CAPPING";
-            layerFunction = "COATINGCOND";
-            break;
-        default:
-            add_node = false;
-            break;
-        }
-        // clang-format on: suggestion is inconsitent
-
-        if( add_node && !vec.empty() )
-        {
-            wxXmlNode* node = appendNode( aCadLayerNode, "LAYER" );
-            addAttribute( node, "layerFunction", layerFunction );
-            addAttribute( node, "polarity", "POSITIVE" );
-
-            if( std::get<2>( layers ) == UNDEFINED_LAYER )
-            {
-                addAttribute( node, "name", genLayerString( std::get<1>( layers ), TO_UTF8( name ) ) );
-                addAttribute( node, "side",
-                              IsFrontLayer( std::get<1>( layers ) ) ? "TOP" : "BOTTOM" );
-            }
-            else
-            {
-                addAttribute(
-                        node, "name",
-                        genLayersString( std::get<1>( layers ), std::get<2>( layers ), TO_UTF8( name ) ) );
-
-                const bool first_external =
-                        std::get<1>( layers ) == F_Cu || std::get<1>( layers ) == B_Cu;
-                const bool second_external =
-                        std::get<2>( layers ) == F_Cu || std::get<2>( layers ) == B_Cu;
-
-                if( first_external )
-                {
-                    if( second_external )
-                        addAttribute( node, "side", "ALL" );
-                    else
-                        addAttribute( node, "side", "FRONT" );
-                }
-                else
-                {
-                    if( second_external )
-                        addAttribute( node, "side", "BACK" );
-                    else
-                        addAttribute( node, "side", "INTERNAL" );
-                }
-
-                wxXmlNode* spanNode = appendNode( node, "SPAN" );
-                addAttribute( spanNode, "fromLayer",
-                              genLayerString( std::get<1>( layers ), "LAYER" ) );
-                addAttribute( spanNode, "toLayer",
-                              genLayerString( std::get<2>( layers ), "LAYER" ) );
-            }
-        }
-    }
-}
-
-
 void PCB_IO_IPC2581::generateStepSection( wxXmlNode* aCadNode )
 {
     wxXmlNode* stepNode = appendNode( aCadNode, "Step" );
@@ -1911,7 +1783,6 @@ void PCB_IO_IPC2581::generateStepSection( wxXmlNode* aCadNode )
 
     generateLayerFeatures( stepNode );
     generateLayerSetDrill( stepNode );
-    generateLayerSetAuxilliary( stepNode );
 }
 
 
@@ -2062,51 +1933,21 @@ void PCB_IO_IPC2581::addPadStack( wxXmlNode* aContentNode, const PCB_VIA* aVia )
 
     LSEQ layer_seq = aVia->GetLayerSet().Seq();
 
-    auto addPadShape{ [&]( PCB_LAYER_ID layer, const PCB_VIA* aVia, const wxString& name,
-                           bool drill ) -> void
-                      {
-                          PCB_SHAPE shape( nullptr, SHAPE_T::CIRCLE );
-
-                          if( drill )
-                              shape.SetEnd( { KiROUND( aVia->GetDrillValue() / 2.0 ), 0 } );
-                          else
-                              shape.SetEnd( { KiROUND( aVia->GetWidth( layer ) / 2.0 ), 0 } );
-
-                          wxXmlNode* padStackPadDefNode =
-                                  appendNode( padStackDefNode, "PadstackPadDef" );
-                          addAttribute( padStackPadDefNode, "layerRef", name );
-                          addAttribute( padStackPadDefNode, "padUse", "REGULAR" );
-
-                          addLocationNode( padStackPadDefNode, 0.0, 0.0 );
-                          addShape( padStackPadDefNode, shape );
-                      } };
-
     for( PCB_LAYER_ID layer : layer_seq )
     {
         if( !aVia->FlashLayer( layer ) || !m_board->IsLayerEnabled( layer ) )
             continue;
 
-        addPadShape( layer, aVia, m_layer_name_map[layer], false );
-    }
+        PCB_SHAPE shape( nullptr, SHAPE_T::CIRCLE );
 
-    if( aVia->Padstack().IsFilled().value_or( false ) )
-        addPadShape( UNDEFINED_LAYER, aVia,
-                     genLayersString( aVia->TopLayer(), aVia->BottomLayer(), "FILLING" ), true );
+        shape.SetEnd( { KiROUND( aVia->GetWidth( layer ) / 2.0 ), 0 } );
 
-    if( aVia->Padstack().IsCapped().value_or( false ) )
-        addPadShape( UNDEFINED_LAYER, aVia,
-                     genLayersString( aVia->TopLayer(), aVia->BottomLayer(), "CAPPING" ), true );
+        wxXmlNode* padStackPadDefNode = appendNode( padStackDefNode, "PadstackPadDef" );
+        addAttribute( padStackPadDefNode, "layerRef", m_layer_name_map[layer] );
+        addAttribute( padStackPadDefNode, "padUse", "REGULAR" );
 
-    for( PCB_LAYER_ID layer : { aVia->TopLayer(), aVia->BottomLayer() } )
-    {
-        if( aVia->Padstack().IsPlugged( layer ).value_or( false ) )
-            addPadShape( layer, aVia, genLayerString( layer, "PLUGGING" ), true );
-
-        if( aVia->Padstack().IsCovered( layer ).value_or( false ) )
-            addPadShape( layer, aVia, genLayerString( layer, "COVERING" ), false );
-
-        if( aVia->Padstack().IsTented( layer ).value_or( false ) )
-            addPadShape( layer, aVia, genLayerString( layer, "TENTING" ), false );
+        addLocationNode( padStackPadDefNode, 0.0, 0.0 );
+        addShape( padStackPadDefNode, shape );
     }
 }
 
@@ -2599,7 +2440,7 @@ void PCB_IO_IPC2581::generateComponents( wxXmlNode* aStepNode )
         PCB_FIELD* field = nullptr;
 
         if( !generate_unique )
-            field = fp->GetField( m_OEMRef );
+            field = fp->GetFieldByName( m_OEMRef );
 
         if( field && !field->GetText().empty() )
         {
@@ -3164,78 +3005,6 @@ void PCB_IO_IPC2581::generateLayerSetNet( wxXmlNode* aLayerNode, PCB_LAYER_ID aL
     }
 }
 
-void PCB_IO_IPC2581::generateLayerSetAuxilliary( wxXmlNode* aStepNode )
-{
-    int hole_count = 1;
-
-    for( const auto& [layers, vec] : m_auxilliary_Layers )
-    {
-        hole_count = 1;
-        bool add_node = true;
-
-        wxString name;
-        bool     hole = false;
-
-        // clang-format off: suggestion is inconsitent
-        switch( std::get<0>(layers) )
-        {
-        case auxLayerType::COVERING:
-            name = "COVERING";
-            break;
-        case auxLayerType::PLUGGING:
-            name = "PLUGGING";
-            hole = true;
-            break;
-        case auxLayerType::TENTING:
-            name = "TENTING";
-            break;
-        case auxLayerType::FILLING:
-            name = "FILLING";
-            hole = true;
-            break;
-        case auxLayerType::CAPPING:
-            name = "CAPPING";
-            hole = true;
-            break;
-        default:
-            add_node = false;
-            break;
-        }
-        // clang-format on: suggestion is inconsitent
-
-        if( !add_node )
-            continue;
-
-        wxXmlNode* layerNode = appendNode( aStepNode, "LayerFeature" );
-        if( std::get<2>( layers ) == UNDEFINED_LAYER )
-            layerNode->AddAttribute( "layerRef", genLayerString( std::get<1>( layers ), TO_UTF8( name ) ) );
-        else
-            layerNode->AddAttribute( "layerRef", genLayersString( std::get<1>( layers ),
-                                                                  std::get<2>( layers ), TO_UTF8( name ) ) );
-
-        for( BOARD_ITEM* item : vec )
-        {
-            if( item->Type() == PCB_VIA_T )
-            {
-                PCB_VIA* via = static_cast<PCB_VIA*>( item );
-
-                PCB_SHAPE shape( nullptr, SHAPE_T::CIRCLE );
-
-                if( hole )
-                    shape.SetEnd( { KiROUND( via->GetDrillValue() / 2.0 ), 0 } );
-                else
-                    shape.SetEnd( { KiROUND( via->GetWidth( std::get<1>( layers ) ) / 2.0 ), 0 } );
-
-                wxXmlNode* padNode = appendNode( layerNode, "Pad" );
-                addPadStack( padNode, via );
-
-                addLocationNode( padNode, 0.0, 0.0 );
-                addShape( padNode, shape );
-            }
-        }
-    }
-}
-
 
 wxXmlNode* PCB_IO_IPC2581::generateAvlSection()
 {
@@ -3265,8 +3034,8 @@ wxXmlNode* PCB_IO_IPC2581::generateAvlSection()
         wxXmlNode* part = appendNode( avl, "AvlItem" );
         addAttribute( part,  "OEMDesignNumber", genString( name, "REF" ) );
 
-        PCB_FIELD* nums[2] = { fp->GetField( m_mpn ), fp->GetField( m_distpn ) };
-        PCB_FIELD* company[2] = { fp->GetField( m_mfg ), nullptr };
+        PCB_FIELD* nums[2] = { fp->GetFieldByName( m_mpn ), fp->GetFieldByName( m_distpn ) };
+        PCB_FIELD* company[2] = { fp->GetFieldByName( m_mfg ), nullptr };
         wxString company_name[2] = { m_mfg, m_dist };
 
         for ( int ii = 0; ii < 2; ++ii )

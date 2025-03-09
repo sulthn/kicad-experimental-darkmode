@@ -157,8 +157,7 @@ wxString GbrMakeProjectGUIDfromString( const wxString& aText )
 
 
 std::string GBR_APERTURE_METADATA::FormatAttribute( GBR_APERTURE_ATTRIB aAttribute,
-                                                    bool                aUseX1StructuredComment,
-                                                    const std::string&  aCustomAttribute )
+                                                    bool aUseX1StructuredComment )
 {
     std::string attribute_string;   // the specific aperture attribute (TA.xxx)
     std::string comment_string;     // a optional G04 comment line to write before the TA. line
@@ -322,9 +321,7 @@ std::string GBR_APERTURE_METADATA::FormatAttribute( GBR_APERTURE_ATTRIB aAttribu
         attribute_string = "TA.AperFunction,ComponentOutline,Courtyard";
         break;
 
-    case GBR_APERTURE_ATTRIB_OTHER:
-        attribute_string = "TA.AperFunction,Other," + aCustomAttribute;
-        break;
+    break;
     }
 
     std::string full_attribute_string;

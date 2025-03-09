@@ -70,12 +70,10 @@ DIALOG_GIT_REPOSITORY::DIALOG_GIT_REPOSITORY( wxWindow* aParent, git_repository*
         updateURLData();
 
     SetupStandardButtons();
-    Layout();
-    finishDialogSettings();
-
     updateAuthControls();
-}
 
+    Layout();
+}
 
 DIALOG_GIT_REPOSITORY::~DIALOG_GIT_REPOSITORY()
 {
@@ -162,7 +160,6 @@ void DIALOG_GIT_REPOSITORY::SetEncrypted( bool aEncrypted )
         m_txtPassword->Disable();
     }
 }
-
 
 std::tuple<bool,wxString,wxString,wxString> DIALOG_GIT_REPOSITORY::isValidHTTPS( const wxString& url )
 {
@@ -334,8 +331,7 @@ void DIALOG_GIT_REPOSITORY::OnTestClick( wxCommandEvent& event )
     git_remote_disconnect( remote );
     git_remote_free( remote );
 
-    auto dlg = wxMessageDialog( this, wxEmptyString, _( "Test Connection" ),
-                                wxOK | wxICON_INFORMATION );
+    auto dlg = wxMessageDialog( this, wxEmptyString, _( "Test connection" ), wxOK | wxICON_INFORMATION );
 
     if( !m_failedTest )
     {
@@ -343,8 +339,7 @@ void DIALOG_GIT_REPOSITORY::OnTestClick( wxCommandEvent& event )
     }
     else
     {
-        dlg.SetMessage( wxString::Format( _( "Could not connect to '%s' " ),
-                                          m_txtURL->GetValue() ) );
+        dlg.SetMessage( wxString::Format( _( "Could not connect to '%s' " ), m_txtURL->GetValue() ) );
         dlg.SetExtendedMessage( m_testError );
     }
 
@@ -440,26 +435,28 @@ void DIALOG_GIT_REPOSITORY::updateAuthControls()
 {
     if( m_ConnType->GetSelection() == static_cast<int>( KIGIT_COMMON::GIT_CONN_TYPE::GIT_CONN_LOCAL ) )
     {
-        m_panelAuth->Enable( false );
+        m_panelAuth->Show( false );
     }
     else
     {
-        m_panelAuth->Enable( true );
+        m_panelAuth->Show( true );
 
         if( m_ConnType->GetSelection() == static_cast<int>( KIGIT_COMMON::GIT_CONN_TYPE::GIT_CONN_SSH ) )
         {
-            m_fpSSHKey->Enable( true );
-            m_labelSSH->Enable( true );
-            m_labelPass1->SetLabel( _( "SSH key password:" ) );
+            m_fpSSHKey->Show( true );
+            m_labelSSH->Show( true );
+            m_labelPass1->SetLabel( _( "SSH Key Password" ) );
         }
         else
         {
-            m_fpSSHKey->Enable( false );
-            m_labelSSH->Enable( false );
-            m_labelPass1->SetLabel( _( "Password:" ) );
+            m_fpSSHKey->Show( false );
+            m_labelSSH->Show( false );
+            m_labelPass1->SetLabel( _( "Password" ) );
             setDefaultSSHKey();
         }
     }
+
+    Layout();
 }
 
 

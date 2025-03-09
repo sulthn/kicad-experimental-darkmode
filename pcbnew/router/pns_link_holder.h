@@ -33,8 +33,7 @@ namespace PNS
 class LINK_HOLDER : public ITEM
 {
 public:
-    LINK_HOLDER( PnsKind aKind ) :
-        ITEM( aKind )
+    LINK_HOLDER( PnsKind aKind ) : ITEM( aKind )
     {}
 
     ///< Add a reference to an item registered in a #NODE that is a part of this line.
@@ -72,7 +71,6 @@ public:
     {
         if( aIndex < 0 )
             aIndex += m_links.size();
-
         return m_links[aIndex];
     }
 

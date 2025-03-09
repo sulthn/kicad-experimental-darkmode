@@ -222,7 +222,7 @@ void DIALOG_RESCUE_EACH::PopulateInstanceList()
         if( eachSymbol->GetLibId().Format() != UTF8( selected_part.GetRequestedName() ) )
             continue;
 
-        SCH_FIELD* valueField = eachSymbol->GetField( FIELD_T::VALUE );
+        SCH_FIELD* valueField = eachSymbol->GetField( VALUE_FIELD );
 
         data.clear();
         data.push_back( eachSymbol->GetRef( m_currentSheet ) );

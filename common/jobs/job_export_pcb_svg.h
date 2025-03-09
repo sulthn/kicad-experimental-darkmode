@@ -35,7 +35,7 @@ public:
     wxString GetDefaultDescription() const override;
     wxString GetSettingsDialogTitle() const override;
 
-    bool         m_fitPageToBoard;
+    int m_pageSizeMode;
     unsigned int m_precision;
 
     enum class GEN_MODE

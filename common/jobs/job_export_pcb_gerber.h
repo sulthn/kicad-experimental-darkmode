@@ -35,6 +35,7 @@ public:
     wxString GetDefaultDescription() const override;
     wxString GetSettingsDialogTitle() const override;
 
+    bool m_subtractSolderMaskFromSilk;
     bool m_includeNetlistAttributes;
     bool m_useX2Format;
     bool m_disableApertureMacros;

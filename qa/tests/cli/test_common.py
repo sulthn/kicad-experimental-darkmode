@@ -25,29 +25,30 @@ import utils
 import re
 
 def test_version():
-    command = [utils.kicad_cli(), "version"]
+    command = ["kicad-cli", "version"]
     stdout, stderr, exitcode = utils.run_and_capture(command)
     assert exitcode == 0
     assert re.match("\\d+.\\d+.\\d+", stdout)
     assert stderr == ''
 
 def test_version_plain():
-    command = [utils.kicad_cli(), "version", "--format=plain"]
+    command = ["kicad-cli", "version", "--format=plain"]
     stdout, stderr, exitcode = utils.run_and_capture(command)
     assert exitcode == 0
     assert re.match("\\d+.\\d+.\\d+", stdout)
     assert stderr == ''
 
 def test_version_commit():
-    command = [utils.kicad_cli(), "version", "--format=commit"]
+    command = ["kicad-cli", "version", "--format=commit"]
     stdout, stderr, exitcode = utils.run_and_capture(command)
     assert exitcode == 0
     assert re.match("\\b[0-9a-f]{40}\\b", stdout)
     assert stderr == ''
 
 def test_help():
-    command = [utils.kicad_cli(), "help"]
+    command = ["kicad-cli", "help"]
     stdout, stderr, exitcode = utils.run_and_capture(command)
     assert exitcode == 1
     assert stdout != ''
     assert stderr == ''
+    

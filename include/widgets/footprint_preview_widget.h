@@ -31,8 +31,6 @@
 class FOOTPRINT_PREVIEW_PANEL_BASE;
 class FOOTPRINT;
 class KIWAY;
-class TOOL_DISPATCHER;
-class EDA_DRAW_PANEL_GAL;
 class wxStaticText;
 class wxSizer;
 
@@ -143,9 +141,9 @@ public:
     virtual void RefreshAll() = 0;
 
     /**
-     * Get the GAL canvas.
+     * Get the underlying wxWindow.
      */
-    virtual EDA_DRAW_PANEL_GAL* GetCanvas() = 0;
+    virtual wxWindow* GetWindow() = 0;
 
     /**
      * Get the colors to use in a preview widget to match the preview panel.

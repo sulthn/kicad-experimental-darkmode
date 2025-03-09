@@ -31,25 +31,30 @@
 #include <sch_item.h>
 #include <template_fieldnames.h>
 #include <general.h>
-#include <string_utils.h>
 #include "scintilla_tricks.h"
 
 class SCH_EDIT_FRAME;
-class SCH_TEXT;
 
 
+/**
+ * Instances are attached to a symbol or sheet and provide a place for the symbol's value,
+ * reference designator, footprint, , a sheet's name, filename, and user definable name-value
+ * pairs of arbitrary purpose.
+ *
+ *  - Field 0 is reserved for the symbol reference.
+ *  - Field 1 is reserved for the symbol value.
+ *  - Field 2 is reserved for the symbol footprint.
+ *  - Field 3 is reserved for the symbol data sheet file.
+ *  - Field 4 and higher are user definable.
+ */
 class SCH_FIELD : public SCH_ITEM, public EDA_TEXT
 {
 public:
-    SCH_FIELD();    // For std::map::operator[]
-
-    SCH_FIELD( const VECTOR2I& aPos, FIELD_T aFieldId, SCH_ITEM* aParent,
+    SCH_FIELD( const VECTOR2I& aPos, int aFieldId, SCH_ITEM* aParent,
                const wxString& aName = wxEmptyString );
 
-    SCH_FIELD( SCH_ITEM* aParent, FIELD_T aFieldId = FIELD_T::USER,
+    SCH_FIELD( SCH_ITEM* aParent, int aFieldId = INVALID_FIELD,
                const wxString& aName = wxEmptyString );
-
-    SCH_FIELD( SCH_TEXT* aText );
 
     SCH_FIELD( const SCH_FIELD& aText );
 
@@ -75,13 +80,13 @@ public:
 
         for( KICAD_T scanType : aScanTypes )
         {
-            if( scanType == SCH_FIELD_LOCATE_REFERENCE_T && m_id == FIELD_T::REFERENCE )
+            if( scanType == SCH_FIELD_LOCATE_REFERENCE_T && m_id == REFERENCE_FIELD )
                 return true;
-            else if ( scanType == SCH_FIELD_LOCATE_VALUE_T && m_id == FIELD_T::VALUE )
+            else if ( scanType == SCH_FIELD_LOCATE_VALUE_T && m_id == VALUE_FIELD )
                 return true;
-            else if ( scanType == SCH_FIELD_LOCATE_FOOTPRINT_T && m_id == FIELD_T::FOOTPRINT )
+            else if ( scanType == SCH_FIELD_LOCATE_FOOTPRINT_T && m_id == FOOTPRINT_FIELD )
                 return true;
-            else if ( scanType == SCH_FIELD_LOCATE_DATASHEET_T && m_id == FIELD_T::DATASHEET )
+            else if ( scanType == SCH_FIELD_LOCATE_DATASHEET_T && m_id == DATASHEET_FIELD )
                 return true;
         }
 
@@ -95,18 +100,16 @@ public:
 
     bool IsHypertext() const override
     {
-        if( m_id == FIELD_T::INTERSHEET_REFS )
-            return true;
-
-        return IsURL( GetShownText( false ) );
+        return GetCanonicalName() == wxT( "Intersheetrefs" );
     }
 
     void DoHypertextAction( EDA_DRAW_FRAME* aFrame ) const override;
 
     /**
-     * Return the field name (not translated).
+     * Return the field name (not translated)..
      *
-     * @param aUseDefaultName If true return the default field name if the field name is empty.
+     * @param aUseDefaultName When true return the default field name if the field name is
+     *                        empty.  Otherwise the default field name is returned.
      * @return the name of the field.
      */
     wxString GetName( bool aUseDefaultName = true ) const;
@@ -121,22 +124,23 @@ public:
 
     void SetText( const wxString& aText ) override;
 
-    FIELD_T GetId() const { return m_id; }
+    /**
+     * Get the initial name of the field set at creation (or set by SetName()).
+     *
+     * This is the raw field name with no translation and no change.
+     */
+    const wxString& GetInternalName() { return m_name; }
 
-    int GetOrdinal() const
-    {
-        return IsMandatory() ? (int) m_id : m_ordinal;
-    }
-    void SetOrdinal( int aOrdinal )
-    {
-        m_id = FIELD_T::USER;
-        m_ordinal = aOrdinal;
-    }
+    int GetId() const { return m_id; }
+
+    void SetId( int aId );
 
     /**
-     * Get the field's name as displayed on the schematic or in the symbol fields table. This is
-     * either the same as GetName() or if the field has a variable for name, the variable name
-     * with the ${} stripped.
+     * Get the fields name as displayed on the schematic or
+     * in the symbol fields table.
+     *
+     * This is either the same as GetName() or if the field has a variable for name, the
+     * variable name with the ${} stripped.
      */
     wxString GetShownName() const;
     wxString GetShownText( const SCH_SHEET_PATH* aPath, bool aAllowExtraText,
@@ -273,6 +277,9 @@ public:
     bool HitTest( const VECTOR2I& aPosition, int aAccuracy = 0 ) const override;
     bool HitTest( const BOX2I& aRect, bool aContained, int aAccuracy = 0 ) const override;
 
+    void Print( const SCH_RENDER_SETTINGS* aSettings, int aUnit, int aBodyStyle,
+                const VECTOR2I& aOffset, bool aForceNoFill, bool aDimmed ) override;
+
     void Plot( PLOTTER* aPlotter, bool aBackground, const SCH_PLOT_OPTS& aPlotOpts,
                int aUnit, int aBodyStyle, const VECTOR2I& aOffset, bool aDimmed ) override;
 
@@ -310,8 +317,6 @@ public:
 #endif
 
 protected:
-    friend class SCH_IO_KICAD_SEXPR_PARSER;
-
     KIFONT::FONT* getDrawFont() const override;
 
     const KIFONT::METRICS& getFontMetrics() const override { return GetFontMetrics(); }
@@ -330,11 +335,9 @@ protected:
      */
     int compare( const SCH_ITEM& aOther, int aCompareFlags = 0 ) const override;
 
-    void setId( FIELD_T aId );
-
 private:
-    FIELD_T  m_id;              ///< Field id, @see enum FIELD_T
-    int      m_ordinal;         ///< Sort order for non-mandatory fields
+    int      m_id;         ///< Field index, @see enum MANDATORY_FIELD_T
+
     wxString m_name;
 
     bool     m_showName;        ///< Render the field name in addition to its value
@@ -351,107 +354,6 @@ private:
 
     mutable COLOR4D                                     m_lastResolvedColor;
 };
-
-
-inline int NextFieldOrdinal( const std::vector<SCH_FIELD>& aFields )
-{
-    int ordinal = 42;     // Arbitrarily larger than any mandatory FIELD_T id
-
-    for( const SCH_FIELD& field : aFields )
-        ordinal = std::max( ordinal, field.GetOrdinal() + 1 );
-
-    return ordinal;
-}
-
-
-inline const SCH_FIELD* FindField( const std::vector<SCH_FIELD>& aFields, FIELD_T aFieldId )
-{
-    for( const SCH_FIELD& field : aFields )
-    {
-        if( field.GetId() == aFieldId )
-            return &field;
-    }
-
-    return nullptr;
-}
-
-
-inline SCH_FIELD* FindField( std::vector<SCH_FIELD>& aFields, FIELD_T aFieldId )
-{
-    auto& constFields = const_cast<const std::vector<SCH_FIELD>&>( aFields );
-    return const_cast<SCH_FIELD*>( FindField( constFields, aFieldId ) );
-}
-
-
-inline const SCH_FIELD* FindField( const std::vector<SCH_FIELD>& aFields,
-                                   const wxString& aFieldName )
-{
-    for( const SCH_FIELD& field : aFields )
-    {
-        if( field.GetName() == aFieldName )
-            return &field;
-    }
-
-    return nullptr;
-}
-
-
-inline SCH_FIELD* FindField( std::vector<SCH_FIELD>& aFields, const wxString& aFieldName )
-{
-    auto& constFields = const_cast<const std::vector<SCH_FIELD>&>( aFields );
-    return const_cast<SCH_FIELD*>( FindField( constFields, aFieldName ) );
-}
-
-
-inline wxString GetFieldValue( const std::vector<SCH_FIELD>* aFields, FIELD_T aFieldType )
-{
-    if( !aFields )
-        return wxEmptyString;
-
-    if( const SCH_FIELD* field = FindField( *aFields, aFieldType ) )
-        return field->GetText();
-
-    return wxEmptyString;
-}
-
-
-inline std::string GetFieldValue( const std::vector<SCH_FIELD>* aFields,
-                                  const wxString& aFieldName, bool aResolve = false )
-{
-    if( !aFields )
-        return "";
-
-    if( const SCH_FIELD* field = FindField( *aFields, aFieldName ) )
-        return ( aResolve ? field->GetShownText( false ) : field->GetText() ).ToStdString();
-
-    return "";
-}
-
-
-inline void SetFieldValue( std::vector<SCH_FIELD>& aFields, const wxString& aFieldName,
-                           const std::string& aValue, bool aIsVisible = true )
-{
-    if( aValue == "" )
-    {
-        alg::delete_if( aFields, [&]( const SCH_FIELD& field )
-                                 {
-                                     return field.GetName() == aFieldName;
-                                 } );
-        return;
-    }
-
-    if( SCH_FIELD* field = FindField( aFields, aFieldName ) )
-    {
-        field->SetText( aValue );
-        return;
-    }
-
-    SCH_ITEM* parent = static_cast<SCH_ITEM*>( aFields.at( 0 ).GetParent() );
-    aFields.emplace_back( VECTOR2I(), FIELD_T::USER, parent, aFieldName );
-    aFields.back().SetText( aValue );
-    aFields.back().SetVisible( aIsVisible );
-}
-
 
 
 #endif /* CLASS_SCH_FIELD_H */

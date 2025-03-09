@@ -74,16 +74,6 @@ SCHEMATIC::SCHEMATIC( PROJECT* aPrj ) :
 
                 wxString newValue = aItem->Get<wxString>( aProperty );
 
-                if( field->GetId() == FIELD_T::REFERENCE )
-                {
-                    symbol->SetRef( &sheetPath, newValue );
-
-                    // The user might want to change all the units to the new ref.  Or they
-                    // might not.  Since we have no way of knowing, we default to the most
-                    // concrete action (change only the selected reference).
-                    return;
-                }
-
                 wxString ref = symbol->GetRef( &sheetPath );
                 int      unit = symbol->GetUnit();
                 LIB_ID   libId = symbol->GetLibId();
@@ -98,14 +88,30 @@ SCHEMATIC::SCHEMATIC( PROJECT* aPrj ) :
                     {
                         switch( field->GetId() )
                         {
-                        case FIELD_T::VALUE:
-                        case FIELD_T::FOOTPRINT:
-                        case FIELD_T::DATASHEET:
+                        case VALUE_FIELD:
                         {
                             if( aCommit )
                                 aCommit->Modify( otherUnit, sheet.LastScreen() );
 
-                            otherUnit->GetField( field->GetId() )->SetText( newValue );
+                            otherUnit->SetValueFieldText( newValue );
+                            break;
+                        }
+
+                        case FOOTPRINT_FIELD:
+                        {
+                            if( aCommit )
+                                aCommit->Modify( otherUnit, sheet.LastScreen() );
+
+                            otherUnit->SetFootprintFieldText( newValue );
+                            break;
+                        }
+
+                        case DATASHEET_FIELD:
+                        {
+                            if( aCommit )
+                                aCommit->Modify( otherUnit, sheet.LastScreen() );
+
+                            otherUnit->GetField( DATASHEET_FIELD )->SetText( newValue );
                             break;
                         }
 
