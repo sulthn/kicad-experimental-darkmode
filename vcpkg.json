@@ -18,7 +18,7 @@
     "boost-test",
     "boost-uuid",
     "cairo",
-    "wxwidgets",
+    "wxwidgets-dev",
     "glew",
     "curl",
     {
@@ -41,7 +41,6 @@
     },
     "icu",
     "ngspice",
-    "wxpython",
     {
       "name": "libgit2",
       "features": [ "ssh", "winhttp" ]
@@ -61,12 +60,8 @@
       "version": "3.11.5#0"
     },
     {
-      "name": "wxwidgets",
-      "version": "3.2.6#2"
-    },
-    {
-      "name": "wxpython",
-      "version": "4.2.2#2"
+      "name": "wxwidgets-dev",
+      "version": "3.3.0#6"
     },
     {
       "name": "ngspice",
