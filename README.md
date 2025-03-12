@@ -2,6 +2,8 @@
 
 This repo uses [`MSWEnableDarkMode()`](https://forum.wxwidgets.org/latest/classwx_app.html#af8c93d7e3345e62a58325f3ab1d158d6) from wxWidgets 3.3.0 (experimental) to enable dark mode on Windows.
 
+## THIS WILL BREAK wxPython
+
 # KiCad README
 
 For specific documentation about [building KiCad](https://dev-docs.kicad.org/en/build/), policies
