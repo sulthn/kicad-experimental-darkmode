@@ -184,6 +184,11 @@ struct APP_SINGLE_TOP : public wxApp
         if( !KIPLATFORM::APP::Init() )
             return false;
 
+#ifdef __WXMSW__
+        // This forces dark mode.
+        MSWEnableDarkMode(DarkMode_Always);
+#endif
+
 #ifndef DEBUG
         // Enable logging traces to the console in release build.
         // This is usually disabled, but it can be useful for users to run to help
